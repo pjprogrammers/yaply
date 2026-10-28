@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-background: #100D18;
+  --brand-surface: #191424;
+  --brand-surface-raised: #231C32;
+  --brand-surface-hover: #2D2440;
+  --brand-border: #382D4B;
+  --brand-text: #F7F4FC;
+  --brand-text-secondary: #B9B0C9;
+  --brand-text-muted: #898097;
+  --brand-violet: #9B6DFF;
+  --brand-violet-bright: #B69AFF;
+  --brand-coral: #FF6B70;
+  --brand-blue: #65A8FF;
+  --brand-yellow: #FFD66B;
+  --brand-green: #54D6A0;
+  --brand-danger: #FF647C;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: radial-gradient(ellipse 140% 90% at 50% 0%, #1F1930 0%, var(--brand-background) 45%, #080510 100%);
+  color: var(--brand-text);
+  min-height: 100vh;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-plus-jakarta), var(--font-inter), sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
