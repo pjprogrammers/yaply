@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Yaply">
+  <rect width="64" height="64" rx="12" fill="#1423b8" />
+  <path d="M14 15h10.4l7.6 12.6L39.6 15H50L36.8 37.4V51h-9.6V37.4L14 15Z" fill="#f7dd47" />
+  <rect x="46" y="45" width="7" height="7" fill="#070707" />
+</svg>

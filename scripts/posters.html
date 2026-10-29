@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Yaply poster sheet</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #222; }
+  body { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; }
+  .poster {
+    flex: none;
+    position: relative;
+    width: 900px;
+    height: 1200px;
+    overflow: hidden;
+    font-family: "Lato", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    isolation: isolate;
+  }
+  .poster .brand {
+    position: absolute;
+    top: 48px;
+    left: 58px;
+    font-size: 23px;
+    letter-spacing: 0.22em;
+    line-height: 1;
+  }
+  .poster .tag {
+    position: absolute;
+    bottom: 50px;
+    right: 58px;
+    font-size: 15px;
+    letter-spacing: 0.2em;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .poster .rule {
+    position: absolute;
+    top: 84px;
+    left: 58px;
+    right: 58px;
+    height: 5px;
+  }
+  .poster .title {
+    position: absolute;
+    left: 52px;
+    bottom: 126px;
+    margin: 0;
+    font-size: 178px;
+    line-height: 0.82;
+    text-transform: uppercase;
+    letter-spacing: -0.06em;
+  }
+  .poster .title.small { font-size: 150px; }
+  .poster .title.tiny { font-size: 128px; }
+  .poster .sub {
+    position: absolute;
+    left: 58px;
+    bottom: 78px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    line-height: 1;
+  }
+
+  /* chain */
+  #poster-chain { background: #1423b8; color: #ffffff; }
+  #poster-chain .rule { background: #f7dd47; }
+  #poster-chain .orbital {
+    position: absolute;
+    top: -92px;
+    right: -104px;
+    width: 620px;
+    height: 620px;
+    transform: rotate(-14deg);
+  }
+  #poster-chain .badge {
+    position: absolute;
+    top: 166px;
+    right: 86px;
+    width: 178px;
+    height: 178px;
+    border-radius: 50%;
+    background: #f7dd47;
+    color: #1423b8;
+    display: grid;
+    place-items: center;
+    font-size: 44px;
+    letter-spacing: -0.06em;
+    transform: rotate(8deg);
+  }
+
+  /* skribbl */
+  #poster-skribbl { background: #f7dd47; color: #0a0a0a; }
+  #poster-skribbl .rule { background: #0a0a0a; }
+  #poster-skribbl .canvas {
+    position: absolute;
+    top: 132px;
+    right: 58px;
+    width: 540px;
+    height: 408px;
+    background: #fffdf2;
+    transform: rotate(3.5deg);
+    border: 12px solid #0a0a0a;
+  }
+  #poster-skribbl .canvas svg { width: 100%; height: 100%; display: block; }
+  #poster-skribbl .pencil {
+    position: absolute;
+    top: 474px;
+    right: 46px;
+    width: 340px;
+    height: 44px;
+    background: #e9479f;
+    transform: rotate(-21deg);
+    border: 10px solid #0a0a0a;
+  }
+  #poster-skribbl .pencil::after {
+    content: "";
+    position: absolute;
+    right: -72px;
+    top: -10px;
+    width: 0;
+    height: 0;
+    border-top: 22px solid transparent;
+    border-bottom: 22px solid transparent;
+    border-left: 62px solid #0a0a0a;
+  }
+  #poster-skribbl .blob {
+    position: absolute;
+    top: 126px;
+    left: 56px;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: #e9479f;
+  }
+
+  /* ludo */
+  #poster-ludo { background: #e9479f; color: #0a0a0a; }
+  #poster-ludo .rule { background: #0a0a0a; }
+  #poster-ludo .board {
+    position: absolute;
+    top: 88px;
+    right: 50px;
+    width: 590px;
+    height: 590px;
+    transform: rotate(9deg);
+  }
+  #poster-ludo .die {
+    position: absolute;
+    top: 206px;
+    left: 56px;
+    width: 160px;
+    height: 160px;
+    background: #fffdf2;
+    border: 12px solid #0a0a0a;
+    transform: rotate(-12deg);
+  }
+  #poster-ludo .die i {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0a0a0a;
+  }
+  #poster-ludo .die i:nth-child(1) { top: 26px; left: 26px; }
+  #poster-ludo .die i:nth-child(2) { top: 26px; right: 26px; }
+  #poster-ludo .die i:nth-child(3) { top: 56px; left: 56px; }
+  #poster-ludo .die i:nth-child(4) { bottom: 26px; left: 26px; }
+  #poster-ludo .die i:nth-child(5) { bottom: 26px; right: 26px; }
+
+  /* spy */
+  #poster-spy { background: #070707; color: #ffffff; }
+  #poster-spy .rule { background: #f7dd47; }
+  #poster-spy .lens {
+    position: absolute;
+    top: 84px;
+    right: 54px;
+    width: 520px;
+    height: 520px;
+  }
+  #poster-spy .title span { color: #e9479f; }
+  #poster-spy .strip {
+    position: absolute;
+    top: 330px;
+    left: -90px;
+    width: 760px;
+    height: 26px;
+    background: #f7dd47;
+    transform: rotate(-18deg);
+  }
+
+  /* karts */
+  #poster-karts { background: #1fc27a; color: #0a0a0a; }
+  #poster-karts .rule { background: #0a0a0a; }
+  #poster-karts .speed {
+    position: absolute;
+    top: 136px;
+    left: 0;
+    right: 0;
+    height: 380px;
+    overflow: hidden;
+  }
+  #poster-karts .speed i {
+    position: absolute;
+    display: block;
+    height: 18px;
+    background: #0a0a0a;
+    transform: skewX(-28deg);
+  }
+  #poster-karts .kart {
+    position: absolute;
+    top: 296px;
+    right: 28px;
+    width: 560px;
+    height: 300px;
+    transform: rotate(-6deg);
+  }
+  #poster-karts .checker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58px;
+    background-image:
+      linear-gradient(45deg, #0a0a0a 25%, transparent 25%, transparent 75%, #0a0a0a 75%),
+      linear-gradient(45deg, #0a0a0a 25%, transparent 25%, transparent 75%, #0a0a0a 75%);
+    background-size: 58px 58px;
+    background-position: 0 0, 29px 29px;
+    opacity: 0.18;
+  }
+
+  /* og */
+  #og {
+    flex: none;
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background: #1423b8;
+    border: 14px solid #f7dd47;
+    font-family: "Lato", "Helvetica Neue", Arial, sans-serif;
+    color: #ffffff;
+  }
+  #og .brand {
+    position: absolute;
+    top: 42px;
+    left: 54px;
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+  }
+  #og h1 {
+    position: absolute;
+    left: 50px;
+    top: 126px;
+    margin: 0;
+    width: 720px;
+    font-size: 104px;
+    line-height: 0.88;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    text-transform: uppercase;
+  }
+  #og p {
+    position: absolute;
+    left: 56px;
+    bottom: 70px;
+    margin: 0;
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  #og .deck {
+    position: absolute;
+    right: -44px;
+    top: 52px;
+    width: 480px;
+    height: 560px;
+  }
+  #og .deck img {
+    position: absolute;
+    width: 260px;
+    height: 347px;
+    object-fit: cover;
+    border: 8px solid #0a0a0a;
+  }
+  #og .deck img:nth-child(1) { left: 8px; top: 156px; transform: rotate(-14deg); }
+  #og .deck img:nth-child(2) { left: 120px; top: 92px; transform: rotate(-5deg); }
+  #og .deck img:nth-child(3) { left: 236px; top: 116px; transform: rotate(9deg); }
+  #og .stamp {
+    position: absolute;
+    left: 56px;
+    bottom: 128px;
+    display: inline-block;
+    background: #f7dd47;
+    color: #0a0a0a;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    padding: 12px 18px;
+  }
+</style>
+</head>
+<body>
+
+<div class="poster" id="poster-chain">
+  <span class="brand">YAPLY</span>
+  <span class="rule"></span>
+  <svg class="orbital" viewBox="0 0 620 620" aria-hidden="true">
+    <g fill="none" stroke="#f7dd47" stroke-width="9">
+      <circle cx="310" cy="310" r="212"/>
+      <circle cx="310" cy="310" r="128"/>
+      <path d="M98 310h424M310 98v424M160 160l300 300M460 160L160 460"/>
+    </g>
+    <g fill="#f7dd47">
+      <circle cx="98" cy="310" r="36"/>
+      <circle cx="310" cy="98" r="27"/>
+      <circle cx="522" cy="310" r="48"/>
+      <circle cx="310" cy="522" r="31"/>
+      <circle cx="460" cy="160" r="22"/>
+      <circle cx="160" cy="460" r="22"/>
+    </g>
+    <g fill="#0a0a0a">
+      <circle cx="98" cy="310" r="14"/>
+      <circle cx="522" cy="310" r="18"/>
+      <circle cx="310" cy="522" r="12"/>
+    </g>
+  </svg>
+  <span class="badge">4P</span>
+  <h2 class="title">Chain<br>Reaction</h2>
+  <span class="sub">STRATEGY &nbsp;/&nbsp; LAST ONE STANDING</span>
+  <span class="tag">PLAY WITH FRIENDS</span>
+</div>
+
+<div class="poster" id="poster-skribbl">
+  <span class="brand">YAPLY</span>
+  <span class="rule"></span>
+  <span class="blob"></span>
+  <div class="canvas">
+    <svg viewBox="0 0 540 408" aria-hidden="true">
+      <path d="M54 300c48-4 54-116 106-120 54-5 40 102 92 104 55 2 35-154 96-158 44-3 46 68 82 74 32 5 54-18 64-34"
+        fill="none" stroke="#e9479f" stroke-width="20" stroke-linecap="round"/>
+      <path d="M70 84h110M70 118h62" stroke="#0a0a0a" stroke-width="13" stroke-linecap="round"/>
+      <circle cx="420" cy="138" r="38" fill="#1423b8"/>
+      <path d="M352 236l60 34-60 34z" fill="#0a0a0a"/>
+    </svg>
+  </div>
+  <div class="pencil"></div>
+  <h2 class="title">Skribbl</h2>
+  <span class="sub">DRAW &nbsp;/&nbsp; GUESS &nbsp;/&nbsp; LAUGH</span>
+  <span class="tag">PLAY WITH FRIENDS</span>
+</div>
+
+<div class="poster" id="poster-ludo">
+  <span class="brand">YAPLY</span>
+  <span class="rule"></span>
+  <svg class="board" viewBox="0 0 590 590" aria-hidden="true">
+    <g transform="rotate(0 295 295)">
+      <rect x="38" y="38" width="514" height="514" fill="#fffdf2" stroke="#0a0a0a" stroke-width="12"/>
+      <rect x="38" y="38" width="171" height="171" fill="#1423b8" stroke="#0a0a0a" stroke-width="10"/>
+      <rect x="381" y="38" width="171" height="171" fill="#f7dd47" stroke="#0a0a0a" stroke-width="10"/>
+      <rect x="38" y="381" width="171" height="171" fill="#1fc27a" stroke="#0a0a0a" stroke-width="10"/>
+      <rect x="381" y="381" width="171" height="171" fill="#e9479f" stroke="#0a0a0a" stroke-width="10"/>
+      <path d="M209 209h172v172H209z" fill="#0a0a0a"/>
+      <path d="M238 238h114v114H238z" fill="#fffdf2"/>
+      <g fill="#0a0a0a">
+        <circle cx="124" cy="124" r="30"/><circle cx="466" cy="124" r="30"/>
+        <circle cx="124" cy="466" r="30"/><circle cx="466" cy="466" r="30"/>
+      </g>
+      <g fill="#fffdf2">
+        <circle cx="124" cy="124" r="14"/><circle cx="466" cy="124" r="14"/>
+        <circle cx="124" cy="466" r="14"/><circle cx="466" cy="466" r="14"/>
+      </g>
+      <g stroke="#0a0a0a" stroke-width="8">
+        <path d="M209 124h172M209 466h172M124 209v172M466 209v172"/>
+      </g>
+    </g>
+  </svg>
+  <div class="die"><i></i><i></i><i></i><i></i><i></i></div>
+  <h2 class="title">Ludo</h2>
+  <span class="sub">CLASSIC BOARD &nbsp;/&nbsp; FOUR FRIENDS</span>
+  <span class="tag">PLAY WITH FRIENDS</span>
+</div>
+
+<div class="poster" id="poster-spy">
+  <span class="brand">YAPLY</span>
+  <span class="rule"></span>
+  <svg class="lens" viewBox="0 0 520 520" aria-hidden="true">
+    <circle cx="214" cy="202" r="158" fill="#f7dd47"/>
+    <circle cx="214" cy="202" r="104" fill="#070707"/>
+    <circle cx="184" cy="172" r="28" fill="#ffffff" opacity=".9"/>
+    <path d="M324 316l128 128-54 54-128-128z" fill="#f7dd47"/>
+    <path d="M386 432l54-54 46 46-54 54z" fill="#e9479f"/>
+  </svg>
+  <span class="strip"></span>
+  <h2 class="title small">Who's<br><span>The Spy</span></h2>
+  <span class="sub">BLUFF &nbsp;/&nbsp; DEDUCE &nbsp;/&nbsp; EXPOSE</span>
+  <span class="tag">PLAY WITH FRIENDS</span>
+</div>
+
+<div class="poster" id="poster-karts">
+  <span class="brand">YAPLY</span>
+  <span class="rule"></span>
+  <div class="speed" aria-hidden="true">
+    <i style="top:28px;left:70px;width:330px"></i>
+    <i style="top:88px;left:-30px;width:420px"></i>
+    <i style="top:150px;left:150px;width:270px"></i>
+    <i style="top:214px;left:24px;width:360px"></i>
+    <i style="top:278px;left:230px;width:230px"></i>
+    <i style="top:330px;left:90px;width:300px"></i>
+  </div>
+  <svg class="kart" viewBox="0 0 560 300" aria-hidden="true">
+    <g fill="#0a0a0a">
+      <rect x="132" y="112" width="300" height="82" rx="18"/>
+      <rect x="196" y="66" width="158" height="62" rx="18"/>
+      <rect x="70" y="152" width="62" height="30" rx="14"/>
+      <circle cx="194" cy="220" r="52"/>
+      <circle cx="382" cy="220" r="52"/>
+      <path d="M250 54h80l28 46H226z"/>
+    </g>
+    <g fill="#fffdf2">
+      <circle cx="194" cy="220" r="24"/>
+      <circle cx="382" cy="220" r="24"/>
+      <rect x="300" y="128" width="82" height="34" rx="8"/>
+    </g>
+    <g fill="#e9479f">
+      <rect x="238" y="90" width="42" height="30" rx="6"/>
+    </g>
+  </svg>
+  <h2 class="title">Smash<br>Karts</h2>
+  <span class="sub">RACE &nbsp;/&nbsp; BATTLE &nbsp;/&nbsp; FIRST PLACE</span>
+  <span class="tag">PLAY WITH FRIENDS</span>
+  <div class="checker" aria-hidden="true"></div>
+</div>
+
+<div id="og">
+  <span class="brand">YAPLY</span>
+  <h1>Browser games for game night</h1>
+  <span class="stamp">NO INSTALLS &nbsp;/&nbsp; ONE LINK</span>
+  <p>Chain Reaction. Skribbl. Ludo. Who's the Spy. Smash Karts.</p>
+  <div class="deck">
+    <img src="../apps/web/public/games/chain-reaction.png" alt="" />
+    <img src="../apps/web/public/games/skribbl.png" alt="" />
+    <img src="../apps/web/public/games/smash-karts.png" alt="" />
+  </div>
+</div>
+
+</body>
+</html>

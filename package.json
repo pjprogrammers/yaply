@@ -13,7 +13,8 @@
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1",
-    "typescript": "^5.6.3"
+    "concurrently": "^10.0.6",
+    "next": "^16.4.3",
+    "typescript": "^6.0.3"
   }
 }

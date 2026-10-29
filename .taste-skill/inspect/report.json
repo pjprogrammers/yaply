@@ -1,0 +1,2644 @@
+{
+ "url": "http://localhost:3000",
+ "at": "2026-10-29T08:12:54.170Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 8,
+   "filled": [
+    0.95,
+    0.57,
+    0.74,
+    0.88,
+    0.36,
+    0.61,
+    0.52,
+    0.57
+   ],
+   "motion": {
+    "elements": 42,
+    "css": 15,
+    "transitions": 27,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 6334,
+     "screens": 7,
+     "words": 555,
+     "img": 16,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 4,
+     "uiAbuse": false,
+     "realPictures": 11,
+     "videoCount": 0,
+     "uiPictures": 4,
+     "pictureSamples": [
+      "ludo.png",
+      "whos-the-spy.png",
+      "chain-reaction.png",
+      "skribbl.png",
+      "smash-karts.png",
+      "chain-reaction.png",
+      "skribbl.png",
+      "ludo.png"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "chars": 19,
+     "lines": 2,
+     "size": 121,
+     "vw": 8.4,
+     "font": "Bricolage Grotesque",
+     "weight": 600,
+     "tracking": -0.06,
+     "leading": 0.86,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "left",
+     "widthRatio": 0.73,
+     "top": 137,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "lines": 2,
+     "size": 121,
+     "font": "Bricolage Grotesque"
+    },
+    "headings": [
+     {
+      "text": "Yaply browser games",
+      "words": 3,
+      "chars": 19,
+      "lines": 2,
+      "size": 121,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.06,
+      "leading": 0.86,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.73,
+      "top": 137,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Game night, minus the setup.",
+      "words": 5,
+      "chars": 28,
+      "lines": 1,
+      "size": 64,
+      "vw": 4.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.58,
+      "top": 1135,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "No installs, ever.",
+      "words": 3,
+      "chars": 18,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 1318,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Your phone is the console.",
+      "words": 5,
+      "chars": 26,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 1523,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "One link fills the room.",
+      "words": 5,
+      "chars": 24,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 1728,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "More games on the same rail.",
+      "words": 6,
+      "chars": 28,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 1933,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick tonight's game.",
+      "words": 3,
+      "chars": 20,
+      "lines": 2,
+      "size": 64,
+      "vw": 4.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2359,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chain Reaction",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2524,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Skribbl",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2582,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Ludo",
+      "words": 1,
+      "chars": 4,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2640,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Who's the Spy?",
+      "words": 3,
+      "chars": 14,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2698,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Smash Karts",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2756,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick a game",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 64,
+      "vw": 4.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.055,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.29,
+      "top": 3307,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Questions, answered.",
+      "words": 2,
+      "chars": 20,
+      "lines": 2,
+      "size": 64,
+      "vw": 4.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.29,
+      "top": 3963,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tonight we're playing Chain Reaction Skribbl Ludo Who's the Spy? Smash Karts Let's go .",
+      "words": 15,
+      "chars": 87,
+      "lines": 2,
+      "size": 41.8,
+      "vw": 2.9,
+      "font": "Bricolage Grotesque",
+      "weight": 500,
+      "tracking": -0.045,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.42,
+      "top": 5398,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Yaply",
+      "words": 1,
+      "chars": 5,
+      "lines": 1,
+      "size": 121,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.07,
+      "leading": 0.76,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.5,
+      "top": 5952,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 16,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Bricolage Grotesque",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      19,
+      26,
+      42,
+      64,
+      121
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Bricolage Grotesque",
+      "size": 19,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 10.7
+     },
+     "measureChars": 86,
+     "max": {
+      "size": 121,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "text": "Yaply"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#060607",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.08,
+      "l": 0.03
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6dc47",
+       "top": 64,
+       "hsl": {
+        "h": 51,
+        "s": 0.91,
+        "l": 0.62
+       }
+      },
+      {
+       "color": "#1423b8",
+       "top": 74,
+       "hsl": {
+        "h": 235,
+        "s": 0.8,
+        "l": 0.4
+       }
+      },
+      {
+       "color": "#060607",
+       "top": 968,
+       "hsl": {
+        "h": 240,
+        "s": 0.08,
+        "l": 0.03
+       }
+      },
+      {
+       "color": "#f473b7",
+       "top": 3080,
+       "hsl": {
+        "h": 328,
+        "s": 0.85,
+        "l": 0.7
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#e9e8e9",
+       "share": 0.28
+      },
+      {
+       "color": "#bcbdbc",
+       "share": 0.22
+      },
+      {
+       "color": "#060607",
+       "share": 0.19
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.17
+      },
+      {
+       "color": "#dee2ff",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#f6dc47",
+      "hsl": {
+       "h": 51,
+       "s": 0.91,
+       "l": 0.62
+      },
+      "fg": "#060607"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 3,
+     "radius": 6,
+     "height": 36,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Play now",
+      "Browse the games"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 4,
+     "boxRadius": 6,
+     "squareMedia": 1,
+     "roundedMedia": 5,
+     "mediaRadius": 2,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 5,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 74
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 6,
+     "fixed": true,
+     "height": 64,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "bricolage grotesque"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 6334,
+    "margins": {
+     "left": 56,
+     "right": 56
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 64,
+      "height": 904,
+      "words": 45,
+      "media": 5,
+      "middle": 150,
+      "heading": {
+       "text": "Yaply",
+       "size": 121,
+       "tag": "h1"
+      },
+      "left": 73,
+      "right": 96,
+      "textLeft": 73,
+      "textRight": 96,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.features",
+      "tag": "section",
+      "top": 968,
+      "height": 1122,
+      "words": 116,
+      "media": 0,
+      "middle": 201,
+      "heading": {
+       "text": "Game night, minus the setup.",
+       "size": 64,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 56,
+      "textLeft": 56,
+      "textRight": 74,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#games.showcase.section-anchor",
+      "tag": "section",
+      "top": 2090,
+      "height": 990,
+      "words": 27,
+      "media": 1,
+      "middle": 268,
+      "heading": {
+       "text": "Pick tonight's game.",
+       "size": 64,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 69,
+      "textLeft": 56,
+      "textRight": 69,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.stages.section-anchor",
+      "tag": "section",
+      "top": 3080,
+      "height": 771,
+      "words": 58,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Pick a game",
+       "size": 64,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 56,
+      "textLeft": 56,
+      "textRight": 56,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#faq.faq.section-anchor",
+      "tag": "section",
+      "top": 3851,
+      "height": 1311,
+      "words": 168,
+      "media": 0,
+      "middle": 218,
+      "heading": {
+       "text": "Questions, answered.",
+       "size": 64,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 64,
+      "textLeft": 56,
+      "textRight": 64,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#play.closing.section-anchor",
+      "tag": "section",
+      "top": 5162,
+      "height": 677,
+      "words": 23,
+      "media": 1,
+      "middle": 349,
+      "heading": {
+       "text": "Tonight we're playing",
+       "size": 42,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 52,
+      "textLeft": 56,
+      "textRight": 681,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.site-footer",
+      "tag": "footer",
+      "top": 5840,
+      "height": 495,
+      "words": 56,
+      "media": 0,
+      "middle": 219,
+      "heading": {
+       "text": "Yaply",
+       "size": 121,
+       "tag": "h2"
+      },
+      "left": 56,
+      "right": 56,
+      "textLeft": 56,
+      "textRight": 56,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Yaply browser games",
+      "size": 121,
+      "top": 137,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 56,
+      "n": 21
+     },
+     {
+      "x": 576,
+      "n": 6
+     },
+     {
+      "x": 73,
+      "n": 3
+     },
+     {
+      "x": 435,
+      "n": 1
+     },
+     {
+      "x": 1087,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 32,
+    "bodySize": 19,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0.11,
+    "voidBox": {
+     "x": 900,
+     "y": 120,
+     "w": 300,
+     "h": 480
+    }
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 7,
+   "filled": [
+    0.97,
+    0.72,
+    1,
+    0.79,
+    0.57,
+    0.76,
+    0.58
+   ],
+   "motion": {
+    "elements": 42,
+    "css": 15,
+    "transitions": 27,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 6753,
+     "screens": 6.6,
+     "words": 555,
+     "img": 16,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 4,
+     "uiAbuse": false,
+     "realPictures": 6,
+     "videoCount": 0,
+     "uiPictures": 4,
+     "pictureSamples": [
+      "chain-reaction.png",
+      "skribbl.png",
+      "ludo.png",
+      "whos-the-spy.png",
+      "smash-karts.png",
+      "chain-reaction.png"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "chars": 19,
+     "lines": 2,
+     "size": 64.5,
+     "vw": 8.4,
+     "font": "Bricolage Grotesque",
+     "weight": 600,
+     "tracking": -0.06,
+     "leading": 0.86,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "left",
+     "widthRatio": 0.72,
+     "top": 108,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "lines": 2,
+     "size": 64.5,
+     "font": "Bricolage Grotesque"
+    },
+    "headings": [
+     {
+      "text": "Yaply browser games",
+      "words": 3,
+      "chars": 19,
+      "lines": 2,
+      "size": 64.5,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.06,
+      "leading": 0.86,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.72,
+      "top": 108,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Game night, minus the setup.",
+      "words": 5,
+      "chars": 28,
+      "lines": 1,
+      "size": 45.4,
+      "vw": 5.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.77,
+      "top": 1101,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "No installs, ever.",
+      "words": 3,
+      "chars": 18,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.48,
+      "top": 1316,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Your phone is the console.",
+      "words": 5,
+      "chars": 26,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.48,
+      "top": 1531,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "One link fills the room.",
+      "words": 5,
+      "chars": 24,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.48,
+      "top": 1747,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "More games on the same rail.",
+      "words": 6,
+      "chars": 28,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.48,
+      "top": 1962,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick tonight's game.",
+      "words": 3,
+      "chars": 20,
+      "lines": 1,
+      "size": 45.4,
+      "vw": 5.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.59,
+      "top": 2806,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chain Reaction",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 2875,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Skribbl",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 2918,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Ludo",
+      "words": 1,
+      "chars": 4,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 2961,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Who's the Spy?",
+      "words": 3,
+      "chars": 14,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3004,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Smash Karts",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3047,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick a game",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 45.4,
+      "vw": 5.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.055,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 3919,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Questions, answered.",
+      "words": 2,
+      "chars": 20,
+      "lines": 2,
+      "size": 45.4,
+      "vw": 5.9,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 4285,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tonight we're playing Chain Reaction Skribbl Ludo Who's the Spy? Smash Karts Let's go .",
+      "words": 15,
+      "chars": 87,
+      "lines": 2,
+      "size": 28,
+      "vw": 3.6,
+      "font": "Bricolage Grotesque",
+      "weight": 500,
+      "tracking": -0.045,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.53,
+      "top": 5626,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Yaply",
+      "words": 1,
+      "chars": 5,
+      "lines": 1,
+      "size": 64.5,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.07,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 6272,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 16,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Bricolage Grotesque",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      13,
+      18,
+      23,
+      28,
+      45,
+      65
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Bricolage Grotesque",
+      "size": 17.9,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 10.7
+     },
+     "measureChars": 86,
+     "max": {
+      "size": 64.5,
+      "vw": 8.4,
+      "font": "Bricolage Grotesque",
+      "text": "Yaply"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#060607",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.08,
+      "l": 0.03
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6dc47",
+       "top": 64,
+       "hsl": {
+        "h": 51,
+        "s": 0.91,
+        "l": 0.62
+       }
+      },
+      {
+       "color": "#1423b8",
+       "top": 74,
+       "hsl": {
+        "h": 235,
+        "s": 0.8,
+        "l": 0.4
+       }
+      },
+      {
+       "color": "#060607",
+       "top": 1024,
+       "hsl": {
+        "h": 240,
+        "s": 0.08,
+        "l": 0.03
+       }
+      },
+      {
+       "color": "#e9469e",
+       "top": 2192,
+       "hsl": {
+        "h": 328,
+        "s": 0.79,
+        "l": 0.59
+       }
+      },
+      {
+       "color": "#f473b7",
+       "top": 3165,
+       "hsl": {
+        "h": 328,
+        "s": 0.85,
+        "l": 0.7
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#e9e8e9",
+       "share": 0.28
+      },
+      {
+       "color": "#bcbdbc",
+       "share": 0.22
+      },
+      {
+       "color": "#060607",
+       "share": 0.19
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.17
+      },
+      {
+       "color": "#dee2ff",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#f6dc47",
+      "hsl": {
+       "h": 51,
+       "s": 0.91,
+       "l": 0.62
+      },
+      "fg": "#060607"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 3,
+     "radius": 6,
+     "height": 36,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Play now",
+      "Browse the games"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 4,
+     "boxRadius": 6,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 6,
+     "fixed": true,
+     "height": 64,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "bricolage grotesque"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 6753,
+    "margins": {
+     "left": 31,
+     "right": 30
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 64,
+      "height": 960,
+      "words": 45,
+      "media": 0,
+      "middle": 92,
+      "heading": {
+       "text": "Yaply",
+       "size": 65,
+       "tag": "h1"
+      },
+      "left": 44,
+      "right": 30,
+      "textLeft": 44,
+      "textRight": 30,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.features",
+      "tag": "section",
+      "top": 1024,
+      "height": 1091,
+      "words": 116,
+      "media": 0,
+      "middle": 39,
+      "heading": {
+       "text": "Game night, minus the setup.",
+       "size": 45,
+       "tag": "h2"
+      },
+      "left": 31,
+      "right": 31,
+      "textLeft": 31,
+      "textRight": 134,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#games.showcase.section-anchor",
+      "tag": "section",
+      "top": 2115,
+      "height": 1050,
+      "words": 27,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 31,
+      "right": 31,
+      "textLeft": 31,
+      "textRight": 54,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.stages.section-anchor",
+      "tag": "section",
+      "top": 3165,
+      "height": 915,
+      "words": 58,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 31,
+      "right": 31,
+      "textLeft": 31,
+      "textRight": 31,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#faq.faq.section-anchor",
+      "tag": "section",
+      "top": 4080,
+      "height": 1454,
+      "words": 168,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Questions, answered.",
+       "size": 45,
+       "tag": "h2"
+      },
+      "left": 31,
+      "right": 33,
+      "textLeft": 31,
+      "textRight": 33,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#play.closing.section-anchor",
+      "tag": "section",
+      "top": 5534,
+      "height": 674,
+      "words": 23,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Tonight we're playing",
+       "size": 28,
+       "tag": "h2"
+      },
+      "left": 29,
+      "right": 74,
+      "textLeft": 31,
+      "textRight": 74,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.site-footer",
+      "tag": "footer",
+      "top": 6208,
+      "height": 545,
+      "words": 56,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Yaply",
+       "size": 65,
+       "tag": "h2"
+      },
+      "left": 31,
+      "right": 175,
+      "textLeft": 31,
+      "textRight": 175,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Yaply browser games",
+      "size": 65,
+      "top": 108,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 31,
+      "n": 28
+     },
+     {
+      "x": 44,
+      "n": 3
+     },
+     {
+      "x": 285,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 32,
+    "bodySize": 18,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 8,
+   "filled": [
+    0.98,
+    0.74,
+    0.77,
+    0.78,
+    0.59,
+    0.66,
+    0.88,
+    0.24
+   ],
+   "motion": {
+    "elements": 42,
+    "css": 15,
+    "transitions": 27,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 6589,
+     "screens": 7.8,
+     "words": 549,
+     "img": 16,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 4,
+     "uiAbuse": false,
+     "realPictures": 6,
+     "videoCount": 0,
+     "uiPictures": 4,
+     "pictureSamples": [
+      "chain-reaction.png",
+      "skribbl.png",
+      "ludo.png",
+      "whos-the-spy.png",
+      "smash-karts.png",
+      "chain-reaction.png"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "chars": 19,
+     "lines": 2,
+     "size": 48.4,
+     "vw": 12.4,
+     "font": "Bricolage Grotesque",
+     "weight": 600,
+     "tracking": -0.06,
+     "leading": 0.86,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "center",
+     "widthRatio": 0.83,
+     "top": 98,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Yaply browser games",
+     "words": 3,
+     "lines": 2,
+     "size": 48.4,
+     "font": "Bricolage Grotesque"
+    },
+    "headings": [
+     {
+      "text": "Yaply browser games",
+      "words": 3,
+      "chars": 19,
+      "lines": 2,
+      "size": 48.4,
+      "vw": 12.4,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.06,
+      "leading": 0.86,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.83,
+      "top": 98,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Game night, minus the setup.",
+      "words": 5,
+      "chars": 28,
+      "lines": 2,
+      "size": 33.3,
+      "vw": 8.5,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 987,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "No installs, ever.",
+      "words": 3,
+      "chars": 18,
+      "lines": 1,
+      "size": 28.1,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.68,
+      "top": 1216,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Your phone is the console.",
+      "words": 5,
+      "chars": 26,
+      "lines": 2,
+      "size": 28.1,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.68,
+      "top": 1421,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "One link fills the room.",
+      "words": 5,
+      "chars": 24,
+      "lines": 2,
+      "size": 28.1,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.68,
+      "top": 1653,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "More games on the same rail.",
+      "words": 6,
+      "chars": 28,
+      "lines": 2,
+      "size": 28.1,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.68,
+      "top": 1886,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick tonight's game.",
+      "words": 3,
+      "chars": 20,
+      "lines": 1,
+      "size": 33.3,
+      "vw": 8.5,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.85,
+      "top": 2526,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chain Reaction",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 2583,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Skribbl",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 2626,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Ludo",
+      "words": 1,
+      "chars": 4,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 2669,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Who's the Spy?",
+      "words": 3,
+      "chars": 14,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 2712,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Smash Karts",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 2755,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Pick a game",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 33.3,
+      "vw": 8.5,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.055,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.56,
+      "top": 3511,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Questions, answered.",
+      "words": 2,
+      "chars": 20,
+      "lines": 2,
+      "size": 33.3,
+      "vw": 8.5,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.56,
+      "top": 3846,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tonight we're playing Chain Reaction Skribbl Ludo Who's the Spy? Smash Karts Let's go .",
+      "words": 15,
+      "chars": 87,
+      "lines": 2,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Bricolage Grotesque",
+      "weight": 500,
+      "tracking": -0.045,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 5209,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Yaply",
+      "words": 1,
+      "chars": 5,
+      "lines": 1,
+      "size": 37.6,
+      "vw": 9.6,
+      "font": "Bricolage Grotesque",
+      "weight": 600,
+      "tracking": -0.07,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 5893,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 16,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Bricolage Grotesque",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      13,
+      17,
+      18,
+      20,
+      28,
+      33,
+      38,
+      48
+     ],
+     "sizeCount": 8,
+     "notLoaded": [],
+     "body": {
+      "font": "Bricolage Grotesque",
+      "size": 17,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 10.7
+     },
+     "measureChars": 54,
+     "max": {
+      "size": 48.4,
+      "vw": 12.4,
+      "font": "Bricolage Grotesque",
+      "text": "Yaply"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#060607",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.08,
+      "l": 0.03
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6dc47",
+       "top": 64,
+       "hsl": {
+        "h": 51,
+        "s": 0.91,
+        "l": 0.62
+       }
+      },
+      {
+       "color": "#1423b8",
+       "top": 74,
+       "hsl": {
+        "h": 235,
+        "s": 0.8,
+        "l": 0.4
+       }
+      },
+      {
+       "color": "#060607",
+       "top": 915,
+       "hsl": {
+        "h": 240,
+        "s": 0.08,
+        "l": 0.03
+       }
+      },
+      {
+       "color": "#f473b7",
+       "top": 2868,
+       "hsl": {
+        "h": 328,
+        "s": 0.85,
+        "l": 0.7
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#e9e8e9",
+       "share": 0.28
+      },
+      {
+       "color": "#bcbdbc",
+       "share": 0.22
+      },
+      {
+       "color": "#060607",
+       "share": 0.19
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.17
+      },
+      {
+       "color": "#dee2ff",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#f6dc47",
+      "hsl": {
+       "h": 51,
+       "s": 0.91,
+       "l": 0.62
+      },
+      "fg": "#060607"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 11,
+     "inHero": 7,
+     "radius": 0,
+     "height": 52,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Play now",
+      "Browse the games",
+      "Chain Reaction Live now",
+      "Skribbl Live now"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 4,
+     "boxRadius": 6,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 2,
+     "fixed": true,
+     "height": 64,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "bricolage grotesque"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 6589,
+    "margins": {
+     "left": 20,
+     "right": 20
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 64,
+      "height": 851,
+      "words": 45,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Yaply",
+       "size": 48,
+       "tag": "h1"
+      },
+      "left": 34,
+      "right": 31,
+      "textLeft": 34,
+      "textRight": 31,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.features",
+      "tag": "section",
+      "top": 915,
+      "height": 1172,
+      "words": 116,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Game night, minus the setup.",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 37,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#games.showcase.section-anchor",
+      "tag": "section",
+      "top": 2086,
+      "height": 782,
+      "words": 27,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Pick tonight's game.",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 48,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.stages.section-anchor",
+      "tag": "section",
+      "top": 2868,
+      "height": 806,
+      "words": 54,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 27,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__intro",
+      "tag": "div",
+      "top": 3675,
+      "height": 287,
+      "words": 2,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Questions, answered.",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 213,
+      "textLeft": 20,
+      "textRight": 213,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 3961,
+      "height": 223,
+      "words": 32,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "What is Yaply?",
+       "size": 20,
+       "tag": "h3"
+      },
+      "left": 20,
+      "right": 55,
+      "textLeft": 20,
+      "textRight": 55,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 4185,
+      "height": 192,
+      "words": 29,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Do I need to install anything?",
+       "size": 20,
+       "tag": "h3"
+      },
+      "left": 20,
+      "right": 29,
+      "textLeft": 20,
+      "textRight": 29,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 4377,
+      "height": 218,
+      "words": 29,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Which games can I play right now?",
+       "size": 20,
+       "tag": "h3"
+      },
+      "left": 20,
+      "right": 45,
+      "textLeft": 20,
+      "textRight": 45,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 4595,
+      "height": 171,
+      "words": 25,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Do I need an account?",
+       "size": 20,
+       "tag": "h3"
+      },
+      "left": 20,
+      "right": 27,
+      "textLeft": 20,
+      "textRight": 27,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 4766,
+      "height": 192,
+      "words": 26,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Does Yaply work on a phone?",
+       "size": 20,
+       "tag": "h3"
+      },
+      "left": 20,
+      "right": 40,
+      "textLeft": 20,
+      "textRight": 40,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.faq__band",
+      "tag": "div",
+      "top": 4958,
+      "height": 171,
+      "words": 20,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 20,
+      "right": 29,
+      "textLeft": 20,
+      "textRight": 29,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#play.closing.section-anchor",
+      "tag": "section",
+      "top": 5129,
+      "height": 700,
+      "words": 23,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Tonight we're playing",
+       "size": 28,
+       "tag": "h2"
+      },
+      "left": 19,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 53,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.site-footer",
+      "tag": "footer",
+      "top": 5829,
+      "height": 759,
+      "words": 56,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Yaply",
+       "size": 38,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 26,
+      "textLeft": 20,
+      "textRight": 26,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Yaply browser games",
+      "size": 48,
+      "top": 98,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 20,
+      "n": 27
+     },
+     {
+      "x": 31,
+      "n": 4
+     }
+    ],
+    "leftBlocks": 31,
+    "bodySize": 17,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "no-footage",
+   "width": 1440,
+   "message": "No video anywhere on the page.",
+   "fix": "Look for one honest clip with scripts/assets.mjs --video (the place, the material, the process) and use it as a muted loop with a poster frame. Defend its absence only if no clip fits the subject."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/home/jashan/Desktop/yaply/.taste-skill/inspect/desktop-fold.jpg",
+   "pages": [
+    "/home/jashan/Desktop/yaply/.taste-skill/inspect/desktop-page-01.jpg",
+    "/home/jashan/Desktop/yaply/.taste-skill/inspect/desktop-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/home/jashan/Desktop/yaply/.taste-skill/inspect/tablet-fold.jpg",
+   "pages": [
+    "/home/jashan/Desktop/yaply/.taste-skill/inspect/tablet-page-01.jpg",
+    "/home/jashan/Desktop/yaply/.taste-skill/inspect/tablet-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/home/jashan/Desktop/yaply/.taste-skill/inspect/mobile-fold.jpg",
+   "pages": [
+    "/home/jashan/Desktop/yaply/.taste-skill/inspect/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
