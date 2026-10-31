@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:prod": "wrangler deploy --env production",
+    "check:worker": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

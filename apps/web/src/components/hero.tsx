@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CHAIN_REACTION_URL } from "@/lib/game-urls";
 
 export function Hero() {
   return (
@@ -17,7 +18,7 @@ export function Hero() {
             <Link href="/games" className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-[#9B6DFF] to-[#7C3AED] hover:from-[#B69AFF] hover:to-[#8B5CF6] transition shadow-[0_20px_80px_-40px_rgba(155,109,255,0.9)]">
               Explore Games
             </Link>
-            <a href="https://chain.yaply.eu.org" className="px-6 py-3 rounded-xl font-semibold bg-[#231C32] border border-[#382D4B] hover:bg-[#2D2440] transition">
+            <a href={CHAIN_REACTION_URL} className="px-6 py-3 rounded-xl font-semibold bg-[#231C32] border border-[#382D4B] hover:bg-[#2D2440] transition">
               Play Chain Reaction
             </a>
           </div>

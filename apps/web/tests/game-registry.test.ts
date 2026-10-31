@@ -1,21 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { GAMES, getGameBySlug } from "../lib/game-registry";
+import { gameHref, games } from "../data/games";
 
-describe("game registry", () => {
-  it("has five games", () => {
-    expect(GAMES).toHaveLength(5);
+describe("game directory", () => {
+  it("lists five games", () => {
+    expect(games).toHaveLength(5);
   });
 
-  it("includes skribbl as implemented", () => {
-    const skribbl = getGameBySlug("skribbl");
-    expect(skribbl?.status).toBe("implemented");
-    expect(skribbl?.route).toBe("/games/skribbl/create");
+  it("marks the two live games as available with external URLs", () => {
+    const live = games.filter((game) => game.status === "available");
+    expect(live.map((game) => game.slug).sort()).toEqual(["chain-reaction", "skribbl"]);
+    for (const game of live) {
+      expect(game.url).toMatch(/^https:\/\//);
+      expect(gameHref(game)).toBe(game.url);
+    }
   });
 
-  it("marks others as coming soon", () => {
-    const others = GAMES.filter((g) => g.slug !== "skribbl");
-    for (const game of others) {
-      expect(game.status).toBe("coming-soon");
+  it("keeps coming-soon games on internal preview pages", () => {
+    const upcoming = games.filter((game) => game.status === "coming-soon");
+    expect(upcoming).toHaveLength(3);
+    for (const game of upcoming) {
+      expect(game.url).toBeNull();
+      expect(gameHref(game)).toBe(`/games/${game.slug}`);
+    }
+  });
+
+  it("gives every game a unique slug and a poster", () => {
+    const slugs = new Set(games.map((game) => game.slug));
+    expect(slugs.size).toBe(games.length);
+    for (const game of games) {
+      expect(game.poster).toMatch(/^\/games\/.+\.png$/);
     }
   });
 });

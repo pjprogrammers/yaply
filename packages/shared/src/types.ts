@@ -1,17 +1,20 @@
 export type PlayerId = string;
 export type RoomCode = string;
+export type GameKind = "skribbl" | "chain";
 
 export type GamePhase =
   | "lobby"
   | "choosing"
   | "drawing"
   | "round-result"
+  | "playing"
   | "game-over";
 
 export type Player = {
   id: PlayerId;
   nickname: string;
   avatar: string;
+  color: string;
   score: number;
   connected: boolean;
   guessedCorrectly: boolean;
@@ -38,10 +41,50 @@ export type GameSettings = {
   language: "en";
   allowLateJoin: boolean;
   wordCount?: number;
+  turnTimeSeconds?: number;
+};
+
+export type ChainCell = {
+  ownerId: PlayerId | null;
+  orbs: number;
+};
+
+export type ChainExplosion = {
+  row: number;
+  col: number;
+  ownerId: PlayerId;
+};
+
+export type ChainMove = {
+  playerId: PlayerId;
+  row: number;
+  col: number;
+  explosions: ChainExplosion[];
+  captured: number;
+  orbsPlaced: number;
+};
+
+export type ChainState = {
+  rows: number;
+  cols: number;
+  cells: ChainCell[];
+  turnPlayerId: PlayerId | null;
+  eliminatedPlayerIds: PlayerId[];
+  winnerId: PlayerId | null;
+  lastMove: ChainMove | null;
+  turnEndsAt: number | null;
+  moveCount: number;
+};
+
+export type Ranking = {
+  playerId: PlayerId;
+  nickname: string;
+  score: number;
 };
 
 export type RoomSnapshot = {
   code: RoomCode;
+  game: GameKind;
   phase: GamePhase;
   hostId: PlayerId;
   players: Player[];
@@ -51,5 +94,8 @@ export type RoomSnapshot = {
   maskedWord: string | null;
   endsAt: number | null;
   strokes: Stroke[];
+  chain: ChainState | null;
+  rankings?: Ranking[];
+  winnerId?: PlayerId | null;
   version: number;
 };

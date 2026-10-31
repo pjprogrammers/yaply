@@ -1,3 +1,5 @@
+import { CHAIN_REACTION_URL, SKRIBBL_URL } from "@/lib/game-urls";
+
 export type GameStatus = "available" | "coming-soon";
 
 export type GameEntry = {
@@ -23,7 +25,7 @@ export const games: GameEntry[] = [
     name: "Chain Reaction",
     description: "Outsmart your opponents, one move at a time.",
     statement: "Expanding orbs, a shrinking board and absolutely no mercy.",
-    url: "https://chain.yaply.eu.org",
+    url: CHAIN_REACTION_URL,
     status: "available",
     tag: "Strategy",
     color: "#1423b8",
@@ -38,7 +40,7 @@ export const games: GameEntry[] = [
     name: "Skribbl",
     description: "Draw, guess, and compete with friends.",
     statement: "One canvas, wild guesses and no drawing talent required.",
-    url: "https://skribbl.yaply.eu.org",
+    url: SKRIBBL_URL,
     status: "available",
     tag: "Party",
     color: "#f7dd47",

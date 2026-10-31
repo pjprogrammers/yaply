@@ -1,15 +1,38 @@
 name = "yaply-realtime"
 main = "src/index.ts"
-compatibility_date = "2024-11-12"
+compatibility_date = "2026-10-01"
 
+# Development defaults. `wrangler dev` uses these; `wrangler deploy --env production`
+# uses the production block below instead.
 [vars]
-APP_ORIGIN = "http://localhost:3000"
+ENVIRONMENT = "development"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+
+[observability]
+enabled = true
 
 [durable_objects]
 bindings = [
   { name = "GAME_ROOMS", class_name = "GameRoom" }
 ]
 
+# v1 created the SQLite-backed GameRoom class. The class name is unchanged, so
+# this migration is kept verbatim and no data is dropped.
 [[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+# Add every deployed frontend origin here (main site, Skribbl, Chain Reaction).
+# Requests without an allowed Origin are rejected in production.
+ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+
+[env.production.durable_objects]
+bindings = [
+  { name = "GAME_ROOMS", class_name = "GameRoom" }
+]
+
+[[env.production.migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]

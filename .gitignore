@@ -53,3 +53,4 @@ apps/*/.next
 apps/*/out
 apps/*/dist
 packages/*/dist
+next-task.md

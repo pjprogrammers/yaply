@@ -10,6 +10,8 @@
     "dev": "concurrently \"npm run dev --workspace=@yaply/realtime\" \"npm run dev --workspace=@yaply/web\"",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run typecheck && npm test",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {

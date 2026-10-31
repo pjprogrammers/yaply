@@ -1,83 +1,313 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
+import { Doodle } from "@/components/doodle";
+import { ArrowRightIcon, PlayIcon, UsersIcon } from "@/components/icons";
+import { Segmented } from "@/components/segmented";
+import { Topbar } from "@/components/topbar";
+import {
+  cleanRoomCode,
+  MAIN_URL,
+  makeRoomCode,
+  readStoredNickname,
+  storeNickname,
+} from "@/lib/config";
+
+const PLAYERS = [
+  { name: "Mara", color: "#4cb3f0" },
+  { name: "Jules", color: "#f2b33d" },
+  { name: "Niko", color: "#e5484d" },
+  { name: "Ari", color: "#c6f24e" },
+];
 
 export default function Home() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
+  const [rounds, setRounds] = useState(3);
+  const [drawTime, setDrawTime] = useState(80);
+  const [words, setWords] = useState(3);
+  const [maxPlayers, setMaxPlayers] = useState(8);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const stored = readStoredNickname();
+    if (stored) setNickname(stored);
+  }, []);
+
+  const displayName = () => nickname.trim() || "Player";
+
+  const createRoom = () => {
+    const name = displayName();
+    storeNickname(name);
+    const code = makeRoomCode();
+    const params = new URLSearchParams({
+      name,
+      host: "1",
+      rounds: String(rounds),
+      time: String(drawTime),
+      words: String(words),
+      max: String(maxPlayers),
+    });
+    router.push(`/room/${code}?${params.toString()}`);
+  };
+
+  const joinRoom = () => {
+    const code = cleanRoomCode(roomCode);
+    if (code.length !== 6) {
+      setError("Room codes are six characters.");
+      return;
+    }
+    const name = displayName();
+    storeNickname(name);
+    router.push(`/room/${code}?name=${encodeURIComponent(name)}`);
+  };
 
   return (
-    <main className="min-h-screen">
-      <header className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-lg sm:text-xl font-extrabold tracking-wider" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-          SKRIB<span className="bg-gradient-to-r from-[#FF6B70] via-[#FFD66B] to-[#9B6DFF] bg-clip-text text-transparent">BL</span>
-        </Link>
-        <Link href="https://yaply.eu.org" className="text-sm text-[#B9B0C9] hover:text-[#F7F4FC] transition">Back to Yaply</Link>
-      </header>
+    <div className="app-shell">
+      <Topbar />
 
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-12">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-6 items-start">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-[#898097] mb-4">Expressive • Playful • Social</p>
-            <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight mb-4" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-              Draw something wild. <span className="bg-gradient-to-r from-[#FF6B70] via-[#FFD66B] to-[#65A8FF] bg-clip-text text-transparent">Guess if you can.</span>
+      <main className="page">
+        <div className="home-grid">
+          <section className="home-copy">
+            <p className="eyebrow">Yaply · Skribbl</p>
+            <h1 className="home-title">
+              Draw badly.
+              <br />
+              Guess fast.
             </h1>
-            <p className="text-lg text-[#B9B0C9] max-w-xl mb-6">
-              Quick rounds of drawing and guessing with friends. Laughs guaranteed.
+            <p className="subline">
+              A private room, a blank sheet and a word nobody can draw. One player sketches while
+              everyone else types guesses into the chat. The faster the guess, the more it scores.
             </p>
-          </div>
 
-          <div className="rounded-[24px] border border-[#382D4B] bg-gradient-to-b from-[#FF6B70]/12 to-[#100D18]/95 p-6 shadow-[0_40px_120px_-80px_rgba(255,107,112,0.7)]">
-            <h2 className="text-xl font-semibold mb-4" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>Start playing</h2>
-            <div className="mb-4">
-              <label className="block text-xs uppercase tracking-wider text-[#898097] mb-2">Nickname</label>
-              <input
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                maxLength={16}
-                placeholder="Enter your name"
-                className="w-full px-4 py-3 rounded-xl bg-[#191424]/80 border border-[#382D4B] text-[#F7F4FC] focus:outline-none focus:border-[#FF6B70]/80"
-              />
+            <div className="home-actions">
+              <Link href="/how-to-play" className="btn btn--ghost">
+                How to play
+                <ArrowRightIcon size={14} />
+              </Link>
+              <a href={MAIN_URL} className="text-link">
+                More Yaply games
+              </a>
             </div>
-            <button
-              onClick={() => router.push(`/create?name=${encodeURIComponent(nickname.trim() || "Player")}`)}
-              className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-[#FF6B70] to-[#FB7185] hover:from-[#FF7C81] hover:to-[#F43F5E] transition mb-2"
-            >
-              Create Private Room
-            </button>
-            <button
-              onClick={() => router.push(`/create?name=${encodeURIComponent(nickname.trim() || "Player")}&quick=1`)}
-              className="w-full py-3 rounded-xl font-semibold bg-[#231C32] border border-[#382D4B] hover:bg-[#2D2440] transition mb-4"
-            >
-              Quick Play
-            </button>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-1 h-px bg-[#382D4B]" />
-              <span className="text-xs text-[#898097]">or join room</span>
-              <div className="flex-1 h-px bg-[#382D4B]" />
+
+            <div className="preview-card">
+              <div className="preview-head">
+                <span className="preview-caption">
+                  <span className="status-dot" data-status="connected" />
+                  Room preview
+                </span>
+                <span className="pill pill--accent">Round 2 of 3</span>
+              </div>
+              <div className="paper">
+                <div className="paper-mask">_ _ _ _ _</div>
+                <div className="paper-canvas">
+                  <Doodle />
+                </div>
+              </div>
+              <div className="preview-players">
+                {PLAYERS.map((player) => (
+                  <span className="preview-chip" key={player.name}>
+                    <i style={{ background: player.color }} />
+                    {player.name}
+                  </span>
+                ))}
+                <span className="preview-chip">+4 more</span>
+              </div>
+              <p className="paper-caption">
+                <span>Mara is drawing</span>
+                <span className="num">0:42 left</span>
+              </p>
             </div>
-            <div className="flex gap-2">
-              <input
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toLowerCase())}
-                maxLength={6}
-                placeholder="ROOM CODE"
-                className="flex-1 px-4 py-3 rounded-xl bg-[#191424]/80 border border-[#382D4B] text-center tracking-[0.5em] font-mono uppercase text-[#F7F4FC] focus:outline-none focus:border-[#FF6B70]/80"
-              />
+
+            <div className="fact-strip">
+              <div className="fact">
+                <p className="fact-label">Players</p>
+                <p className="fact-value">2–12</p>
+              </div>
+              <div className="fact">
+                <p className="fact-label">Draw time</p>
+                <p className="fact-value">60–120s</p>
+              </div>
+              <div className="fact">
+                <p className="fact-label">Rounds</p>
+                <p className="fact-value">2–5</p>
+              </div>
+            </div>
+          </section>
+
+          <aside className="rail">
+            <section className="card">
+              <div className="card-head">
+                <div>
+                  <h2 className="card-title">Play with friends</h2>
+                  <p className="small faint" style={{ marginTop: 3 }}>
+                    No account, no install.
+                  </p>
+                </div>
+                <span className="pill">
+                  <UsersIcon size={11} />
+                  Live room
+                </span>
+              </div>
+
+              <label className="field">
+                <span className="field-label">Nickname</span>
+                <input
+                  className="input"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  maxLength={MAX_NICKNAME_LENGTH}
+                  placeholder="Your name"
+                  autoComplete="nickname"
+                />
+              </label>
+
+              <div className="settings-list" style={{ marginTop: 18 }}>
+                <div className="setting-row">
+                  <span className="setting-label">Rounds</span>
+                  <Segmented
+                    label="Rounds"
+                    value={rounds}
+                    options={[
+                      { label: "2", value: 2 },
+                      { label: "3", value: 3 },
+                      { label: "5", value: 5 },
+                    ]}
+                    onChange={setRounds}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Draw time</span>
+                  <Segmented
+                    label="Draw time"
+                    value={drawTime}
+                    options={[
+                      { label: "60s", value: 60 },
+                      { label: "80s", value: 80 },
+                      { label: "120s", value: 120 },
+                    ]}
+                    onChange={setDrawTime}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Word choices</span>
+                  <Segmented
+                    label="Word choices"
+                    value={words}
+                    options={[
+                      { label: "2", value: 2 },
+                      { label: "3", value: 3 },
+                      { label: "4", value: 4 },
+                    ]}
+                    onChange={setWords}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Max players</span>
+                  <Segmented
+                    label="Max players"
+                    value={maxPlayers}
+                    options={[
+                      { label: "4", value: 4 },
+                      { label: "8", value: 8 },
+                      { label: "12", value: 12 },
+                    ]}
+                    onChange={setMaxPlayers}
+                  />
+                </div>
+              </div>
+
               <button
-                onClick={() => router.push(`/room/${roomCode}?name=${encodeURIComponent(nickname.trim() || "Player")}`)}
-                disabled={roomCode.length !== 6}
-                className="px-6 py-3 rounded-xl font-semibold bg-[#231C32] border border-[#382D4B] hover:bg-[#2D2440] disabled:opacity-40 transition"
+                className="btn btn--primary btn--block btn--lg"
+                type="button"
+                onClick={createRoom}
+                style={{ marginTop: 18 }}
               >
-                Join
+                <PlayIcon size={15} />
+                Create a room
               </button>
-            </div>
-          </div>
+
+              <div className="divider" style={{ margin: "20px 0 18px" }} />
+
+              <div className="field">
+                <span className="field-label">Join with a code</span>
+                <div className="join-row">
+                  <div className="code-input-wrap">
+                    <input
+                      className="input input--code"
+                      value={roomCode}
+                      onChange={(event) => {
+                        setRoomCode(cleanRoomCode(event.target.value));
+                        setError("");
+                      }}
+                      maxLength={6}
+                      placeholder="ABC123"
+                      inputMode="text"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      aria-label="Six character room code"
+                    />
+                    {roomCode.length > 0 && (
+                      <button
+                        type="button"
+                        className="icon-btn code-clear"
+                        onClick={() => setRoomCode("")}
+                        aria-label="Clear room code"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={joinRoom}
+                    disabled={roomCode.length !== 6}
+                  >
+                    Join
+                  </button>
+                </div>
+                {error && (
+                  <p className="small" style={{ color: "var(--negative)" }}>
+                    {error}
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="card-head">
+                <h2 className="card-title">The shape of a round</h2>
+                <span className="pill">3 min</span>
+              </div>
+              <div className="help-list" style={{ gap: 12 }}>
+                <div>
+                  <p className="setting-value">1 · Pick a word</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    The drawer gets a short list and 20 seconds to choose.
+                  </p>
+                </div>
+                <div>
+                  <p className="setting-value">2 · Draw and guess</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    Everyone types guesses. Correct answers score more the earlier they land.
+                  </p>
+                </div>
+                <div>
+                  <p className="setting-value">3 · Score and pass</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    The word is revealed, points go up and the next player takes the pen.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </aside>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -1,53 +1,193 @@
 "use client";
 
-import { Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
+import { ArrowLeftIcon, PlayIcon } from "@/components/icons";
+import { Segmented } from "@/components/segmented";
+import { Topbar } from "@/components/topbar";
+import { makeRoomCode, readStoredNickname, storeNickname } from "@/lib/config";
 
 function CreateContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const initialName = searchParams.get("name") || "Player";
-  const quick = searchParams.get("quick") === "1";
-  const [nickname, setNickname] = useState(initialName);
+  const searchParams = useSearchParams();
+  const nameParam = (searchParams.get("name") ?? "").trim();
+  const [nickname, setNickname] = useState(nameParam);
+  const [rounds, setRounds] = useState(3);
+  const [drawTime, setDrawTime] = useState(80);
+  const [words, setWords] = useState(3);
+  const [maxPlayers, setMaxPlayers] = useState(8);
+
+  useEffect(() => {
+    if (nickname) return;
+    const stored = readStoredNickname();
+    if (stored) setNickname(stored);
+  }, [nickname]);
 
   const create = () => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    router.push(`/games/skribbl/room/${code.toLowerCase()}?name=${encodeURIComponent(nickname.trim() || "Player")}`);
+    const name = nickname.trim() || "Player";
+    storeNickname(name);
+    const code = makeRoomCode();
+    const params = new URLSearchParams({
+      name,
+      host: "1",
+      rounds: String(rounds),
+      time: String(drawTime),
+      words: String(words),
+      max: String(maxPlayers),
+    });
+    router.push(`/room/${code}?${params.toString()}`);
   };
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-3xl border border-slate-700/60 bg-gradient-to-b from-cyan-500/10 to-slate-950/95 p-6 shadow-2xl">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-extrabold mb-2" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-            Create Room
-          </h1>
-          <p className="text-slate-400">Start a Skribbl room with friends</p>
+    <div className="app-shell">
+      <Topbar />
+      <main className="page page--narrow">
+        <div className="page-head">
+          <div className="page-head-copy">
+            <p className="eyebrow">Skribbl</p>
+            <h1 className="home-title">Create a room</h1>
+            <p className="subline">
+              Pick the pace, then share the six-character code. Everyone else joins from the home
+              screen.
+            </p>
+          </div>
+          <Link href="/" className="btn btn--ghost btn--sm">
+            <ArrowLeftIcon size={13} />
+            Back
+          </Link>
         </div>
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Nickname</label>
-          <input
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            maxLength={16}
-            className="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-slate-700/70 text-white focus:outline-none focus:border-cyan-400/80"
-          />
+
+        <div className="lobby-grid">
+          <section className="card">
+            <div className="form-grid">
+              <label className="field">
+                <span className="field-label">Your nickname</span>
+                <input
+                  className="input"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  maxLength={MAX_NICKNAME_LENGTH}
+                  placeholder="Your name"
+                  autoComplete="nickname"
+                />
+              </label>
+
+              <div className="settings-list">
+                <div className="setting-row">
+                  <span className="setting-label">Rounds</span>
+                  <Segmented
+                    label="Rounds"
+                    value={rounds}
+                    options={[
+                      { label: "2", value: 2 },
+                      { label: "3", value: 3 },
+                      { label: "5", value: 5 },
+                    ]}
+                    onChange={setRounds}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Draw time</span>
+                  <Segmented
+                    label="Draw time"
+                    value={drawTime}
+                    options={[
+                      { label: "60s", value: 60 },
+                      { label: "80s", value: 80 },
+                      { label: "120s", value: 120 },
+                    ]}
+                    onChange={setDrawTime}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Word choices</span>
+                  <Segmented
+                    label="Word choices"
+                    value={words}
+                    options={[
+                      { label: "2", value: 2 },
+                      { label: "3", value: 3 },
+                      { label: "4", value: 4 },
+                    ]}
+                    onChange={setWords}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Max players</span>
+                  <Segmented
+                    label="Max players"
+                    value={maxPlayers}
+                    options={[
+                      { label: "4", value: 4 },
+                      { label: "8", value: 8 },
+                      { label: "12", value: 12 },
+                    ]}
+                    onChange={setMaxPlayers}
+                  />
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button className="btn btn--primary btn--lg" type="button" onClick={create}>
+                  <PlayIcon size={15} />
+                  Create room
+                </button>
+                <Link href="/" className="btn btn--ghost btn--lg">
+                  Cancel
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <aside className="rail">
+            <section className="card">
+              <div className="card-head">
+                <h2 className="card-title">How this room plays</h2>
+                <span className="pill">{rounds} rounds</span>
+              </div>
+              <div className="help-list" style={{ gap: 12 }}>
+                <div>
+                  <p className="setting-value">Every player draws</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    Turns rotate through the room. Each player gets the pen once per round.
+                  </p>
+                </div>
+                <div>
+                  <p className="setting-value">Fast guesses score more</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    Correct guesses earn up to 100 points. The drawer earns points when the room
+                    guesses.
+                  </p>
+                </div>
+                <div>
+                  <p className="setting-value">Host controls the pace</p>
+                  <p className="small faint" style={{ marginTop: 2 }}>
+                    You can still change rounds and draw time in the lobby before starting.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </aside>
         </div>
-        <button onClick={create} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-cyan-500 to-violet-500 hover:from-cyan-400 hover:to-violet-400 transition">
-          {quick ? "Quick Play" : "Create Private Room"}
-        </button>
-        <button onClick={() => router.push("/")} className="w-full mt-3 py-3 rounded-xl font-semibold bg-slate-800/80 border border-slate-700/70 hover:bg-slate-700/70 transition">
-          Back to Home
-        </button>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
 export default function CreatePage() {
   return (
-    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-slate-400">Loading...</main>}>
+    <Suspense
+      fallback={
+        <div className="app-shell">
+          <Topbar />
+          <main className="page page--narrow">
+            <div className="loading-card">Loading…</div>
+          </main>
+        </div>
+      }
+    >
       <CreateContent />
     </Suspense>
   );
