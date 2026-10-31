@@ -33,6 +33,7 @@ const FATAL_CODES = new Set([
   "ROOM_NOT_FOUND",
   "ROOM_FULL",
   "ROOM_EXISTS",
+  "ROOM_NOT_RESERVED",
   "GAME_MISMATCH",
   "ROOM_IN_PROGRESS",
   "RESUME_FAILED",
@@ -195,7 +196,6 @@ function ConnectedRoom({
   const [width, setWidth] = useState(DRAW_WIDTHS[1]);
 
   const now = useNow(250);
-  const phaseRef = useRef<string>("");
   const playerIdRef = useRef<string | null>(null);
 
   const handleEvent = useCallback((event: ServerEvent) => {
@@ -327,8 +327,6 @@ function ConnectedRoom({
 
   useEffect(() => {
     if (!snapshot) return;
-    const previousPhase = phaseRef.current;
-    phaseRef.current = snapshot.phase;
 
     if (snapshot.phase === "lobby") {
       setStrokes([]);
@@ -344,7 +342,10 @@ function ConnectedRoom({
       setSelectedWord(null);
       setRoundResult(null);
       setFinished(null);
-      if (previousPhase !== "choosing") setChoices([]);
+      // Don't clear `choices` here. The server sends the private "game.word.choices"
+      // event just before the choosing snapshot, so clearing on the phase change
+      // would wipe the options the drawer just received. Stale choices are already
+      // cleared when the round starts drawing and when the round ends.
       return;
     }
 
@@ -610,6 +611,7 @@ function ConnectedRoom({
                           { label: "2", value: 2 },
                           { label: "3", value: 3 },
                           { label: "4", value: 4 },
+                          { label: "5", value: 5 },
                         ]}
                         onChange={(value) => updateSettings({ wordCount: value })}
                       />

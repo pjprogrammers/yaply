@@ -18,6 +18,7 @@ import {
   MAX_INVALID_MESSAGES,
   MAX_MESSAGE_BYTES,
   MAX_POINTS_PER_STROKE,
+  MAX_SOCKETS_PER_CLIENT_PER_ROOM,
   MAX_SOCKETS_PER_ROOM,
   MAX_STROKES_PER_ROUND,
   MESSAGE_RATE_LIMIT,
@@ -25,6 +26,7 @@ import {
   PROTOCOL_VERSION,
   RECONNECT_GRACE_PERIOD_MS,
   ROOM_INACTIVITY_EXPIRY_MS,
+  ROOM_RESERVATION_TTL_MS,
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
@@ -74,6 +76,13 @@ type StoredState = {
   version: number;
   createdAt: number;
   lastActivity: number;
+  /**
+   * Set by `POST /rooms` before the first player connects. The reservation is
+   * what makes room allocation atomic: a second request for the same code sees
+   * an unexpired reservation and picks another code.
+   */
+  reservedAt: number | null;
+  reservedGame: GameKind | null;
 };
 
 type SocketState = {
@@ -82,6 +91,8 @@ type SocketState = {
   invalid: number;
   createdAt: number;
   lastMessageAt: number;
+  /** Best-effort client identity used to cap multiple sockets per room. */
+  client: string;
 };
 
 const DRAWER_GRACE_MS = 15_000;
@@ -154,6 +165,8 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     version: 0,
     createdAt: now,
     lastActivity: now,
+    reservedAt: null,
+    reservedGame: null,
   };
 }
 
@@ -184,14 +197,126 @@ export class GameRoom {
     // Merge over a fresh state so rooms written by an older build gain any
     // fields added since, instead of starting with `undefined` values.
     this.room = { ...createEmptyState(stored.code, game), ...stored, game };
+
+    // Sockets never survive a Durable Object restart. Persisted `connected`
+    // flags are stale until each player reconnects with their resume token, so
+    // reset them and give every seat a fresh reconnect grace period.
+    const now = Date.now();
+    let changed = false;
+    for (const player of this.room.players) {
+      if (player.connected) {
+        player.connected = false;
+        player.lastSeen = now;
+        changed = true;
+      } else if (!Number.isFinite(player.lastSeen) || player.lastSeen <= 0) {
+        player.lastSeen = now;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await this.ctx.storage.put("room", this.room);
+    }
+    // Re-establish timeout/expiry enforcement after a hibernation or restart.
+    await this.scheduleAlarm();
+  }
+
+  private roomHasState(): boolean {
+    return (
+      this.room.players.length > 0 ||
+      this.room.phase !== "lobby" ||
+      this.room.version > 0 ||
+      this.room.strokes.length > 0 ||
+      this.room.chain !== null
+    );
+  }
+
+  private activeReservation(now = Date.now()): { game: GameKind; expiresAt: number } | null {
+    if (!this.room.reservedAt || !this.room.reservedGame) return null;
+    const expiresAt = this.room.reservedAt + ROOM_RESERVATION_TTL_MS;
+    if (now >= expiresAt) return null;
+    return { game: this.room.reservedGame, expiresAt };
+  }
+
+  private clearExpiredReservation(now: number): boolean {
+    if (!this.room.reservedAt || this.activeReservation(now)) return false;
+    this.room.reservedAt = null;
+    this.room.reservedGame = null;
+    this.room.lastActivity = now;
+    return true;
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/internal/exists") {
-      const exists = this.room.players.length > 0 || this.room.phase !== "lobby" || this.room.version > 0;
+      const now = Date.now();
+      const exists = this.roomHasState() || this.activeReservation(now) !== null;
       return new Response(JSON.stringify({ exists }), {
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+      });
+    }
+
+    if (url.pathname === "/internal/reserve") {
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ reserved: false, reason: "method" }), {
+          status: 405,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ reserved: false, reason: "body" }), {
+          status: 400,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      const payload = typeof body === "object" && body !== null
+        ? (body as { game?: unknown; code?: unknown })
+        : {};
+      const game = payload.game === "chain" ? "chain" : payload.game === "skribbl" ? "skribbl" : null;
+      const code = typeof payload.code === "string" ? payload.code.toLowerCase() : "";
+      if (!game || !/^[a-z0-9]{6}$/.test(code)) {
+        return new Response(JSON.stringify({ reserved: false, reason: "invalid" }), {
+          status: 400,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      const now = Date.now();
+      this.clearExpiredReservation(now);
+
+      if (this.roomHasState()) {
+        return new Response(JSON.stringify({ reserved: false, reason: "exists" }), {
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      if (this.room.code && this.room.code !== code) {
+        return new Response(JSON.stringify({ reserved: false, reason: "code" }), {
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      if (this.activeReservation(now)) {
+        return new Response(JSON.stringify({ reserved: false, reason: "reserved" }), {
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+
+      this.room.code = code;
+      this.room.game = game;
+      this.room.reservedAt = now;
+      this.room.reservedGame = game;
+      this.room.lastActivity = now;
+      await this.ctx.storage.put("room", this.room);
+      await this.scheduleAlarm();
+
+      return new Response(JSON.stringify({ reserved: true }), {
+        status: 201,
         headers: { "content-type": "application/json", "cache-control": "no-store" },
       });
     }
@@ -217,14 +342,35 @@ export class GameRoom {
       return new Response("Too many connections for this room", { status: 429 });
     }
 
+    const clientId = this.clientKey(request);
+    let clientSockets = 0;
+    for (const state of this.socketState.values()) {
+      if (state.client === clientId) clientSockets += 1;
+    }
+    if (clientSockets >= MAX_SOCKETS_PER_CLIENT_PER_ROOM) {
+      logRoom("warn", "room.connect.client_capped", {
+        game,
+        code: safeCode(code),
+      });
+      return new Response("Too many connections from this client", { status: 429 });
+    }
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    this.handleSession(server);
+    this.handleSession(server, clientId);
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  private handleSession(ws: WebSocket) {
+  private clientKey(request: Request): string {
+    return (
+      request.headers.get("cf-connecting-ip") ??
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown"
+    );
+  }
+
+  private handleSession(ws: WebSocket, client = "unknown") {
     ws.accept();
     this.sockets.set(ws, null);
     this.socketState.set(ws, {
@@ -233,6 +379,7 @@ export class GameRoom {
       invalid: 0,
       createdAt: Date.now(),
       lastMessageAt: Date.now(),
+      client,
     });
 
     // A fresh room has no alarm yet. Schedule one so the unjoined-socket
@@ -328,6 +475,22 @@ export class GameRoom {
     } catch {
       // A closed socket is removed by its close handler.
     }
+  }
+
+  private rejectEntry(
+    ws: WebSocket,
+    action: "room.create" | "room.join",
+    code: string,
+    message: string,
+  ) {
+    logRoom("warn", "room.entry_rejected", {
+      game: this.requestedGame ?? this.room.game,
+      code: safeCode(this.requestedCode || this.room.code),
+      action,
+      reason: code,
+      phase: this.room.phase,
+    });
+    this.send(ws, { type: "room.error", code, message });
   }
 
   private broadcast(event: ServerEvent) {
@@ -472,6 +635,12 @@ export class GameRoom {
     // does not hand the room to someone else.
     this.broadcast({ type: "room.player.left", playerId });
     this.broadcastSnapshot();
+    logRoom("info", "room.player_disconnected", {
+      game: this.room.game,
+      code: safeCode(this.room.code),
+      phase: this.room.phase,
+      players: this.room.players.length,
+    });
     await this.persist();
     await this.scheduleAlarm();
   }
@@ -517,6 +686,12 @@ export class GameRoom {
         return;
       }
       if (event.protocolVersion !== PROTOCOL_VERSION) {
+        logRoom("warn", "room.protocol_mismatch", {
+          game: this.requestedGame ?? this.room.game,
+          code: safeCode(this.requestedCode || this.room.code),
+          clientVersion: event.protocolVersion,
+          serverVersion: PROTOCOL_VERSION,
+        });
         this.send(ws, {
           type: "room.error",
           code: "PROTOCOL_MISMATCH",
@@ -584,38 +759,43 @@ export class GameRoom {
 
   private async handleCreate(ws: WebSocket, event: Extract<ClientEvent, { type: "room.create" }>) {
     if (!this.requestedCode || !this.requestedGame) {
-      this.send(ws, {
-        type: "room.error",
-        code: "INVALID_ROOM",
-        message: "That room address is not valid.",
-      });
+      this.rejectEntry(ws, "room.create", "INVALID_ROOM", "That room address is not valid.");
       return;
     }
 
     if (this.requestedGame !== event.game) {
-      this.send(ws, {
-        type: "room.error",
-        code: "GAME_MISMATCH",
-        message: "That room belongs to a different game.",
-      });
+      this.rejectEntry(ws, "room.create", "GAME_MISMATCH", "That room belongs to a different game.");
       return;
     }
 
     if (this.room.code && this.room.game !== event.game) {
-      this.send(ws, {
-        type: "room.error",
-        code: "GAME_MISMATCH",
-        message: "That room belongs to a different game.",
-      });
+      this.rejectEntry(ws, "room.create", "GAME_MISMATCH", "That room belongs to a different game.");
       return;
     }
 
-    if (this.room.players.length > 0) {
-      this.send(ws, {
-        type: "room.error",
-        code: "ROOM_EXISTS",
-        message: "That room code is already in use. Go back and create a new room.",
-      });
+    if (this.roomHasState()) {
+      this.rejectEntry(
+        ws,
+        "room.create",
+        "ROOM_EXISTS",
+        "That room code is already in use. Go back and create a new room.",
+      );
+      return;
+    }
+
+    const reservation = this.activeReservation();
+    if (!reservation) {
+      this.rejectEntry(
+        ws,
+        "room.create",
+        "ROOM_NOT_RESERVED",
+        "This room was not reserved. Go back and create a new room.",
+      );
+      return;
+    }
+
+    if (reservation.game !== event.game || this.room.reservedGame !== event.game) {
+      this.rejectEntry(ws, "room.create", "GAME_MISMATCH", "That room belongs to a different game.");
       return;
     }
 
@@ -640,38 +820,32 @@ export class GameRoom {
 
   private async handleJoin(ws: WebSocket, event: Extract<ClientEvent, { type: "room.join" }>) {
     if (this.room.players.length === 0) {
-      this.send(ws, {
-        type: "room.error",
-        code: "ROOM_NOT_FOUND",
-        message: "No room with that code is open. Check the code and try again.",
-      });
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "ROOM_NOT_FOUND",
+        "No room with that code is open. Check the code and try again.",
+      );
       return;
     }
 
     if (this.requestedGame !== event.game) {
-      this.send(ws, {
-        type: "room.error",
-        code: "GAME_MISMATCH",
-        message: "That room belongs to a different game.",
-      });
+      this.rejectEntry(ws, "room.join", "GAME_MISMATCH", "That room belongs to a different game.");
       return;
     }
 
     if (event.game !== this.room.game) {
-      this.send(ws, {
-        type: "room.error",
-        code: "GAME_MISMATCH",
-        message: "That room belongs to a different game.",
-      });
+      this.rejectEntry(ws, "room.join", "GAME_MISMATCH", "That room belongs to a different game.");
       return;
     }
 
     if (event.code.toLowerCase() !== this.room.code.toLowerCase()) {
-      this.send(ws, {
-        type: "room.error",
-        code: "ROOM_NOT_FOUND",
-        message: "No room with that code is open. Check the code and try again.",
-      });
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "ROOM_NOT_FOUND",
+        "No room with that code is open. Check the code and try again.",
+      );
       return;
     }
 
@@ -685,34 +859,38 @@ export class GameRoom {
       this.sendPrivateState(ws, resumed.id);
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcastSnapshot();
+      logRoom("info", "room.reconnected", {
+        game: this.room.game,
+        code: safeCode(this.room.code),
+        players: this.room.players.length,
+        phase: this.room.phase,
+      });
       await this.commit();
       return;
     }
 
     if (event.resumeToken && this.room.phase !== "lobby") {
-      this.send(ws, {
-        type: "room.error",
-        code: "RESUME_FAILED",
-        message: "That seat has expired. Wait for the next round or ask the host for a new room.",
-      });
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "RESUME_FAILED",
+        "That seat has expired. Wait for the next round or ask the host for a new room.",
+      );
       return;
     }
 
     if (this.room.phase !== "lobby") {
-      this.send(ws, {
-        type: "room.error",
-        code: "ROOM_IN_PROGRESS",
-        message: "That game is already in progress. Ask the host to start a rematch.",
-      });
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "ROOM_IN_PROGRESS",
+        "That game is already in progress. Ask the host to start a rematch.",
+      );
       return;
     }
 
     if (this.room.players.length >= this.room.settings.maxPlayers) {
-      this.send(ws, {
-        type: "room.error",
-        code: "ROOM_FULL",
-        message: "That room is full.",
-      });
+      this.rejectEntry(ws, "room.join", "ROOM_FULL", "That room is full.");
       return;
     }
 
@@ -726,6 +904,11 @@ export class GameRoom {
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
     this.broadcastSnapshot();
     this.broadcastSystemChat(`${player.nickname} joined.`);
+    logRoom("info", "room.joined", {
+      game: this.room.game,
+      code: safeCode(this.room.code),
+      players: this.room.players.length,
+    });
     await this.commit();
   }
 
@@ -1375,7 +1558,16 @@ export class GameRoom {
     }
 
     if (this.room.players.length === 0) {
-      this.room = createEmptyState(this.room.code, this.room.game);
+      // Keep the used marker (version) and creation time so the code is not
+      // reallocated before the empty-room TTL alarm fires. The room itself is
+      // lobby-empty, so a fresh player can still create it after expiry.
+      const previous = this.room;
+      this.room = {
+        ...createEmptyState(previous.code, previous.game),
+        version: previous.version,
+        createdAt: previous.createdAt,
+        lastActivity: Date.now(),
+      };
       return;
     }
 
@@ -1410,6 +1602,14 @@ export class GameRoom {
     if (this.room.game === "skribbl") {
       if (this.room.phase === "choosing" && this.room.chooseEndsAt) {
         deadlines.push(this.room.chooseEndsAt);
+      }
+      if (this.room.phase === "choosing") {
+        const drawer = this.player(this.room.drawerId);
+        if (drawer && !drawer.connected) {
+          // Skip a drawer who dropped while picking a word instead of waiting
+          // for the full auto-choice timeout.
+          deadlines.push(drawer.lastSeen + DRAWER_GRACE_MS);
+        }
       }
       if (this.room.phase === "drawing") {
         if (this.room.endsAt) deadlines.push(this.room.endsAt);
@@ -1447,7 +1647,11 @@ export class GameRoom {
       deadlines.push(this.room.lastActivity + ROOM_INACTIVITY_EXPIRY_MS);
     }
 
-    if (this.room.players.length === 0) {
+    const reservation = this.activeReservation(now);
+    if (reservation) {
+      // While a code is reserved, the empty-room TTL must not delete it.
+      deadlines.push(reservation.expiresAt);
+    } else if (this.room.players.length === 0) {
       deadlines.push(this.room.lastActivity + EMPTY_ROOM_TTL_MS);
     }
 
@@ -1519,10 +1723,26 @@ export class GameRoom {
     const now = Date.now();
     let changed = false;
 
+    if (this.clearExpiredReservation(now)) {
+      changed = true;
+      logRoom("info", "room.reservation_expired", {
+        game: this.room.game,
+        code: safeCode(this.room.code),
+      });
+    }
+
     if (this.room.game === "skribbl") {
-      if (this.room.phase === "choosing" && this.room.chooseEndsAt && now >= this.room.chooseEndsAt) {
-        this.applyWordChoice(this.room.wordChoices[0]?.id ?? "");
-        changed = true;
+      if (this.room.phase === "choosing") {
+        const drawer = this.player(this.room.drawerId);
+        if (drawer && !drawer.connected && now - drawer.lastSeen >= DRAWER_GRACE_MS) {
+          // Skip a drawer who dropped while picking a word instead of waiting
+          // for the full auto-choice timeout.
+          this.nextTurn();
+          changed = true;
+        } else if (this.room.chooseEndsAt && now >= this.room.chooseEndsAt) {
+          this.applyWordChoice(this.room.wordChoices[0]?.id ?? "");
+          changed = true;
+        }
       } else if (this.room.phase === "drawing") {
         const drawer = this.player(this.room.drawerId);
         if (drawer && !drawer.connected && now - drawer.lastSeen >= DRAWER_GRACE_MS) {
@@ -1552,6 +1772,12 @@ export class GameRoom {
     );
     for (const player of stale) {
       this.removePlayer(player.id, "disconnected");
+      logRoom("info", "room.player_removed", {
+        game: this.room.game,
+        code: safeCode(this.room.code),
+        reason: "grace_expired",
+        players: this.room.players.length,
+      });
       changed = true;
     }
 
@@ -1570,6 +1796,7 @@ export class GameRoom {
     const anyConnected = this.room.players.some((player) => player.connected);
     if (
       this.room.players.length === 0 &&
+      !this.activeReservation(now) &&
       now - this.room.lastActivity >= EMPTY_ROOM_TTL_MS
     ) {
       this.room = createEmptyState(this.room.code, this.room.game);

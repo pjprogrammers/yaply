@@ -1,35 +1,57 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanRoomCode,
+  createRoomCode,
   inviteUrl,
-  makeRoomCode,
   numberParam,
   readStoredNickname,
   roomPath,
   storeNickname,
 } from "./config";
 
-const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe("chain room config", () => {
-  it("generates six-character codes from the unambiguous alphabet", () => {
-    for (let i = 0; i < 50; i += 1) {
-      const code = makeRoomCode();
-      expect(code).toHaveLength(6);
-      for (const character of code) {
-        expect(CODE_ALPHABET).toContain(character);
-      }
-    }
+  it("asks the Worker for a reserved chain room code", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room");
+    vi.resetModules();
+
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ code: "xyz789", game: "chain" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config = await import("./config");
+    await expect(config.createRoomCode()).resolves.toBe("xyz789");
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://rt.example.com/rooms");
+    expect(JSON.parse(String(init.body))).toEqual({ game: "chain" });
   });
 
-  it("does not repeat itself in practice", () => {
-    const codes = new Set(Array.from({ length: 100 }, () => makeRoomCode()));
-    expect(codes.size).toBe(100);
+  it("rejects a room issued for the wrong game", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room");
+    vi.resetModules();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: "xyz789", game: "skribbl" }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    const config = await import("./config");
+    await expect(config.createRoomCode()).rejects.toThrow("different game");
   });
 
   it("normalises user-entered room codes", () => {

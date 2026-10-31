@@ -6,6 +6,8 @@ node_modules
 # Testing
 coverage
 *.lcov
+test-results/
+playwright-report/
 
 # Next.js
 .next/
@@ -53,4 +55,8 @@ apps/*/.next
 apps/*/out
 apps/*/dist
 packages/*/dist
+
+#coding agent use stuff , dont bother with this
 next-task.md
+goal.md
+playwright.config.ts

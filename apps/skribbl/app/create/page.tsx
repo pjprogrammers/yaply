@@ -7,7 +7,7 @@ import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
 import { ArrowLeftIcon, PlayIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
 import { Topbar } from "@/components/topbar";
-import { makeRoomCode, readStoredNickname, storeNickname } from "@/lib/config";
+import { createRoomCode, readStoredNickname, storeNickname } from "@/lib/config";
 
 function CreateContent() {
   const router = useRouter();
@@ -18,6 +18,8 @@ function CreateContent() {
   const [drawTime, setDrawTime] = useState(80);
   const [words, setWords] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(8);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (nickname) return;
@@ -25,19 +27,31 @@ function CreateContent() {
     if (stored) setNickname(stored);
   }, [nickname]);
 
-  const create = () => {
+  const create = async () => {
+    if (creating) return;
     const name = nickname.trim() || "Player";
     storeNickname(name);
-    const code = makeRoomCode();
-    const params = new URLSearchParams({
-      name,
-      host: "1",
-      rounds: String(rounds),
-      time: String(drawTime),
-      words: String(words),
-      max: String(maxPlayers),
-    });
-    router.push(`/room/${code}?${params.toString()}`);
+    setError("");
+    setCreating(true);
+    try {
+      const code = await createRoomCode();
+      const params = new URLSearchParams({
+        name,
+        host: "1",
+        rounds: String(rounds),
+        time: String(drawTime),
+        words: String(words),
+        max: String(maxPlayers),
+      });
+      router.push(`/room/${code}?${params.toString()}`);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not create a room right now. Please try again.",
+      );
+      setCreating(false);
+    }
   };
 
   return (
@@ -110,6 +124,7 @@ function CreateContent() {
                       { label: "2", value: 2 },
                       { label: "3", value: 3 },
                       { label: "4", value: 4 },
+                      { label: "5", value: 5 },
                     ]}
                     onChange={setWords}
                   />
@@ -130,14 +145,24 @@ function CreateContent() {
               </div>
 
               <div className="form-actions">
-                <button className="btn btn--primary btn--lg" type="button" onClick={create}>
+                <button
+                  className="btn btn--primary btn--lg"
+                  type="button"
+                  onClick={create}
+                  disabled={creating}
+                >
                   <PlayIcon size={15} />
-                  Create room
+                  {creating ? "Creating room…" : "Create room"}
                 </button>
                 <Link href="/" className="btn btn--ghost btn--lg">
                   Cancel
                 </Link>
               </div>
+              {error && (
+                <p className="small" style={{ color: "var(--negative)" }}>
+                  {error}
+                </p>
+              )}
             </div>
           </section>
 

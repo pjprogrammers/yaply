@@ -1,7 +1,7 @@
 import { PROTOCOL_VERSION } from "./constants";
 import type { ClientEvent, ServerEvent } from "./events";
 import { parseServerEvent } from "./schemas";
-import { normalizeRealtimeBaseUrl } from "./config";
+import { buildRoomUrl } from "./config";
 import type { GameKind, GameSettings, RoomSnapshot } from "./types";
 
 export type ConnectionStatus =
@@ -30,6 +30,7 @@ const FATAL_CODES = new Set([
   "ROOM_NOT_FOUND",
   "ROOM_FULL",
   "ROOM_EXISTS",
+  "ROOM_NOT_RESERVED",
   "GAME_MISMATCH",
   "ROOM_IN_PROGRESS",
   "RESUME_FAILED",
@@ -40,9 +41,7 @@ const MAX_QUEUED_EVENTS = 100;
 const MAX_PROTOCOL_ERRORS = 5;
 
 function roomUrl(baseUrl: string, code: string, game: GameKind): string {
-  const base = normalizeRealtimeBaseUrl(baseUrl);
-  if (!base) return "";
-  return `${base}/${encodeURIComponent(code)}?game=${encodeURIComponent(game)}`;
+  return buildRoomUrl(baseUrl, code, game);
 }
 
 export class GameSocket {
@@ -55,6 +54,7 @@ export class GameSocket {
   private queue: ClientEvent[] = [];
   private welcome = false;
   private protocolErrors = 0;
+  private joinFallbackTried = false;
 
   constructor(private readonly options: GameSocketOptions) {
     this.resumeToken = options.resumeToken ?? null;
@@ -183,6 +183,25 @@ export class GameSocket {
       }
 
       if (event.type === "room.error") {
+        // A copied creator link may still carry create=1. If the room already
+        // exists, fall back to joining it instead of failing the connection.
+        if (
+          event.code === "ROOM_EXISTS" &&
+          this.options.create &&
+          !this.welcome &&
+          !this.joinFallbackTried
+        ) {
+          this.joinFallbackTried = true;
+          this.sendNow({
+            type: "room.join",
+            protocolVersion: PROTOCOL_VERSION,
+            code: this.options.code,
+            game: this.options.game,
+            nickname: this.options.nickname,
+          });
+          return;
+        }
+
         this.options.onError?.(event.code, event.message);
         if (FATAL_CODES.has(event.code)) {
           this.fail(event.code, event.message);
@@ -205,7 +224,7 @@ export class GameSocket {
     socket.addEventListener("close", (event) => {
       if (this.socket === socket) this.socket = null;
       if (this.closed) {
-        this.setStatus("disconnected");
+        if (this.status !== "failed") this.setStatus("disconnected");
         return;
       }
       // 4000 means another tab took over this seat. Reconnecting would fight it.

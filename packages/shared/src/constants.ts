@@ -28,6 +28,12 @@ export const DRAWING_BATCH_INTERVAL_MS = 40;
 export const RECONNECT_GRACE_PERIOD_MS = 30000;
 export const ROOM_INACTIVITY_EXPIRY_MS = 600000;
 export const EMPTY_ROOM_TTL_MS = 60000;
+/**
+ * A room code allocated by `POST /rooms` is reserved for this long before the
+ * first player connects. It is released automatically so abandoned create
+ * attempts do not permanently burn codes.
+ */
+export const ROOM_RESERVATION_TTL_MS = 2 * 60_000;
 
 /** Hard cap on a single WebSocket frame. Larger frames are dropped unparsed. */
 export const MAX_MESSAGE_BYTES = 16 * 1024;
@@ -42,6 +48,14 @@ export const MAX_INVALID_MESSAGES = 20;
 export const UNJOINED_SOCKET_TTL_MS = 30000;
 /** Hard cap on sockets (joined or not) attached to one room. */
 export const MAX_SOCKETS_PER_ROOM = 32;
+/**
+ * Best-effort cap on sockets from one client (IP) in one room. This blunts
+ * attempts to multiply the per-socket rate limit by opening many connections,
+ * while still allowing a group behind one NAT/router to fill a default room.
+ * The Worker also rate limits upgrades per client; Cloudflare's account-wide
+ * limits remain the final backstop.
+ */
+export const MAX_SOCKETS_PER_CLIENT_PER_ROOM = 8;
 
 export const CHAIN_ROWS = 6;
 export const CHAIN_COLS = 9;

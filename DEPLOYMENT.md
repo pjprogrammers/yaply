@@ -7,7 +7,7 @@
 | Main site | Vercel Hobby | `apps/web` | https://yaply-web.vercel.app |
 | Skribbl | Vercel Hobby | `apps/skribbl` | https://yaply-skribbl.vercel.app |
 | Chain Reaction | Vercel Hobby | `apps/chain` | https://yaply-chain.vercel.app |
-| Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `https://yaply-realtime.<account>.workers.dev` |
+| Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `https://yaply-realtime-production.yaplygames.workers.dev` |
 
 Final production domains, once DNS is approved:
 
@@ -62,8 +62,15 @@ npm run dev --workspace=@yaply/web       # http://localhost:3000
 
 Local defaults in `apps/realtime/wrangler.toml` allow origins on ports 3000,
 3001, and 3002. Both game apps fall back to `ws://localhost:8787/room` when
-`NEXT_PUBLIC_REALTIME_URL` is unset, so no `.env.local` is required for local
-multiplayer.
+`NEXT_PUBLIC_REALTIME_URL` is unset.
+
+If a game's `.env.local` points at the production Worker, override it for a
+local run (process environment wins over `.env.local`):
+
+```bash
+NEXT_PUBLIC_REALTIME_URL=ws://localhost:8787/room \
+  npm run dev --workspace=@yaply/skribbl
+```
 
 Useful Worker endpoints while developing:
 
@@ -74,6 +81,32 @@ curl -X POST http://localhost:8787/rooms \
   -H 'content-type: application/json' \
   -d '{"game":"chain"}'
 ```
+
+### Browser end-to-end tests
+
+With the Worker on 8787 and both game dev servers running against it:
+
+```bash
+npm run test:e2e
+```
+
+The Playwright suite creates real rooms through the Worker, completes full
+Skribbl and Chain Reaction matches, refreshes a player mid-match, disconnects a
+drawer, and checks multi-player state convergence. Override the targets with
+`E2E_SKRIBBL_URL` and `E2E_CHAIN_URL` if needed.
+
+### Local load test
+
+```bash
+npm run test:load -- --rooms 5
+npm run test:load -- --rooms 20 --players 2 --games skribbl,chain
+```
+
+The script refuses non-local Worker URLs unless `--allow-remote` is passed. It
+creates rooms through `POST /rooms`, joins real WebSockets, starts a game in
+each room, measures an authoritative round-trip, and reconnects a sample of
+players. Keep levels under the local Worker limits (30 room creations and 60
+socket upgrades per client per minute) or leave a minute between runs.
 
 ## Environment variables
 
@@ -95,7 +128,7 @@ NEXT_PUBLIC_SKRIBBL_URL=https://skribbl.yaply.eu.org
 ### `apps/skribbl` and `apps/chain` (Vercel project settings in production)
 
 ```env
-NEXT_PUBLIC_REALTIME_URL=wss://yaply-realtime.<account>.workers.dev/room
+NEXT_PUBLIC_REALTIME_URL=wss://yaply-realtime-production.yaplygames.workers.dev/room
 NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
 ```
 
@@ -206,8 +239,8 @@ Future schema changes require a new migration tag.
 After deployment, verify:
 
 ```bash
-curl https://yaply-realtime.<account>.workers.dev/health
-curl https://yaply-realtime.<account>.workers.dev/version
+curl https://yaply-realtime-production.yaplygames.workers.dev/health
+curl https://yaply-realtime-production.yaplygames.workers.dev/version
 ```
 
 `/version` reports `protocolVersion: 1` and `environment: "production"`.
@@ -276,20 +309,43 @@ affected frontend.
 12. A third client cannot join a full room; an invalid room code shows a clean error.
 13. Links from the main site reach both game deployments.
 14. Repeat steps 7–13 after switching to the custom domains.
+15. `npm run test:e2e` passes against a locally running Worker and both
+    frontends (six Playwright tests, including full matches, refresh/reconnect,
+    drawer disconnects, and Chain eliminations/surrenders).
+16. `npm run test:load -- --rooms 5`, then `--rooms 10`, then `--rooms 20`
+    (pausing at least a minute between levels for the per-minute limits) reports
+    zero failures locally. Do not run the load test against production without
+    an approved maintenance window and `--allow-remote`.
+17. Repeat the browser smoke tests against the deployed fronts and Worker after
+    deploying the updated code.
 
 ## Operational notes
 
+- `POST /rooms` is the only production room-allocation path. The Worker
+  generates the code, reserves it in the `${game}:${code}` Durable Object
+  before responding, and retries collisions internally. Both game frontends
+  call it before navigating to `/room/[code]`.
+- A collision during `room.create` (for example, a copied `?host=1` URL opened
+  in a second tab) automatically falls back to `room.join`. When a Player
+  opens their own invite link in a new tab, they join as a new player instead
+  of seeing `ROOM_EXISTS`.
 - Rooms are isolated by Durable Object id `${game}:${code}`, so a Chain room and
   a Skribbl room can never share state even with the same code.
-- `POST /rooms` allocates codes and checks the Durable Object namespace for
-  collisions. Clients may also generate a code, but `ROOM_EXISTS` remains the
-  final server-side guard.
 - Empty rooms expire after 60 seconds; inactive rooms expire after 10 minutes.
   Expiry deletes room storage and pending alarms.
 - Per-socket limits: 16 KiB frames, token-bucket message rate, 20 invalid frames
-  before disconnect, 32 sockets per room, and a 30-second join deadline.
+  before disconnect, 32 sockets per room, 8 sockets from one client IP per
+  room, and a 30-second join deadline for sockets that never join.
+- Worker-level limits: 30 room creations and 60 WebSocket upgrades per client
+  per minute. These are per Worker isolate and are a best-effort abuse control;
+  Cloudflare account limits remain the final backstop.
 - Reconnect tokens are stored in `sessionStorage` per game and room. The server
-  holds a disconnected seat for 30 seconds.
+  holds a disconnected seat for 30 seconds. A brand-new browser or tab does not
+  inherit another player's identity.
+- Observability: structured JSON logs cover room allocation failures, origin
+  rejections, upgrade rate limits, protocol mismatches, reconnect/disconnect
+  outcomes, per-client socket caps, room expiry, and Durable Object errors.
+  Reconnect tokens are never logged.
 - Check Cloudflare Workers/DO/SQLite quotas and Vercel Hobby usage before a large
   public launch. Free-tier limits are sufficient for small friend groups.
 - Never commit `.env.local`, `.dev.vars`, Wrangler credentials, or API tokens.

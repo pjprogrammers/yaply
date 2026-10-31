@@ -1,6 +1,6 @@
 import {
-  generateRoomCode,
   normalizeHttpUrl,
+  requestRoomCode,
   resolveRealtimeBaseUrl,
 } from "@yaply/shared/config";
 
@@ -16,8 +16,13 @@ export const REALTIME_URL = resolveRealtimeBaseUrl(
 
 export const NICKNAME_KEY = "yaply:nickname";
 
-export function makeRoomCode(): string {
-  return generateRoomCode(6);
+/**
+ * Room codes are allocated by the Worker so availability is checked and the
+ * code is reserved atomically before the browser opens a WebSocket.
+ */
+export async function createRoomCode(): Promise<string> {
+  const { code } = await requestRoomCode(REALTIME_URL, "skribbl");
+  return code;
 }
 
 export function cleanRoomCode(value: string): string {

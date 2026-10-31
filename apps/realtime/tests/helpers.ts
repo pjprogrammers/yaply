@@ -103,6 +103,7 @@ export type RoomHarness = {
 export async function makeRoom(
   game: "skribbl" | "chain",
   code = "abc123",
+  options: { reserve?: boolean } = {},
 ): Promise<RoomHarness> {
   const state = new FakeDurableObjectState();
   const room = new GameRoom(state as unknown as DurableObjectState, {});
@@ -110,6 +111,19 @@ export async function makeRoom(
 
   (room as any).requestedCode = code;
   (room as any).requestedGame = game;
+
+  if (options.reserve !== false) {
+    const response = await room.fetch(
+      new Request("https://room.internal/internal/reserve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ game, code }),
+      }),
+    );
+    if (!response.ok) {
+      throw new Error(`Could not reserve test room: ${response.status}`);
+    }
+  }
 
   return {
     room,

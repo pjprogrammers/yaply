@@ -17,7 +17,12 @@ export function normalizeHttpUrl(value: string | undefined, fallback: string): s
   }
 }
 
-/** Converts an http(s) base to ws(s) and makes sure the /room path is present. */
+/**
+ * Converts an http(s) base to ws(s) and makes sure exactly one `/room` path is
+ * present. Query strings and fragments are discarded because the room route is
+ * built by `buildRoomUrl`; keeping them would produce malformed URLs such as
+ * `/room?token=x/abc123?game=skribbl`.
+ */
 export function normalizeRealtimeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -33,11 +38,28 @@ export function normalizeRealtimeBaseUrl(value: string): string {
   if (url.protocol === "http:") url.protocol = "ws:";
   if (url.protocol !== "ws:" && url.protocol !== "wss:") return "";
 
+  url.search = "";
+  url.hash = "";
+
   const path = url.pathname.replace(/\/+$/, "");
-  if (!path) url.pathname = "/room";
-  else if (!path.endsWith("/room")) url.pathname = `${path}/room`;
+  url.pathname = !path || path === "/room"
+    ? "/room"
+    : path.endsWith("/room")
+      ? path
+      : `${path}/room`;
 
   return url.toString().replace(/\/+$/, "");
+}
+
+/**
+ * Builds the exact room WebSocket URL used by the browser:
+ * `wss://host/room/abc123?game=skribbl`.
+ */
+export function buildRoomUrl(baseUrl: string, code: string, game: GameKind): string {
+  const base = normalizeRealtimeBaseUrl(baseUrl);
+  if (!base) return "";
+  const safeCode = encodeURIComponent(code.trim().toLowerCase());
+  return `${base}/${safeCode}?game=${encodeURIComponent(game)}`;
 }
 
 /**
@@ -76,36 +98,85 @@ export type RoomCodeResponse = {
   game: GameKind;
 };
 
+export type RequestRoomCodeOptions = {
+  /** Total attempts, including the first one. */
+  attempts?: number;
+  /** Base delay between retries; the actual delay grows linearly. */
+  retryDelayMs?: number;
+  fetchImpl?: typeof fetch;
+  sleepImpl?: (ms: number) => Promise<void>;
+};
+
+const RETRYABLE_ROOM_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
 /**
- * Asks the Worker for a fresh room code. The Worker checks the Durable Object
- * namespace for collisions before returning, so clients never invent a code
- * that already belongs to another room.
+ * Asks the Worker for a fresh room code. The Worker reserves the code in the
+ * Durable Object namespace before returning it, so clients never invent a code
+ * that already belongs to another room. Retryable failures (collisions,
+ * throttling and transient 5xx responses) are retried automatically.
  */
 export async function requestRoomCode(
   baseUrl: string,
   game: GameKind,
-  fetchImpl: typeof fetch = fetch,
+  options: RequestRoomCodeOptions | typeof fetch = {},
 ): Promise<RoomCodeResponse> {
+  const opts: RequestRoomCodeOptions =
+    typeof options === "function" ? { fetchImpl: options } : options;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl = opts.sleepImpl ?? defaultSleep;
+  const attempts = Math.max(1, opts.attempts ?? 3);
+  const retryDelayMs = Math.max(0, opts.retryDelayMs ?? 250);
+
   const origin = realtimeHttpOrigin(baseUrl);
   if (!origin) throw new Error("The realtime server URL is not configured.");
 
-  const response = await fetchImpl(`${origin}/rooms`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ game }),
-  });
+  let lastMessage = "Could not create a room right now.";
+  let lastRetryable = false;
 
-  const payload = (await response.json().catch(() => null)) as
-    | { code?: unknown; game?: unknown; error?: unknown }
-    | null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchImpl(`${origin}/rooms`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ game }),
+        cache: "no-store",
+        credentials: "omit",
+      });
+    } catch {
+      lastMessage = "The realtime server could not be reached.";
+      lastRetryable = true;
+      if (attempt + 1 < attempts) await sleepImpl(retryDelayMs * (attempt + 1));
+      continue;
+    }
 
-  if (!response.ok || typeof payload?.code !== "string") {
-    const message =
+    const payload = (await response.json().catch(() => null)) as
+      | { code?: unknown; game?: unknown; error?: unknown }
+      | null;
+
+    if (response.ok && typeof payload?.code === "string") {
+      if (payload.game !== undefined && payload.game !== game) {
+        throw new Error("The realtime server returned a room for a different game.");
+      }
+      return { code: payload.code, game };
+    }
+
+    lastMessage =
       typeof payload?.error === "string" ? payload.error : "Could not create a room right now.";
-    throw new Error(message);
+    lastRetryable = RETRYABLE_ROOM_STATUS.has(response.status);
+    if (!lastRetryable) break;
+    if (attempt + 1 < attempts) await sleepImpl(retryDelayMs * (attempt + 1));
   }
 
-  return { code: payload.code, game };
+  const error = new Error(lastMessage);
+  (error as Error & { retryable?: boolean }).retryable = lastRetryable;
+  throw error;
 }
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";

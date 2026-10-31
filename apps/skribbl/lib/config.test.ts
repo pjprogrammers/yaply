@@ -1,30 +1,59 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanRoomCode,
+  createRoomCode,
   inviteUrl,
-  makeRoomCode,
   numberParam,
   readStoredNickname,
   roomPath,
   storeNickname,
 } from "./config";
 
-const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe("skribbl room config", () => {
-  it("generates six-character codes from the unambiguous alphabet", () => {
-    for (let i = 0; i < 50; i += 1) {
-      const code = makeRoomCode();
-      expect(code).toHaveLength(6);
-      for (const character of code) {
-        expect(CODE_ALPHABET).toContain(character);
-      }
-    }
+  it("asks the Worker for a reserved skribbl room code", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room");
+    vi.resetModules();
+
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ code: "abc123", game: "skribbl" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config = await import("./config");
+    await expect(config.createRoomCode()).resolves.toBe("abc123");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://rt.example.com/rooms");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ game: "skribbl" });
+  });
+
+  it("surfaces a Worker failure instead of inventing a code", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room");
+    vi.resetModules();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: "Room creation is disabled." }), {
+          status: 403,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    const config = await import("./config");
+    await expect(config.createRoomCode()).rejects.toThrow("Room creation is disabled.");
   });
 
   it("normalises user-entered room codes", () => {
@@ -64,5 +93,14 @@ describe("skribbl room config", () => {
 
     expect(config.REALTIME_URL).toBe("wss://rt.example.com/room");
     expect(config.MAIN_URL).toBe("https://main.example.com");
+  });
+
+  it("does not invent a localhost realtime URL on a deployed origin", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "");
+    vi.resetModules();
+
+    const config = await import("./config");
+
+    expect(config.REALTIME_URL).toBe("");
   });
 });

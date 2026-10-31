@@ -200,7 +200,37 @@ describe("Skribbl room rules", () => {
     const publicSnapshot = guesser.last("room.snapshot").snapshot;
     expect(publicSnapshot.phase).toBe("drawing");
     expect(publicSnapshot.maskedWord).not.toBe(selected.word);
-    expect(allText(guesser)).not.toContain(selected.word);
+    expect(allText(guesser)).not.toContain(`"${selected.word}"`);
+  });
+
+  it("offers exactly the configured number of word choices", async () => {
+    for (const wordCount of [2, 3, 4, 5]) {
+      const harness = await makeRoom("skribbl");
+      const alice = harness.connect();
+      await alice.message({
+        type: "room.create",
+        protocolVersion: 1,
+        game: "skribbl",
+        nickname: "Alice",
+        settings: { wordCount },
+      });
+      const bob = harness.connect();
+      await bob.message({
+        type: "room.join",
+        protocolVersion: 1,
+        game: "skribbl",
+        code: "abc123",
+        nickname: "Bob",
+      });
+      await alice.message({ type: "room.start" });
+
+      const snapshot = alice.last("room.snapshot").snapshot;
+      const drawer = snapshot.drawerId === alice.last("room.welcome").playerId ? alice : bob;
+      const choices = drawer.last("game.word.choices").choices;
+
+      expect(choices).toHaveLength(wordCount);
+      expect(new Set(choices.map((choice: any) => choice.display)).size).toBe(wordCount);
+    }
   });
 
   it("scores a correct guess on the server and ends the round", async () => {
@@ -328,5 +358,755 @@ describe("Chain Reaction room rules", () => {
     const finished = sockets[0].last("game.finished");
     expect(finished.winnerId).toBe(playerIds[turnIndex === 0 ? 1 : 0]);
     expect(sockets[0].last("room.snapshot").snapshot.phase).toBe("game-over");
+  });
+});
+
+describe("Room code reservation", () => {
+  const TTL = 2 * 60_000;
+
+  function reserve(room: any, game: string, code: string): Promise<Response> {
+    return room.fetch(
+      new Request("https://room.internal/internal/reserve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ game, code }),
+      }),
+    );
+  }
+
+  it("rejects room.create when the code was never reserved", async () => {
+    const harness = await makeRoom("skribbl", "abc123", { reserve: false });
+    const socket = harness.connect();
+    await socket.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Alice",
+    });
+
+    expect(socket.last("room.error").code).toBe("ROOM_NOT_RESERVED");
+    expect(harness.state.storage.map.has("room")).toBe(false);
+  });
+
+  it("refuses to reserve a code twice while the first reservation is live", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    const second = await reserve(harness.room, "skribbl", "abc123");
+    const body = (await second.json()) as any;
+
+    expect(second.status).toBe(200);
+    expect(body).toEqual({ reserved: false, reason: "reserved" });
+  });
+
+  it("refuses to reserve a code that already has room state", async () => {
+    const { harness } = await createAndJoin("skribbl", ["Alice"]);
+    const response = await reserve(harness.room, "skribbl", "abc123");
+    const body = (await response.json()) as any;
+
+    expect(body.reserved).toBe(false);
+    expect(body.reason).toBe("exists");
+  });
+
+  it("reports a reserved room as existing for allocation", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    const response = await harness.room.fetch(
+      new Request("https://room.internal/internal/exists"),
+    );
+    expect(((await response.json()) as any).exists).toBe(true);
+  });
+
+  it("rejects invalid reservation payloads", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+
+    const badMethod = await harness.room.fetch(
+      new Request("https://room.internal/internal/reserve"),
+    );
+    expect(badMethod.status).toBe(405);
+
+    const badGame = await reserve(harness.room, "ludo", "abc123");
+    expect(badGame.status).toBe(400);
+
+    const badCode = await reserve(harness.room, "skribbl", "no");
+    expect(badCode.status).toBe(400);
+
+    const badBody = await harness.room.fetch(
+      new Request("https://room.internal/internal/reserve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{nope",
+      }),
+    );
+    expect(badBody.status).toBe(400);
+  });
+
+  it("expires a reservation after the TTL and allows reallocation", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    (harness.room as any).room.reservedAt = Date.now() - TTL - 1;
+
+    const socket = harness.connect();
+    await socket.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Alice",
+    });
+    expect(socket.last("room.error").code).toBe("ROOM_NOT_RESERVED");
+
+    const again = await reserve(harness.room, "skribbl", "abc123");
+    expect(again.status).toBe(201);
+  });
+
+  it("clears an expired reservation on alarm without deleting the room early", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    (harness.room as any).room.reservedAt = Date.now() - TTL - 1;
+    (harness.room as any).room.lastActivity = Date.now() - 61_000;
+
+    await harness.room.alarm();
+
+    expect((harness.room as any).room.reservedAt).toBeNull();
+    expect(harness.state.storage.map.has("room")).toBe(true);
+
+    (harness.room as any).room.lastActivity = Date.now() - 61_000;
+    await harness.room.alarm();
+    expect(harness.state.storage.map.has("room")).toBe(false);
+  });
+
+  it("keeps a live reservation past the empty-room TTL", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    (harness.room as any).room.lastActivity = Date.now() - 61_000;
+
+    await harness.room.alarm();
+
+    expect(harness.state.storage.map.has("room")).toBe(true);
+    expect((harness.room as any).room.reservedAt).not.toBeNull();
+  });
+
+  it("does not reallocate a used code before the empty-room TTL", async () => {
+    const { harness, sockets } = await createAndJoin("skribbl", ["Alice"]);
+    await sockets[0].message({ type: "room.leave" });
+    await flush();
+
+    const blocked = await reserve(harness.room, "skribbl", "abc123");
+    expect(((await blocked.json()) as any).reason).toBe("exists");
+
+    (harness.room as any).room.lastActivity = Date.now() - 61_000;
+    await harness.room.alarm();
+    expect(harness.state.storage.map.has("room")).toBe(false);
+
+    const reused = await reserve(harness.room, "skribbl", "abc123");
+    expect(reused.status).toBe(201);
+  });
+
+  it("does not let a different game consume a reservation", async () => {
+    const harness = await makeRoom("chain", "abc123", { reserve: false });
+    await reserve(harness.room, "skribbl", "abc123");
+
+    const socket = harness.connect();
+    await socket.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "chain",
+      nickname: "Alice",
+    });
+    expect(socket.last("room.error").code).toBe("GAME_MISMATCH");
+  });
+});
+
+describe("Security and abuse controls", () => {
+  it("rejects client-supplied score, winner and host fields", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice"]);
+    const socket = sockets[0];
+
+    await socket.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Mallory",
+      score: 9999,
+      isHost: true,
+    });
+    expect(socket.last("room.error").code).toBe("INVALID_EVENT");
+
+    await socket.message({
+      type: "chat.guess",
+      text: "hello",
+      playerId: "someone-else",
+    });
+    expect(socket.last("room.error").code).toBe("INVALID_EVENT");
+  });
+
+  it("only lets the host change lobby settings", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[1].message({
+      type: "room.settings.update",
+      settings: { rounds: 9 },
+    });
+    expect(sockets[1].last("room.error").code).toBe("NOT_HOST");
+    expect(sockets[1].last("room.snapshot").snapshot.settings.rounds).toBe(3);
+
+    await sockets[0].message({
+      type: "room.settings.update",
+      settings: { rounds: 9 },
+    });
+    expect(sockets[0].last("room.snapshot").snapshot.settings.rounds).toBe(9);
+  });
+
+  it("ignores a word choice from a player who is not the drawer", async () => {
+    const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const guesser = sockets[drawerIndex === 0 ? 1 : 0];
+
+    await guesser.message({ type: "game.word.choose", wordId: "anything" });
+
+    expect(guesser.events("game.word.selected")).toHaveLength(0);
+    expect(guesser.last("room.snapshot").snapshot.phase).toBe("choosing");
+  });
+
+  it("does not restart a running game when start is sent twice", async () => {
+    const { sockets } = await createAndJoin("chain", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const first = sockets[0].last("room.snapshot").snapshot;
+
+    await sockets[0].message({ type: "room.start" });
+    const second = sockets[0].last("room.snapshot").snapshot;
+
+    expect(second.chain.moveCount).toBe(first.chain.moveCount);
+    expect(second.chain.turnPlayerId).toBe(first.chain.turnPlayerId);
+    expect(
+      sockets[0]
+        .events("chat.message")
+        .filter((event: any) => event.text === "The game started."),
+    ).toHaveLength(1);
+  });
+
+  it("replaces an older socket when a resume token is reused", async () => {
+    const { harness, sockets, playerIds, tokens } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+
+    const replacement = harness.connect();
+    await replacement.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Alice",
+      resumeToken: tokens[0],
+    });
+
+    expect(sockets[0].closed?.code).toBe(4000);
+    expect(replacement.last("room.welcome").playerId).toBe(playerIds[0]);
+    expect(replacement.last("room.snapshot").snapshot.players).toHaveLength(2);
+  });
+
+  it("refuses a resume token from a different room while a game is running", async () => {
+    const { sockets, tokens } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+
+    const other = await createAndJoin("skribbl", ["Carol", "Dave"], "def456");
+    await other.sockets[0].message({ type: "room.start" });
+    const socket = other.harness.connect();
+    await socket.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "def456",
+      nickname: "Mallory",
+      resumeToken: tokens[0],
+    });
+
+    expect(socket.last("room.error").code).toBe("RESUME_FAILED");
+  });
+
+  it("closes a socket after too many invalid messages", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice"]);
+    const socket = sockets[0];
+
+    for (let index = 0; index < 20; index += 1) {
+      await socket.message("{not json");
+    }
+
+    expect(socket.closed?.code).toBe(1008);
+    expect(socket.last("room.error").code).toBe("PARSE_ERROR");
+  });
+
+  it("caps the number of sockets per room", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    for (let index = 0; index < 32; index += 1) {
+      (harness.room as any).sockets.set({}, null);
+    }
+
+    const response = await harness.room.fetch(
+      new Request("https://room.internal/room/abc123?game=skribbl", {
+        headers: { Upgrade: "websocket" },
+      }),
+    );
+    expect(response.status).toBe(429);
+  });
+
+  it("rejects chat from a player who has not joined", async () => {
+    const { harness } = await createAndJoin("skribbl", ["Alice"]);
+    const outsider = harness.connect();
+    await outsider.message({ type: "chat.guess", text: "hello" });
+
+    expect(outsider.last("room.error").code).toBe("NOT_IN_ROOM");
+    expect(outsider.events("chat.message")).toHaveLength(0);
+  });
+});
+
+describe("Persistence and lifecycle", () => {
+  async function restart(state: any, game: "skribbl" | "chain", code: string): Promise<any> {
+    const { GameRoom } = await import("../src/Room");
+    const room = new GameRoom(state as any, {});
+    await state.ready;
+    (room as any).requestedCode = code;
+    (room as any).requestedGame = game;
+    return room;
+  }
+
+  it("restores room state after a Durable Object restart", async () => {
+    const { harness, sockets, playerIds, tokens } = await createAndJoin("chain", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const before = sockets[0].last("room.snapshot").snapshot;
+
+    const restarted = await restart(harness.state, "chain", "abc123");
+    const socket = new (await import("./helpers")).FakeWebSocket();
+    (restarted as any).handleSession(socket);
+    await socket.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "chain",
+      code: "abc123",
+      nickname: "Alice",
+      resumeToken: tokens[0],
+    });
+
+    const snapshot = socket.last("room.snapshot").snapshot;
+    expect(socket.last("room.welcome").playerId).toBe(playerIds[0]);
+    expect(snapshot.phase).toBe("playing");
+    expect(snapshot.chain.turnPlayerId).toBe(before.chain.turnPlayerId);
+    expect(snapshot.chain.cells).toEqual(before.chain.cells);
+  });
+
+  it("restores the private word for the drawer after a restart", async () => {
+    const { harness, sockets, playerIds, tokens } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = drawer.last("game.word.selected").word;
+
+    const restarted = await restart(harness.state, "skribbl", "abc123");
+    const socket = new (await import("./helpers")).FakeWebSocket();
+    (restarted as any).handleSession(socket);
+    await socket.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Alice",
+      resumeToken: tokens[drawerIndex],
+    });
+
+    expect(socket.last("room.snapshot").snapshot.phase).toBe("drawing");
+    expect(socket.last("game.word.selected").word).toBe(word);
+  });
+
+  it("restores a live reservation after a restart", async () => {
+    const harness = await makeRoom("chain", "abc123");
+    const restarted = await restart(harness.state, "chain", "abc123");
+    const response = await restarted.fetch(
+      new Request("https://room.internal/internal/exists"),
+    );
+    expect(((await response.json()) as any).exists).toBe(true);
+  });
+
+  it("transfers host when the host leaves", async () => {
+    const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.leave" });
+    await flush();
+
+    expect(sockets[1].last("room.snapshot").snapshot.hostId).toBe(playerIds[1]);
+  });
+
+  it("expires a fully inactive room", async () => {
+    const { harness, sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    sockets[0].close(1001, "gone");
+    sockets[1].close(1001, "gone");
+    await flush();
+
+    (harness.room as any).sockets.clear();
+    (harness.room as any).playerSockets.clear();
+    (harness.room as any).room.lastActivity = Date.now() - 601_000;
+    for (const player of (harness.room as any).room.players) {
+      player.connected = false;
+      player.lastSeen = Date.now() - 601_000;
+    }
+    await harness.room.alarm();
+    // The alarm first removes stale players; the empty-room TTL then starts
+    // from that removal, so expiry happens on the next scheduled alarm.
+    expect((harness.room as any).room.players).toHaveLength(0);
+    (harness.room as any).room.lastActivity = Date.now() - 61_000;
+    await harness.room.alarm();
+
+    expect(harness.state.storage.map.has("room")).toBe(false);
+    expect(harness.state.storage.alarm).toBeNull();
+  });
+
+  it("reschedules the alarm for an active round", async () => {
+    const { harness, sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    await harness.room.alarm();
+
+    expect(harness.state.storage.alarm).not.toBeNull();
+    expect(harness.state.storage.alarm!).toBeGreaterThan(Date.now());
+  });
+
+  it("keeps the room alive while at least one player is connected", async () => {
+    const { harness, sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    sockets[1].close(1001, "gone");
+    await flush();
+
+    (harness.room as any).room.lastActivity = Date.now() - 601_000;
+    const bob = (harness.room as any).room.players[1];
+    bob.connected = false;
+    bob.lastSeen = Date.now() - 601_000;
+    await harness.room.alarm();
+
+    expect(harness.state.storage.map.has("room")).toBe(true);
+    expect((harness.room as any).room.players).toHaveLength(1);
+    expect((harness.room as any).room.players[0].nickname).toBe("Alice");
+  });
+});
+
+describe("Skribbl edge cases", () => {
+  async function startedRound(names: string[]) {
+    const joined = await createAndJoin("skribbl", names);
+    await joined.sockets[0].message({ type: "room.start" });
+    const snapshot = joined.sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = joined.playerIds.indexOf(snapshot.drawerId);
+    const drawer = joined.sockets[drawerIndex];
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = drawer.last("game.word.selected").word;
+    return { ...joined, drawerIndex, drawer, word };
+  }
+
+  it("does not score the same player twice for a repeated correct guess", async () => {
+    const { sockets, playerIds, drawerIndex, word } = await startedRound(["Alice", "Bob", "Carol"]);
+    const guesserIndex = drawerIndex === 0 ? 1 : 0;
+    const guesser = sockets[guesserIndex];
+
+    await guesser.message({ type: "chat.guess", text: word });
+    const score = guesser
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]).score;
+
+    await guesser.message({ type: "chat.guess", text: word });
+
+    const repeated = guesser
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]).score;
+    expect(repeated).toBe(score);
+    expect(guesser.events("game.correct-guess")).toHaveLength(1);
+    expect(guesser.last("room.snapshot").snapshot.phase).toBe("drawing");
+  });
+
+  it("scores near-simultaneous correct guesses and ends the round once", async () => {
+    const { sockets, playerIds, drawerIndex, word } = await startedRound(["Alice", "Bob", "Carol"]);
+    const guesserIndexes = playerIds.map((_, index) => index).filter((index) => index !== drawerIndex);
+
+    await Promise.all(
+      guesserIndexes.map((index) => sockets[index].message({ type: "chat.guess", text: word })),
+    );
+
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    for (const index of guesserIndexes) {
+      const player = snapshot.players.find((entry: any) => entry.id === playerIds[index]);
+      expect(player.score).toBeGreaterThan(0);
+      expect(player.guessedCorrectly).toBe(true);
+    }
+    expect(sockets[0].events("game.round.ended")).toHaveLength(1);
+    expect(sockets[0].last("game.round.ended").reason).toBe("all-guessed");
+  });
+
+  it("ignores a correct guess after the round has ended", async () => {
+    const { sockets, playerIds, drawerIndex, word } = await startedRound(["Alice", "Bob"]);
+    const guesserIndex = drawerIndex === 0 ? 1 : 0;
+    const guesser = sockets[guesserIndex];
+
+    await guesser.message({ type: "chat.guess", text: word });
+    expect(guesser.last("room.snapshot").snapshot.phase).toBe("round-result");
+    const score = guesser
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]).score;
+
+    await guesser.message({ type: "chat.guess", text: word });
+
+    const repeated = guesser
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]).score;
+    expect(repeated).toBe(score);
+    expect(guesser.events("game.correct-guess")).toHaveLength(1);
+  });
+
+  it("skips a drawer who disconnects while choosing after the grace period", async () => {
+    const { harness, sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const before = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(before.drawerId);
+    const otherIndex = drawerIndex === 0 ? 1 : 0;
+
+    sockets[drawerIndex].close(1001, "gone");
+    await flush();
+    const drawer = (harness.room as any).room.players.find(
+      (player: any) => player.id === before.drawerId,
+    );
+    drawer.lastSeen = Date.now() - 16_000;
+
+    await harness.room.alarm();
+
+    const after = sockets[otherIndex].last("room.snapshot").snapshot;
+    expect(after.phase).toBe("choosing");
+    expect(after.drawerId).toBe(playerIds[otherIndex]);
+    expect(after.drawerId).not.toBe(before.drawerId);
+  });
+
+  it("ends the round when the drawer disconnects while drawing", async () => {
+    const { harness, sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    await drawer.message({
+      type: "game.word.choose",
+      wordId: drawer.last("game.word.choices").choices[0].id,
+    });
+
+    drawer.close(1001, "gone");
+    await flush();
+    const record = (harness.room as any).room.players.find(
+      (player: any) => player.id === snapshot.drawerId,
+    );
+    record.lastSeen = Date.now() - 16_000;
+
+    await harness.room.alarm();
+
+    expect(sockets[drawerIndex === 0 ? 1 : 0].last("room.snapshot").snapshot.phase).toBe(
+      "round-result",
+    );
+    expect(
+      sockets[drawerIndex === 0 ? 1 : 0].last("game.round.ended").reason,
+    ).toBe("drawer-disconnected");
+  });
+
+  it("keeps a correct guesser's score through a reconnect", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+    ]);
+    const guesserIndex = drawerIndex === 0 ? 1 : 0;
+    const guesser = sockets[guesserIndex];
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await guesser.message({ type: "chat.guess", text: word });
+    const scored = guesser
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]).score;
+    expect(scored).toBeGreaterThan(0);
+
+    guesser.close(1001, "refresh");
+    await flush();
+
+    const replacement = harness.connect();
+    await replacement.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+
+    const restored = replacement
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.score).toBe(scored);
+    expect(restored.connected).toBe(true);
+    expect(replacement.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
+  });
+
+  it("rejects an expired resume token after the reconnect grace period", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+    ]);
+    const guesserIndex = drawerIndex === 0 ? 1 : 0;
+    const guesser = sockets[guesserIndex];
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await guesser.message({ type: "chat.guess", text: word });
+    guesser.close(1001, "gone");
+    await flush();
+    const record = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    );
+    record.lastSeen = Date.now() - 31_000;
+
+    await harness.room.alarm();
+    expect((harness.room as any).room.players).toHaveLength(2);
+
+    const replacement = harness.connect();
+    await replacement.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+    expect(replacement.last("room.error").code).toBe("RESUME_FAILED");
+  });
+});
+
+describe("Chain Reaction edge cases", () => {
+  async function startedChain() {
+    const joined = await createAndJoin("chain", ["Alice", "Bob"]);
+    await joined.sockets[0].message({ type: "room.start" });
+    return joined;
+  }
+
+  it("rejects a replayed move after the turn has advanced", async () => {
+    const { sockets, playerIds } = await startedChain();
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const turnIndex = playerIds.indexOf(snapshot.chain.turnPlayerId);
+
+    await sockets[turnIndex].message({ type: "chain.place", row: 2, col: 4 });
+    const after = sockets[0].last("room.snapshot").snapshot;
+
+    await sockets[turnIndex].message({ type: "chain.place", row: 2, col: 4 });
+    expect(sockets[turnIndex].last("room.error").code).toBe("INVALID_MOVE");
+    expect(sockets[0].last("room.snapshot").snapshot.chain.cells).toEqual(after.chain.cells);
+  });
+
+  it("plays an automatic legal move when the turn clock expires", async () => {
+    const { harness, sockets, playerIds } = await startedChain();
+    const before = sockets[0].last("room.snapshot").snapshot;
+    const currentId = before.chain.turnPlayerId;
+
+    (harness.room as any).room.chain.turnEndsAt = Date.now() - 1;
+    await harness.room.alarm();
+
+    const after = sockets[0].last("room.snapshot").snapshot;
+    expect(after.chain.moveCount).toBe(before.chain.moveCount + 1);
+    expect(after.chain.turnPlayerId).not.toBe(currentId);
+    expect(after.chain.lastMove.playerId).toBe(currentId);
+    expect(sockets[0].events("chain.turn.timeout")).toHaveLength(1);
+    expect(after.chain.turnPlayerId).toBe(playerIds.find((id) => id !== currentId));
+  });
+
+  it("finishes the game when the player on turn disconnects for good", async () => {
+    const { harness, sockets, playerIds } = await startedChain();
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const turnIndex = playerIds.indexOf(snapshot.chain.turnPlayerId);
+
+    sockets[turnIndex].close(1001, "gone");
+    await flush();
+    const player = (harness.room as any).room.players.find(
+      (record: any) => record.id === snapshot.chain.turnPlayerId,
+    );
+    player.lastSeen = Date.now() - 31_000;
+
+    await harness.room.alarm();
+
+    const after = sockets[turnIndex === 0 ? 1 : 0].last("room.snapshot").snapshot;
+    expect(after.phase).toBe("game-over");
+    expect(after.chain.winnerId).toBe(playerIds[turnIndex === 0 ? 1 : 0]);
+  });
+
+  it("rejects forged outcome fields on a move", async () => {
+    const { sockets, playerIds } = await startedChain();
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const turnIndex = playerIds.indexOf(snapshot.chain.turnPlayerId);
+
+    await sockets[turnIndex].message({
+      type: "chain.place",
+      row: 2,
+      col: 4,
+      winnerId: playerIds[turnIndex],
+      score: 9999,
+    });
+
+    expect(sockets[turnIndex].last("room.error").code).toBe("INVALID_EVENT");
+    expect(sockets[0].last("room.snapshot").snapshot.chain.moveCount).toBe(0);
+  });
+});
+
+describe("Additional security and persistence", () => {
+  it("rejects unknown event types", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice"]);
+    await sockets[0].message({ type: "game.win", playerId: "me" });
+    expect(sockets[0].last("room.error").code).toBe("INVALID_EVENT");
+  });
+
+  it("rejects an invalid resume token during an active game", async () => {
+    const { harness, sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+
+    const outsider = harness.connect();
+    await outsider.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Mallory",
+      resumeToken: "not-a-real-token",
+    });
+    expect(outsider.last("room.error").code).toBe("RESUME_FAILED");
+  });
+
+  it("caps multiple sockets from one client in the same room", async () => {
+    const harness = await makeRoom("skribbl", "abc123");
+    const room = harness.room as any;
+    for (let index = 0; index < 8; index += 1) {
+      room.socketState.set({}, {
+        tokens: 60,
+        lastRefill: Date.now(),
+        invalid: 0,
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+        client: "203.0.113.7",
+      });
+    }
+
+    const response = await harness.room.fetch(
+      new Request("https://room.internal/room/abc123?game=skribbl", {
+        headers: { Upgrade: "websocket", "cf-connecting-ip": "203.0.113.7" },
+      }),
+    );
+    expect(response.status).toBe(429);
+  });
+
+  it("resets persisted connected flags and reschedules alarms after a restart", async () => {
+    const { harness } = await createAndJoin("chain", ["Alice", "Bob"]);
+    const stored = harness.state.storage.map.get("room") as any;
+    expect(stored.players.every((player: any) => player.connected)).toBe(true);
+
+    const { GameRoom } = await import("../src/Room");
+    const restarted = new GameRoom(harness.state as any, {});
+    await harness.state.ready;
+
+    const room = (restarted as any).room;
+    expect(room.players.every((player: any) => !player.connected)).toBe(true);
+    const persisted = harness.state.storage.map.get("room") as any;
+    expect(persisted.players.every((player: any) => !player.connected)).toBe(true);
+    expect(harness.state.storage.alarm).not.toBeNull();
   });
 });

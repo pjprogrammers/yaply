@@ -10,8 +10,8 @@ import { Segmented } from "@/components/segmented";
 import { Topbar } from "@/components/topbar";
 import {
   cleanRoomCode,
+  createRoomCode,
   MAIN_URL,
-  makeRoomCode,
   readStoredNickname,
   storeNickname,
 } from "@/lib/config";
@@ -32,6 +32,8 @@ export default function Home() {
   const [words, setWords] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [error, setError] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const stored = readStoredNickname();
@@ -40,19 +42,31 @@ export default function Home() {
 
   const displayName = () => nickname.trim() || "Player";
 
-  const createRoom = () => {
+  const createRoom = async () => {
+    if (creating) return;
     const name = displayName();
     storeNickname(name);
-    const code = makeRoomCode();
-    const params = new URLSearchParams({
-      name,
-      host: "1",
-      rounds: String(rounds),
-      time: String(drawTime),
-      words: String(words),
-      max: String(maxPlayers),
-    });
-    router.push(`/room/${code}?${params.toString()}`);
+    setCreateError("");
+    setCreating(true);
+    try {
+      const code = await createRoomCode();
+      const params = new URLSearchParams({
+        name,
+        host: "1",
+        rounds: String(rounds),
+        time: String(drawTime),
+        words: String(words),
+        max: String(maxPlayers),
+      });
+      router.push(`/room/${code}?${params.toString()}`);
+    } catch (cause) {
+      setCreateError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not create a room right now. Please try again.",
+      );
+      setCreating(false);
+    }
   };
 
   const joinRoom = () => {
@@ -225,11 +239,17 @@ export default function Home() {
                 className="btn btn--primary btn--block btn--lg"
                 type="button"
                 onClick={createRoom}
+                disabled={creating}
                 style={{ marginTop: 18 }}
               >
                 <PlayIcon size={15} />
-                Create a room
+                {creating ? "Creating room…" : "Create a room"}
               </button>
+              {createError && (
+                <p className="small" style={{ color: "var(--negative)", marginTop: 8 }}>
+                  {createError}
+                </p>
+              )}
 
               <div className="divider" style={{ margin: "20px 0 18px" }} />
 

@@ -17,7 +17,12 @@ type Env = {
 };
 
 const CREATE_ROOMS_PER_MINUTE = 30;
+const WS_UPGRADES_PER_MINUTE = 60;
+const MAX_RATE_BUCKETS = 5_000;
+/** Room creation only needs `{"game":"skribbl"}`; reject anything larger. */
+const MAX_ROOM_CREATE_BODY_BYTES = 1_024;
 const createBuckets = new Map<string, { count: number; resetAt: number }>();
+const upgradeBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -87,17 +92,36 @@ function clientKey(request: Request): string {
   );
 }
 
-function allowRoomCreation(request: Request): boolean {
+function pruneBuckets(map: Map<string, { count: number; resetAt: number }>, now: number): void {
+  if (map.size <= MAX_RATE_BUCKETS) return;
+  for (const [key, bucket] of map) {
+    if (now >= bucket.resetAt) map.delete(key);
+  }
+}
+
+function takeFromBucket(
+  map: Map<string, { count: number; resetAt: number }>,
+  key: string,
+  limit: number,
+): boolean {
   const now = Date.now();
-  const key = clientKey(request);
-  const bucket = createBuckets.get(key);
+  pruneBuckets(map, now);
+  const bucket = map.get(key);
   if (!bucket || now >= bucket.resetAt) {
-    createBuckets.set(key, { count: 1, resetAt: now + 60_000 });
+    map.set(key, { count: 1, resetAt: now + 60_000 });
     return true;
   }
-  if (bucket.count >= CREATE_ROOMS_PER_MINUTE) return false;
+  if (bucket.count >= limit) return false;
   bucket.count += 1;
   return true;
+}
+
+function allowRoomCreation(request: Request): boolean {
+  return takeFromBucket(createBuckets, clientKey(request), CREATE_ROOMS_PER_MINUTE);
+}
+
+function allowSocketUpgrade(request: Request): boolean {
+  return takeFromBucket(upgradeBuckets, clientKey(request), WS_UPGRADES_PER_MINUTE);
 }
 
 function roomKey(game: "skribbl" | "chain", code: string): string {
@@ -114,14 +138,28 @@ function generateRoomCode(): string {
   return code;
 }
 
-async function roomExists(env: Env, game: "skribbl" | "chain", code: string): Promise<boolean> {
-  const stub = env.GAME_ROOMS.get(env.GAME_ROOMS.idFromName(roomKey(game, code)));
-  const response = await stub.fetch("https://room.internal/internal/exists", {
-    headers: { "x-yaply-internal": "1" },
-  });
-  if (!response.ok) return false;
-  const body = (await response.json().catch(() => null)) as { exists?: unknown } | null;
-  return body?.exists === true;
+async function reserveRoom(
+  env: Env,
+  game: "skribbl" | "chain",
+  code: string,
+): Promise<{ reserved: boolean; reason?: string }> {
+  try {
+    const stub = env.GAME_ROOMS.get(env.GAME_ROOMS.idFromName(roomKey(game, code)));
+    const response = await stub.fetch("https://room.internal/internal/reserve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ game, code }),
+    });
+    const body = (await response.json().catch(() => null)) as
+      | { reserved?: unknown; reason?: unknown }
+      | null;
+    return {
+      reserved: response.ok && body?.reserved === true,
+      reason: typeof body?.reason === "string" ? body.reason : undefined,
+    };
+  } catch {
+    return { reserved: false, reason: "do_error" };
+  }
 }
 
 function log(level: "info" | "warn" | "error", event: string, details: Record<string, unknown>): void {
@@ -155,6 +193,13 @@ export default {
           service: "yaply-realtime",
           protocolVersion: PROTOCOL_VERSION,
           environment: isProduction(env) ? "production" : "development",
+          runtime: "cloudflare-workers",
+          features: {
+            serverAllocatedRooms: true,
+            reservedRoomCodes: true,
+            reconnectTokens: true,
+            durableObjectAlarms: true,
+          },
         },
         200,
         { "access-control-allow-origin": "*" },
@@ -170,12 +215,32 @@ export default {
         return json({ error: "Origin is not allowed." }, 403, corsHeaders(request, env));
       }
       if (!allowRoomCreation(request)) {
-        return json({ error: "Too many rooms created. Try again in a minute." }, 429, corsHeaders(request, env));
+        return json(
+          { error: "Too many rooms created. Try again in a minute." },
+          429,
+          { ...corsHeaders(request, env), "retry-after": "60" },
+        );
+      }
+
+      let raw: string;
+      try {
+        raw = await request.text();
+      } catch {
+        return json({ error: "Expected a JSON body." }, 400, corsHeaders(request, env));
+      }
+
+      const bodyBytes = new TextEncoder().encode(raw).byteLength;
+      if (bodyBytes > MAX_ROOM_CREATE_BODY_BYTES) {
+        log("warn", "room.create.body_too_large", {
+          bytes: bodyBytes,
+          origin: request.headers.get("Origin") ?? null,
+        });
+        return json({ error: "That request is too large." }, 413, corsHeaders(request, env));
       }
 
       let body: unknown;
       try {
-        body = await request.json();
+        body = JSON.parse(raw);
       } catch {
         return json({ error: "Expected a JSON body." }, 400, corsHeaders(request, env));
       }
@@ -187,9 +252,11 @@ export default {
         return json({ error: "Choose a valid game." }, 400, corsHeaders(request, env));
       }
 
+      let lastReason = "collision";
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const code = generateRoomCode();
-        if (!(await roomExists(env, gameResult.data, code))) {
+        const result = await reserveRoom(env, gameResult.data, code);
+        if (result.reserved) {
           log("info", "room.code_issued", {
             game: gameResult.data,
             code: `${code.slice(0, 2)}***`,
@@ -197,12 +264,30 @@ export default {
           });
           return json({ code, game: gameResult.data }, 201, corsHeaders(request, env));
         }
+        lastReason = result.reason ?? "collision";
       }
 
-      return json({ error: "Could not allocate a room code. Try again." }, 503, corsHeaders(request, env));
+      log("warn", "room.code_allocation_failed", {
+        game: gameResult.data,
+        reason: lastReason,
+        durationMs: Date.now() - started,
+      });
+      return json(
+        { error: "Could not allocate a room code. Try again." },
+        503,
+        { ...corsHeaders(request, env), "retry-after": "1" },
+      );
     }
 
     if (url.pathname.startsWith("/room/")) {
+      if (request.method !== "GET") {
+        return json(
+          { error: "Method not allowed." },
+          405,
+          { ...corsHeaders(request, env), allow: "GET" },
+        );
+      }
+
       const code = (url.pathname.split("/")[2] ?? "").toLowerCase();
       if (!ROOM_CODE_PATTERN.test(code)) {
         return json({ error: "Invalid room code." }, 400, corsHeaders(request, env));
@@ -226,9 +311,32 @@ export default {
         return json({ error: "Expected a WebSocket upgrade." }, 426, corsHeaders(request, env));
       }
 
+      if (!allowSocketUpgrade(request)) {
+        log("warn", "room.connect.rate_limited", {
+          game: gameParam,
+          code: `${code.slice(0, 2)}***`,
+          origin: request.headers.get("Origin") ?? null,
+        });
+        return json(
+          { error: "Too many connection attempts. Try again in a minute." },
+          429,
+          { ...corsHeaders(request, env), "retry-after": "60" },
+        );
+      }
+
       const id = env.GAME_ROOMS.idFromName(roomKey(gameParam, code));
       const stub = env.GAME_ROOMS.get(id);
-      return stub.fetch(request);
+      try {
+        return await stub.fetch(request);
+      } catch (error) {
+        log("error", "room.connect.do_failed", {
+          game: gameParam,
+          code: `${code.slice(0, 2)}***`,
+          category: error instanceof Error ? error.name : "unknown",
+          durationMs: Date.now() - started,
+        });
+        return json({ error: "The room server is unavailable. Try again." }, 502);
+      }
     }
 
     return json({ error: "Not found." }, 404);

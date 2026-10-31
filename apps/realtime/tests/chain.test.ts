@@ -147,3 +147,84 @@ describe("chain engine", () => {
     expect(next).toBe("b");
   });
 });
+
+describe("chain explosions and determinism", () => {
+  it("explodes an edge cell into three neighbours", () => {
+    const state = fresh();
+    state.cells[4] = { ownerId: "a", orbs: 2 };
+    state.turnPlayerId = "a";
+
+    const result = applyChainMove(state, "a", 0, 4, ["a", "b"], 1_000, 45)!;
+
+    expect(result.move.explosions).toEqual([{ row: 0, col: 4, ownerId: "a" }]);
+    expect(result.state.cells[4]).toEqual({ ownerId: "a", orbs: 0 });
+    for (const index of [3, 5, 1 * 9 + 4]) {
+      expect(result.state.cells[index]).toMatchObject({ ownerId: "a", orbs: 1 });
+    }
+  });
+
+  it("explodes a centre cell into four neighbours", () => {
+    const state = fresh();
+    state.cells[2 * 9 + 4] = { ownerId: "a", orbs: 3 };
+    state.turnPlayerId = "a";
+
+    const result = applyChainMove(state, "a", 2, 4, ["a", "b"], 1_000, 45)!;
+
+    expect(result.move.explosions).toEqual([{ row: 2, col: 4, ownerId: "a" }]);
+    expect(result.state.cells[2 * 9 + 4]).toEqual({ ownerId: "a", orbs: 0 });
+    for (const index of [1 * 9 + 4, 3 * 9 + 4, 2 * 9 + 3, 2 * 9 + 5]) {
+      expect(result.state.cells[index]).toMatchObject({ ownerId: "a", orbs: 1 });
+    }
+  });
+
+  it("explodes multiple cells in the same cascade", () => {
+    const state = fresh();
+    // Corner (0,0) is one orb from critical mass; the neighbouring edge (0,1)
+    // reaches critical mass only after the corner sends an orb into it.
+    state.cells[0] = { ownerId: "a", orbs: 1 };
+    state.cells[1] = { ownerId: "a", orbs: 2 };
+    state.turnPlayerId = "a";
+
+    const result = applyChainMove(state, "a", 0, 0, ["a", "b"], 1_000, 45)!;
+
+    expect(result.move.explosions.map((entry) => `${entry.row}:${entry.col}`)).toEqual([
+      "0:0",
+      "0:1",
+    ]);
+    expect(result.state.cells.every((cell) => cell.orbs >= 0)).toBe(true);
+  });
+
+  it("is deterministic and never mutates the input state", () => {
+    const state = fresh(["a", "b"]);
+    state.cells[2 * 9 + 4] = { ownerId: "a", orbs: 3 };
+    state.turnPlayerId = "a";
+    const snapshot = JSON.stringify(state);
+
+    const first = applyChainMove(state, "a", 2, 4, ["a", "b"], 5_000, 45)!;
+    const second = applyChainMove(state, "a", 2, 4, ["a", "b"], 5_000, 45)!;
+
+    expect(first.state).toEqual(second.state);
+    expect(first.move).toEqual(second.move);
+    expect(first.eliminated).toEqual(second.eliminated);
+    expect(JSON.stringify(state)).toBe(snapshot);
+  });
+
+  it("skips eliminated seats when choosing the next turn", () => {
+    const state = {
+      ...fresh(["a", "b", "c"]),
+      turnPlayerId: "a",
+      eliminatedPlayerIds: ["b"],
+    };
+    expect(nextActivePlayer(state, ["a", "b", "c"], "a")).toBe("c");
+  });
+
+  it("rejects out-of-bounds coordinates without changing the board", () => {
+    const state = fresh();
+    const before = JSON.stringify(state);
+    expect(canPlace(state, "a", -1, 0)).toBe(false);
+    expect(canPlace(state, "a", 0, -1)).toBe(false);
+    expect(canPlace(state, "a", state.rows, 0)).toBe(false);
+    expect(canPlace(state, "a", 0, state.cols)).toBe(false);
+    expect(JSON.stringify(state)).toBe(before);
+  });
+});
