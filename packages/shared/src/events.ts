@@ -76,6 +76,8 @@ export type ServerEvent =
       text: string;
       createdAt: number;
       system?: boolean;
+      /** True when the server applied secret-word visibility to this message. */
+      private?: boolean;
     }
   | {
       type: "game.correct-guess";

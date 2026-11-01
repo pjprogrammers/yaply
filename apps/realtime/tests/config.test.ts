@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   buildRoomUrl,
   normalizeHttpUrl,
@@ -221,5 +222,36 @@ describe("requestRoomCode", () => {
       requestRoomCode("", "chain", { fetchImpl: fetchMock }),
     ).rejects.toThrow("not configured");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Worker production configuration", () => {
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  const productionBlock = toml.slice(toml.indexOf("[env.production.vars]"));
+  const allowedOrigins =
+    /ALLOWED_ORIGINS\s*=\s*"([^"]*)"/.exec(productionBlock)?.[1]
+      ?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? [];
+
+  it("allows every documented production frontend origin", () => {
+    // DEPLOYMENT.md calls these the canonical production domains; omitting one
+    // makes the Worker fail closed for that deployed site.
+    expect(allowedOrigins).toEqual(
+      expect.arrayContaining([
+        "https://yaply.eu.org",
+        "https://skribbl.yaply.eu.org",
+        "https://chain.yaply.eu.org",
+      ]),
+    );
+  });
+
+  it("does not allow localhost origins in production", () => {
+    expect(allowedOrigins.every((origin) => !origin.includes("localhost"))).toBe(true);
+  });
+
+  it("binds the GameRoom Durable Object for production", () => {
+    expect(productionBlock).toContain('name = "GAME_ROOMS"');
+    expect(productionBlock).toContain('new_sqlite_classes = ["GameRoom"]');
   });
 });

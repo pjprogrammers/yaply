@@ -4,6 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { MAX_CHAT_LENGTH } from "@yaply/shared/constants";
 import { SendIcon } from "./icons";
 
+export type ChatMessageType =
+  | "normal"
+  | "player_joined"
+  | "player_left"
+  | "correct_guess"
+  | "own_correct_guess"
+  | "drawing_started"
+  | "close_guess"
+  | "word_revealed"
+  | "round_started"
+  | "disconnected"
+  | "reconnected"
+  | "announcement"
+  | "error";
+
 export type ChatMessage = {
   id: string;
   playerId: string;
@@ -11,6 +26,8 @@ export type ChatMessage = {
   text: string;
   system?: boolean;
   correct?: boolean;
+  type?: ChatMessageType;
+  private?: boolean;
 };
 
 type ChatProps = {
@@ -20,6 +37,25 @@ type ChatProps = {
   placeholder?: string;
   hint?: string;
 };
+
+function getMessageType(message: ChatMessage): ChatMessageType {
+  if (message.type) return message.type;
+  if (message.system) {
+    const text = message.text.toLowerCase();
+    if (text.includes("joined the room") || text.includes("reconnect")) return "player_joined";
+    if (text.includes("left the room")) return "player_left";
+    if (text.includes("disconnected")) return "disconnected";
+    if (text.includes("you guessed")) return "own_correct_guess";
+    if (text.includes("guessed the word")) return "correct_guess";
+    if (text.includes("drawing")) return "drawing_started";
+    if (text.includes("round")) return "round_started";
+    if (text.includes("word was") || text.includes("revealed")) return "word_revealed";
+    if (text.includes("close")) return "close_guess";
+    return "announcement";
+  }
+  if (message.correct) return "correct_guess";
+  return "normal";
+}
 
 export function Chat({ messages, onSend, disabled = false, placeholder, hint }: ChatProps) {
   const [value, setValue] = useState("");
@@ -53,25 +89,30 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
             Wrong guesses stay in the room.
           </div>
         ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={[
-                "chat-line",
-                message.system ? "chat-line--system" : "",
-                message.correct ? "chat-line--correct" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {!message.system && (
-                <span className={`chat-name ${message.correct ? "chat-name--system" : ""}`}>
-                  {message.nickname}
-                </span>
-              )}
-              {message.text}
-            </div>
-          ))
+          messages.map((message) => {
+            const msgType = getMessageType(message);
+            const isSystem = message.system || msgType !== "normal";
+            return (
+              <div
+                key={message.id}
+                className={[
+                  "chat-line",
+                  isSystem ? `chat-line--event chat-line--${msgType}` : "",
+                  message.private ? "chat-line--private" : "",
+                  message.correct && msgType !== "normal" ? "chat-line--correct" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {!isSystem && (
+                  <span className="chat-name">
+                    {message.nickname}
+                  </span>
+                )}
+                {isSystem ? message.text : `${message.nickname}: ${message.text}`}
+              </div>
+            );
+          })
         )}
       </div>
       <form className="chat-form" onSubmit={submit}>

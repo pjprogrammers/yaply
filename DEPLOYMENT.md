@@ -203,7 +203,7 @@ Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+ALLOWED_ORIGINS = "https://yaply.eu.org,https://skribbl.yaply.eu.org,https://chain.yaply.eu.org,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
 ```
 
 Rules:
@@ -211,7 +211,9 @@ Rules:
 - `ALLOWED_ORIGINS` is a comma-separated allowlist with no trailing slashes.
 - In production the check is **fail-closed**: requests without an `Origin`
   header, or with an origin not on the list, are rejected. Add every deployed
-  frontend origin, including custom domains, before deploying.
+  frontend origin, including custom domains, before deploying. The values above
+  cover both the canonical `yaply.eu.org` domains and the Vercel project
+  domains; remove any that you do not actually deploy.
 - `APP_ORIGIN` is still read for backward compatibility, but new deployments
   should use `ALLOWED_ORIGINS` only.
 - Never put secrets in these public client variables.

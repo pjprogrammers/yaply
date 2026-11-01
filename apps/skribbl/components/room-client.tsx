@@ -25,8 +25,10 @@ import {
   UndoIcon,
 } from "./icons";
 import { PlayerList } from "./player-list";
+import { Leaderboard } from "./leaderboard";
 import { Segmented } from "./segmented";
 import { Topbar } from "./topbar";
+import { MAIN_URL } from "@/lib/config";
 import { WordMask } from "./word-mask";
 
 const FATAL_CODES = new Set([
@@ -37,6 +39,7 @@ const FATAL_CODES = new Set([
   "GAME_MISMATCH",
   "ROOM_IN_PROGRESS",
   "RESUME_FAILED",
+  "PROTOCOL_MISMATCH",
 ]);
 
 const DRAW_COLORS = ["#111111", "#6b6b6b", "#e5484d", "#4cb3f0", "#3fc07a", "#f2b33d", "#b06cf0"];
@@ -201,6 +204,22 @@ function ConnectedRoom({
   const handleEvent = useCallback((event: ServerEvent) => {
     switch (event.type) {
       case "chat.message": {
+        const msgType = event.system
+          ? (() => {
+              const text = event.text.toLowerCase();
+              if (text.includes("joined the room") || text.includes("reconnect")) return "player_joined" as const;
+              if (text.includes("left the room")) return "player_left" as const;
+              if (text.includes("disconnected")) return "disconnected" as const;
+              if (text.includes("you guessed")) return "own_correct_guess" as const;
+              if (text.includes("guessed the word")) return "correct_guess" as const;
+              if (text.includes("drawing")) return "drawing_started" as const;
+              if (text.includes("round")) return "round_started" as const;
+              if (text.includes("word was") || text.includes("revealed")) return "word_revealed" as const;
+              if (text.includes("close")) return "close_guess" as const;
+              if (text.includes("error")) return "error" as const;
+              return "announcement" as const;
+            })()
+          : "normal";
         setMessages((previous) => [
           ...previous.slice(-90),
           {
@@ -209,6 +228,8 @@ function ConnectedRoom({
             nickname: event.nickname,
             text: event.text,
             system: event.system,
+            type: msgType,
+            private: event.private,
           },
         ]);
         break;
@@ -500,6 +521,9 @@ function ConnectedRoom({
             <button className="btn btn--ghost btn--sm" type="button" onClick={handleLeave}>
               Leave
             </button>
+            <a className="btn btn--ghost btn--sm" href={MAIN_URL}>
+              Main Yaply page
+            </a>
           </div>
         </div>
       </Topbar>
@@ -821,6 +845,9 @@ function ConnectedRoom({
                         <button className="btn btn--ghost" type="button" onClick={handleLeave}>
                           Leave room
                         </button>
+                        <a className="btn btn--ghost" href={MAIN_URL}>
+                          Main Yaply page
+                        </a>
                       </div>
                     </div>
                   ) : null
@@ -914,6 +941,7 @@ function ConnectedRoom({
                   drawerId={snapshot.drawerId}
                 />
               </section>
+              <Leaderboard players={snapshot.players} meId={playerId} hostId={snapshot.hostId} />
 
               <Chat
                 messages={messages}

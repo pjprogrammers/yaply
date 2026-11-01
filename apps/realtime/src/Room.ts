@@ -20,6 +20,7 @@ import {
   MAX_POINTS_PER_STROKE,
   MAX_SOCKETS_PER_CLIENT_PER_ROOM,
   MAX_SOCKETS_PER_ROOM,
+  MAX_STROKE_POINTS_PER_ROUND,
   MAX_STROKES_PER_ROUND,
   MESSAGE_RATE_LIMIT,
   PLAYER_COLORS,
@@ -30,7 +31,7 @@ import {
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
-import { pickWords, normalizeGuess } from "./words-util";
+import { pickWords, normalizeGuess, containsSecretWord } from "./words-util";
 import { calculateGuessPoints, calculateDrawerPoints } from "./scoring";
 import {
   applyChainMove,
@@ -91,6 +92,8 @@ type SocketState = {
   invalid: number;
   createdAt: number;
   lastMessageAt: number;
+  /** Last explicit snapshot request, used to bound expensive sync replies. */
+  lastSyncAt: number;
   /** Best-effort client identity used to cap multiple sockets per room. */
   client: string;
 };
@@ -98,6 +101,9 @@ type SocketState = {
 const DRAWER_GRACE_MS = 15_000;
 const CHOOSE_TIME_MS = 20_000;
 const ROUND_RESULT_MS = 5_000;
+const SNAPSHOT_SYNC_COOLDOWN_MS = 1_000;
+const SECRET_MESSAGE_PLACEHOLDER = "Secret message hidden.";
+const SECRET_MESSAGE_REDACTED = "••••••";
 
 function logRoom(
   level: "info" | "warn" | "error",
@@ -200,20 +206,16 @@ export class GameRoom {
 
     // Sockets never survive a Durable Object restart. Persisted `connected`
     // flags are stale until each player reconnects with their resume token, so
-    // reset them and give every seat a fresh reconnect grace period.
+    // reset them and give every seat a fresh reconnect grace period. Without a
+    // fresh `lastSeen`, a DO that wakes after a long hibernation would delete
+    // players the instant its first alarm fires, even though their clients are
+    // still reconnecting.
     const now = Date.now();
-    let changed = false;
-    for (const player of this.room.players) {
-      if (player.connected) {
+    if (this.room.players.length > 0) {
+      for (const player of this.room.players) {
         player.connected = false;
         player.lastSeen = now;
-        changed = true;
-      } else if (!Number.isFinite(player.lastSeen) || player.lastSeen <= 0) {
-        player.lastSeen = now;
-        changed = true;
       }
-    }
-    if (changed) {
       await this.ctx.storage.put("room", this.room);
     }
     // Re-establish timeout/expiry enforcement after a hibernation or restart.
@@ -334,7 +336,7 @@ export class GameRoom {
     this.requestedCode = code;
     this.requestedGame = game;
 
-    if (request.headers.get("Upgrade") !== "websocket") {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected websocket", { status: 400 });
     }
 
@@ -379,6 +381,7 @@ export class GameRoom {
       invalid: 0,
       createdAt: Date.now(),
       lastMessageAt: Date.now(),
+      lastSyncAt: 0,
       client,
     });
 
@@ -494,7 +497,10 @@ export class GameRoom {
   }
 
   private broadcast(event: ServerEvent) {
-    for (const ws of this.sockets.keys()) {
+    for (const [ws, playerId] of this.sockets) {
+      // A socket that only opened the room URL has not joined yet and must not
+      // receive room snapshots, chat, drawings or system messages.
+      if (!playerId) continue;
       this.send(ws, event);
     }
   }
@@ -602,6 +608,7 @@ export class GameRoom {
     const previous = this.playerSockets.get(player.id);
     if (previous && previous !== ws) {
       this.sockets.delete(previous);
+      this.socketState.delete(previous);
       try {
         previous.close(4000, "Replaced by a new connection");
       } catch {
@@ -748,10 +755,20 @@ export class GameRoom {
       case "game.rematch":
         await this.handleRematch(ws);
         break;
-      case "room.sync":
+      case "room.sync": {
+        const state = this.socketState.get(ws);
+        const now = Date.now();
+        // Reconnects already receive a snapshot. Without a cooldown a client can
+        // make the room serialize the full canvas up to the message rate limit
+        // every second, even though the client never uses this event.
+        if (state) {
+          if (now - state.lastSyncAt < SNAPSHOT_SYNC_COOLDOWN_MS) return;
+          state.lastSyncAt = now;
+        }
         this.sendPrivateState(ws, this.sockets.get(ws) ?? "");
         this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
         break;
+      }
       default:
         break;
     }
@@ -810,7 +827,7 @@ export class GameRoom {
     this.attachSocket(ws, player);
     this.sendWelcome(ws, player);
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
-    this.broadcastSystemChat(`${player.nickname} opened the room.`);
+    this.broadcastSystemChat(`${player.nickname} joined the room.`);
     logRoom("info", "room.created", {
       game: this.room.game,
       code: safeCode(this.room.code),
@@ -903,7 +920,7 @@ export class GameRoom {
     this.broadcast({ type: "room.player.joined", playerId: player.id });
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
     this.broadcastSnapshot();
-    this.broadcastSystemChat(`${player.nickname} joined.`);
+    this.broadcastSystemChat(`${player.nickname} joined the room.`);
     logRoom("info", "room.joined", {
       game: this.room.game,
       code: safeCode(this.room.code),
@@ -1019,6 +1036,9 @@ export class GameRoom {
     if (this.room.game !== "skribbl") return;
 
     this.room.guessedPlayerIds = [];
+    for (const p of this.room.players) {
+      p.guessedCorrectly = false;
+    }
     this.room.strokes = [];
     this.room.selectedWord = null;
     this.room.selectedWordId = null;
@@ -1117,8 +1137,22 @@ export class GameRoom {
     const player = this.socketPlayer(ws);
     if (!player || player.id !== this.room.drawerId || this.room.phase !== "drawing") return;
 
+    // Bound the whole round, not just each stroke. Without this a drawer can
+    // create hundreds of maximum-length strokes and push the persisted room and
+    // every snapshot past the Durable Object value limit.
+    let totalPoints = 0;
+    for (const entry of this.room.strokes) totalPoints += entry.points.length;
+    let budget = MAX_STROKE_POINTS_PER_ROUND - totalPoints;
+    if (budget <= 0) {
+      if (event.done) await this.commit();
+      return;
+    }
+
     let stroke = this.room.strokes.find((entry) => entry.id === event.strokeId);
     if (!stroke) {
+      // The final `done` frame follows an earlier flushed frame, so it carries
+      // no points of its own. Never create an empty stroke for it.
+      if (event.points.length === 0) return;
       if (this.room.strokes.length >= MAX_STROKES_PER_ROUND) return;
       stroke = {
         id: event.strokeId,
@@ -1130,11 +1164,18 @@ export class GameRoom {
       this.room.strokes.push(stroke);
     }
 
-    const room = MAX_POINTS_PER_STROKE - stroke.points.length;
-    const accepted = room > 0 ? event.points.slice(0, room) : [];
-    if (accepted.length > 0) {
-      stroke.points.push(...accepted);
+    budget = Math.min(budget, MAX_POINTS_PER_STROKE - stroke.points.length);
+    const accepted = budget > 0 ? event.points.slice(0, budget) : [];
+    if (accepted.length === 0) {
+      // The canvas flushes every 40ms and then sends a trailing `done` frame
+      // when the pointer is released. That frame is valid even though its
+      // points array is empty, so persist the round without treating it as
+      // abuse or appending an empty stroke.
+      if (event.done) await this.commit();
+      return;
     }
+
+    stroke.points.push(...accepted);
 
     this.broadcast({
       type: "drawing.stroke",
@@ -1169,8 +1210,12 @@ export class GameRoom {
 
     if (removedId) {
       this.broadcast({ type: "drawing.undo", strokeId: removedId });
+    } else {
+      // No canvas change means no state to persist or re-broadcast. Clients
+      // apply the undo event locally, so a full snapshot here would only give a
+      // drawer a way to amplify traffic to every player.
+      return;
     }
-    this.broadcastSnapshot();
     await this.commit();
   }
 
@@ -1178,9 +1223,10 @@ export class GameRoom {
     const player = this.socketPlayer(ws);
     if (!player || player.id !== this.room.drawerId || this.room.phase !== "drawing") return;
 
+    if (this.room.strokes.length === 0) return;
+
     this.room.strokes = [];
     this.broadcast({ type: "drawing.clear" });
-    this.broadcastSnapshot();
     await this.commit();
   }
 
@@ -1191,19 +1237,33 @@ export class GameRoom {
     const trimmed = text.trim().slice(0, MAX_CHAT_LENGTH);
     if (!trimmed) return;
 
-    if (this.room.game !== "skribbl" || this.room.phase !== "drawing") {
+    const isDrawing = this.room.game === "skribbl" && this.room.phase === "drawing";
+    const selectedWord = this.room.selectedWord ?? "";
+    const isDrawer = player.id === this.room.drawerId;
+    const alreadyGuessed =
+      this.room.guessedPlayerIds.includes(player.id) || player.guessedCorrectly;
+
+    if (
+      isDrawing &&
+      (isDrawer || alreadyGuessed) &&
+      containsSecretWord(trimmed, selectedWord)
+    ) {
+      this.sendSecretMessage(player, trimmed);
+      return;
+    }
+
+    if (!isDrawing) {
       this.broadcastChat(player, trimmed);
       return;
     }
 
-    if (player.id === this.room.drawerId) {
+    if (isDrawer) {
       this.broadcastChat(player, trimmed);
       return;
     }
 
-    const alreadyGuessed = this.room.guessedPlayerIds.includes(player.id);
     const guess = normalizeGuess(trimmed);
-    const answer = normalizeGuess(this.room.selectedWord ?? "");
+    const answer = normalizeGuess(selectedWord);
 
     if (alreadyGuessed) {
       if (guess !== answer) this.broadcastChat(player, trimmed);
@@ -1211,7 +1271,14 @@ export class GameRoom {
     }
 
     if (guess !== answer) {
-      this.broadcastChat(player, trimmed);
+      // A player who has not guessed yet can still accidentally reveal the word
+      // inside a longer sentence. Keep that message private as well, but do not
+      // award points: only an exact guess counts as correct.
+      if (containsSecretWord(trimmed, selectedWord)) {
+        this.sendSecretMessage(player, trimmed);
+      } else {
+        this.broadcastChat(player, trimmed);
+      }
       return;
     }
 
@@ -1252,6 +1319,30 @@ export class GameRoom {
     }
 
     await this.commit();
+  }
+
+  private sendSecretMessage(player: StoredPlayer, text: string) {
+    // The sender always sees the message they wrote. Every other socket gets a
+    // safe placeholder in the same slot, so chat order is preserved without
+    // leaking the word through any realtime event.
+    const selectedWord = this.room.selectedWord ?? "";
+    const hiddenText = containsSecretWord(SECRET_MESSAGE_PLACEHOLDER, selectedWord)
+      ? SECRET_MESSAGE_REDACTED
+      : SECRET_MESSAGE_PLACEHOLDER;
+
+    const createdAt = Date.now();
+    for (const [ws, playerId] of this.sockets.entries()) {
+      if (!playerId) continue;
+      const canSeeOriginal = playerId === player.id;
+      this.send(ws, {
+        type: "chat.message",
+        playerId: player.id,
+        nickname: player.nickname,
+        text: canSeeOriginal ? text : hiddenText,
+        createdAt,
+        private: true,
+      });
+    }
   }
 
   private broadcastChat(player: StoredPlayer, text: string) {
@@ -1451,7 +1542,12 @@ export class GameRoom {
   private async handleChainTimeout() {
     if (!this.room.chain || this.room.phase !== "playing") return;
     const currentId = this.room.chain.turnPlayerId;
-    if (!currentId) return;
+    if (!currentId) {
+      // No one owns the turn: finish instead of leaving an expired deadline
+      // that the alarm would keep re-scheduling.
+      this.finishChain(this.chainLeader());
+      return;
+    }
 
     const current = this.player(currentId);
     if (current) {
@@ -1580,7 +1676,7 @@ export class GameRoom {
       else this.finishSkribbl();
     }
 
-    this.broadcastSystemChat(`${player.nickname} ${reason === "left" ? "left" : "disconnected"}.`);
+    this.broadcastSystemChat(`${player.nickname} ${reason === "left" ? "left the room" : "disconnected"}.`);
     if (wasTurn && this.room.chain && !this.room.chain.turnEndsAt) {
       this.room.chain.turnEndsAt = Date.now() + (this.room.settings.turnTimeSeconds ?? 45) * 1000;
     }
@@ -1661,9 +1757,14 @@ export class GameRoom {
       }
     }
 
-    const future = deadlines.filter((deadline) => Number.isFinite(deadline) && deadline > now);
-    if (future.length === 0) return null;
-    return Math.min(...future);
+    const valid = deadlines.filter((deadline) => Number.isFinite(deadline));
+    const future = valid.filter((deadline) => deadline > now);
+    if (future.length > 0) return Math.min(...future);
+    // A room that slept through its own deadlines (hibernation, late alarm)
+    // must still wake up once so `alarm()` can finish or clean it up. Returning
+    // null here would delete the alarm and strand the room forever.
+    if (valid.length > 0) return now + 1;
+    return null;
   }
 
   private async scheduleAlarm() {
@@ -1740,7 +1841,14 @@ export class GameRoom {
           this.nextTurn();
           changed = true;
         } else if (this.room.chooseEndsAt && now >= this.room.chooseEndsAt) {
-          this.applyWordChoice(this.room.wordChoices[0]?.id ?? "");
+          // A persisted choosing phase can be missing its offers (older build
+          // or corrupted state). Advance instead of re-arming the same expired
+          // deadline forever.
+          if (this.room.wordChoices.length > 0) {
+            this.applyWordChoice(this.room.wordChoices[0]?.id ?? "");
+          } else {
+            this.nextTurn();
+          }
           changed = true;
         }
       } else if (this.room.phase === "drawing") {

@@ -20,6 +20,7 @@ import { CheckIcon, ClockIcon, CopyIcon, PlayIcon } from "./icons";
 import { PlayerList } from "./player-list";
 import { Segmented } from "./segmented";
 import { Topbar } from "./topbar";
+import { MAIN_URL } from "@/lib/config";
 
 const FATAL_CODES = new Set([
   "ROOM_NOT_FOUND",
@@ -29,6 +30,7 @@ const FATAL_CODES = new Set([
   "GAME_MISMATCH",
   "ROOM_IN_PROGRESS",
   "RESUME_FAILED",
+  "PROTOCOL_MISMATCH",
 ]);
 
 const STATUS_LABEL: Record<string, string> = {
@@ -350,6 +352,9 @@ function ConnectedRoom({
             <button className="btn btn--ghost btn--sm" type="button" onClick={handleLeave}>
               Leave
             </button>
+            <a className="btn btn--ghost btn--sm" href={MAIN_URL}>
+              Main Yaply page
+            </a>
           </div>
         </div>
       </Topbar>
@@ -565,6 +570,9 @@ function ConnectedRoom({
                         <button className="btn btn--ghost" type="button" onClick={handleLeave}>
                           Leave room
                         </button>
+                        <a className="btn btn--ghost" href={MAIN_URL}>
+                          Main Yaply page
+                        </a>
                       </div>
                     </div>
                   </div>

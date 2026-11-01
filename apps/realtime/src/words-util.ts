@@ -26,3 +26,33 @@ export function normalizeGuess(value: string): string {
     .replace(/\s+/g, " ")
     .toLocaleLowerCase("en");
 }
+
+function normalizeForWordMatch(value: string): string {
+  return normalizeGuess(value).replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/**
+ * Separator-free form used as a second pass so spellings such as "s t a r",
+ * "s-t-a-r" or "s.t.a.r" cannot slip a word past the spaced comparison.
+ */
+function compactForWordMatch(value: string): string {
+  return normalizeGuess(value).replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/**
+ * Returns true when `text` contains `word` anywhere in the message.
+ *
+ * The comparison ignores case, Unicode compatibility differences, punctuation,
+ * repeated whitespace and inserted separators, so "The answer is Daughter!",
+ * "daughter-in-law", "mydaughter" and "d a u g h t e r" all count for the word
+ * "daughter". Matching the raw sequence is intentional: over-hiding a harmless
+ * message is preferable to leaking a word.
+ */
+export function containsSecretWord(text: string, word: string): boolean {
+  const needle = normalizeForWordMatch(word);
+  if (needle.length === 0) return false;
+  if (normalizeForWordMatch(text).includes(needle)) return true;
+
+  const compactNeedle = compactForWordMatch(word);
+  return compactNeedle.length > 0 && compactForWordMatch(text).includes(compactNeedle);
+}

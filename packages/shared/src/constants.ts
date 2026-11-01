@@ -22,6 +22,12 @@ export const MAX_NICKNAME_LENGTH = 16;
 export const MAX_CHAT_LENGTH = 200;
 export const MAX_STROKES_PER_ROUND = 500;
 export const MAX_POINTS_PER_STROKE = 1000;
+/**
+ * Total points stored across every stroke in one round. This bounds both the
+ * Durable Object value size and the snapshot payload regardless of how many
+ * strokes a drawer creates.
+ */
+export const MAX_STROKE_POINTS_PER_ROUND = 20_000;
 export const MAX_STROKE_POINTS_PER_MESSAGE = 128;
 export const MAX_STROKE_ID_LENGTH = 64;
 export const DRAWING_BATCH_INTERVAL_MS = 40;

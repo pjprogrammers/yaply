@@ -71,7 +71,7 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
       strokeId: z.string().min(1).max(MAX_STROKE_ID_LENGTH),
       color: StrokeColorSchema,
       width: z.number().int().min(1).max(20),
-      points: z.array(PointSchema).min(1).max(MAX_STROKE_POINTS_PER_MESSAGE),
+      points: z.array(PointSchema).max(MAX_STROKE_POINTS_PER_MESSAGE),
       done: z.boolean().optional(),
     })
     .strict(),
@@ -224,6 +224,7 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     text: z.string(),
     createdAt: z.number(),
     system: z.boolean().optional(),
+    private: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("game.correct-guess"),

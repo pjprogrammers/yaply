@@ -2130,3 +2130,300 @@ p {
     font-size: 24px;
   }
 }
+
+/* Enhanced Chat Event Styling */
+.chat-line--event {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: block;
+}
+
+.chat-line--normal {
+  color: var(--text);
+  background: transparent;
+}
+
+[data-theme="light"] .chat-line--normal {
+  color: #111111;
+}
+
+[data-theme="dark"] .chat-line--normal {
+  color: #ffffff;
+}
+
+/* Player joined - Green */
+.chat-line--player_joined {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+[data-theme="light"] .chat-line--player_joined {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+[data-theme="dark"] .chat-line--player_joined {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+/* Player left - Orange/Red */
+.chat-line--player_left {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+}
+
+[data-theme="light"] .chat-line--player_left {
+  background: rgba(249, 115, 22, 0.15);
+  color: #ea580c;
+}
+
+[data-theme="dark"] .chat-line--player_left {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+}
+
+/* Disconnected - Orange */
+.chat-line--disconnected {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+}
+
+[data-theme="light"] .chat-line--disconnected {
+  background: rgba(249, 115, 22, 0.15);
+  color: #ea580c;
+}
+
+[data-theme="dark"] .chat-line--disconnected {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+}
+
+/* Reconnected - Green */
+.chat-line--reconnected {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+[data-theme="light"] .chat-line--reconnected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+[data-theme="dark"] .chat-line--reconnected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+/* Correct guess - Bright green */
+.chat-line--correct_guess {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+[data-theme="light"] .chat-line--correct_guess {
+  background: rgba(16, 185, 129, 0.18);
+  color: #047857;
+}
+
+[data-theme="dark"] .chat-line--correct_guess {
+  background: rgba(16, 185, 129, 0.18);
+  color: #22c55e;
+}
+
+/* Own correct guess - Purple */
+.chat-line--own_correct_guess {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+[data-theme="light"] .chat-line--own_correct_guess {
+  background: rgba(168, 85, 247, 0.15);
+  color: #7c3aed;
+}
+
+[data-theme="dark"] .chat-line--own_correct_guess {
+  background: rgba(168, 85, 247, 0.18);
+  color: #a78bfa;
+}
+
+/* Drawing started - Blue */
+.chat-line--drawing_started {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+[data-theme="light"] .chat-line--drawing_started {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+[data-theme="dark"] .chat-line--drawing_started {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+/* Round started - Blue */
+.chat-line--round_started {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+[data-theme="light"] .chat-line--round_started {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+[data-theme="dark"] .chat-line--round_started {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+/* Close to the word - Yellow */
+.chat-line--close_guess {
+  background: rgba(251, 191, 36, 0.12);
+  color: #f59e0b;
+}
+
+[data-theme="light"] .chat-line--close_guess {
+  background: rgba(251, 191, 36, 0.18);
+  color: #d97706;
+}
+
+[data-theme="dark"] .chat-line--close_guess {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+}
+
+/* Word revealed / round ended - Cyan */
+.chat-line--word_revealed {
+  background: rgba(6, 182, 212, 0.12);
+  color: #06b6d4;
+}
+
+[data-theme="light"] .chat-line--word_revealed {
+  background: rgba(6, 182, 212, 0.15);
+  color: #0891b2;
+}
+
+[data-theme="dark"] .chat-line--word_revealed {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+/* Host announcement - Purple */
+.chat-line--announcement {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+[data-theme="light"] .chat-line--announcement {
+  background: rgba(168, 85, 247, 0.15);
+  color: #7c3aed;
+}
+
+[data-theme="dark"] .chat-line--announcement {
+  background: rgba(168, 85, 247, 0.18);
+  color: #a78bfa;
+}
+
+/* System errors - Red */
+.chat-line--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+[data-theme="light"] .chat-line--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+[data-theme="dark"] .chat-line--error {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+/* Leaderboard */
+.leaderboard {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leaderboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 4px;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+
+.leaderboard-row--top {
+  background: var(--surface-2);
+}
+
+.leaderboard-row--me {
+  outline: 1px solid var(--border);
+}
+
+.leaderboard-rank {
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.leaderboard-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.leaderboard-name-text {
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-score {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* Messages the server marked as private (secret-word protection) */
+.chat-line--private {
+  background: rgba(16, 185, 129, 0.1);
+  color: #22c55e;
+  font-style: normal;
+}
+
+[data-theme="light"] .chat-line--private {
+  background: rgba(16, 185, 129, 0.12);
+  color: #16a34a;
+}
+
+[data-theme="dark"] .chat-line--private {
+  background: rgba(16, 185, 129, 0.12);
+  color: #86efac;
+}

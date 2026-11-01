@@ -97,6 +97,12 @@ function pruneBuckets(map: Map<string, { count: number; resetAt: number }>, now:
   for (const [key, bucket] of map) {
     if (now >= bucket.resetAt) map.delete(key);
   }
+  // A flood of unique client keys could still exceed the cap with unexpired
+  // buckets, so drop the oldest entries as a last resort.
+  for (const key of map.keys()) {
+    if (map.size <= MAX_RATE_BUCKETS) break;
+    map.delete(key);
+  }
 }
 
 function takeFromBucket(
@@ -220,6 +226,15 @@ export default {
           429,
           { ...corsHeaders(request, env), "retry-after": "60" },
         );
+      }
+
+      const declaredLength = Number(request.headers.get("content-length"));
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_ROOM_CREATE_BODY_BYTES) {
+        log("warn", "room.create.body_too_large", {
+          bytes: declaredLength,
+          origin: request.headers.get("Origin") ?? null,
+        });
+        return json({ error: "That request is too large." }, 413, corsHeaders(request, env));
       }
 
       let raw: string;

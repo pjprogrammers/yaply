@@ -71,6 +71,18 @@ describe("client event validation", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts the trailing empty done frame the canvas sends after a flush", () => {
+    const result = ClientEventSchema.safeParse({
+      type: "drawing.stroke",
+      strokeId: "s1",
+      color: "#ffffff",
+      width: 4,
+      points: [],
+      done: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects chat over the maximum length", () => {
     const result = ClientEventSchema.safeParse({ type: "chat.guess", text: "x".repeat(201) });
     expect(result.success).toBe(false);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateDrawerPoints, calculateGuessPoints } from "../src/scoring";
-import { normalizeGuess, pickWords } from "../src/words-util";
+import { normalizeGuess, pickWords, containsSecretWord } from "../src/words-util";
 
 describe("scoring", () => {
   it("rewards a fast correct guess more than a slow one", () => {
@@ -32,5 +32,20 @@ describe("word helpers", () => {
     const words = pickWords(5);
     expect(words).toHaveLength(5);
     expect(new Set(words).size).toBe(5);
+  });
+
+  it("detects the secret word inside longer messages", () => {
+    expect(containsSecretWord("I think it is DAUGHTER!", "daughter")).toBe(true);
+    expect(containsSecretWord("daughter-in-law", "daughter")).toBe(true);
+    expect(containsSecretWord("mydaughter", "daughter")).toBe(true);
+    expect(containsSecretWord("ice   cream", "ice cream")).toBe(true);
+    expect(containsSecretWord("anything", "")).toBe(false);
+  });
+
+  it("detects the secret word when separators are inserted", () => {
+    expect(containsSecretWord("s t a r", "star")).toBe(true);
+    expect(containsSecretWord("S-T-A-R!", "star")).toBe(true);
+    expect(containsSecretWord("maybe s.t.a.r?", "star")).toBe(true);
+    expect(containsSecretWord("i c e   c r e a m", "ice cream")).toBe(true);
   });
 });
