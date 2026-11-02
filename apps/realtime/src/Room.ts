@@ -36,7 +36,7 @@ import {
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
-import { pickWords, normalizeGuess, containsSecretWord } from "./words-util";
+import { pickWordChoices, normalizeGuess, containsSecretWord } from "./words-util";
 import { calculateGuessPoints, calculateDrawerPoints } from "./scoring";
 import {
   applyChainMove,
@@ -80,6 +80,11 @@ type StoredState = {
   selectedWord: string | null;
   selectedWordId: string | null;
   wordChoices: WordChoice[];
+  /**
+   * Words already offered in the current match. A word is only recycled after
+   * the whole directory has been used, so a short game never repeats a choice.
+   */
+  usedWords: string[];
   guessedPlayerIds: string[];
   roundOrder: string[];
   turnNumber: number;
@@ -206,6 +211,7 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     selectedWord: null,
     selectedWordId: null,
     wordChoices: [],
+    usedWords: [],
     guessedPlayerIds: [],
     roundOrder: [],
     turnNumber: 0,
@@ -1131,6 +1137,7 @@ export class GameRoom {
     this.room.selectedWord = null;
     this.room.selectedWordId = null;
     this.room.wordChoices = [];
+    this.room.usedWords = [];
     this.room.guessedPlayerIds = [];
     this.room.revealedIndices = [];
     // A rematch is a new match, so scores and departed seats from the previous
@@ -1219,7 +1226,13 @@ export class GameRoom {
     this.room.roundNumber = Math.ceil(this.room.turnNumber / this.room.roundOrder.length);
     this.room.phase = "choosing";
     this.room.chooseEndsAt = Date.now() + CHOOSE_TIME_MS;
-    this.room.wordChoices = pickWords(this.room.settings.wordCount ?? 3).map((word, index) => ({
+    const pick = pickWordChoices(
+      this.room.settings.wordCount ?? 3,
+      "en",
+      this.room.usedWords ?? [],
+    );
+    this.room.usedWords = pick.used;
+    this.room.wordChoices = pick.words.map((word, index) => ({
       id: `w${index}`,
       word,
     }));
