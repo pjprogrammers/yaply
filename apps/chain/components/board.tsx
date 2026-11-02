@@ -56,6 +56,7 @@ export function Board({
 
   // A new move or a new turn always clears a half-finished confirmation.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on turn/move change
     setSelected(null);
   }, [chain.moveCount, chain.turnPlayerId, canPlay]);
 

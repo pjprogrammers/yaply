@@ -63,7 +63,7 @@ export default function HowToPlay() {
                 <h2>Place one orb on your turn</h2>
                 <p>
                   You can place on any empty cell, or on a cell you already own. You cannot place on
-                  an opponent's cell. After your move the turn passes to the next player who still
+                  an opponent&apos;s cell. After your move the turn passes to the next player who still
                   has a seat on the board.
                 </p>
               </div>

@@ -288,7 +288,9 @@ export function Board3D({
     onCancel,
     theme,
   });
-  propsRef.current = { chain, players, meId, canPlay, onPlace, flash, selected, onCancel, theme };
+  useEffect(() => {
+    propsRef.current = { chain, players, meId, canPlay, onPlace, flash, selected, onCancel, theme };
+  }, [chain, players, meId, canPlay, onPlace, flash, selected, onCancel, theme]);
 
   const hoverRef = useRef<{ row: number; col: number } | null>(null);
   const cursorRef = useRef<{ row: number; col: number }>({ row: 0, col: 0 });
@@ -429,10 +431,11 @@ export function Board3D({
           }
           const isSelected = selectedCell?.row === row && selectedCell?.col === col;
           const isHovered = hovered?.row === row && hovered?.col === col;
+          const playable = isPlayableCell(props.chain, props.meId, props.canPlay, row, col);
           if (isSelected) {
             ctx.fillStyle = alpha(colors.accent, 0.24);
             ctx.fill();
-          } else if (isHovered && props.canPlay) {
+          } else if (isHovered && playable) {
             ctx.fillStyle = alpha(colors.accent, 0.09);
             ctx.fill();
           }
@@ -478,7 +481,10 @@ export function Board3D({
       };
       if (selectedCell) {
         ringFor(selectedCell.row, selectedCell.col, colors.accent, 2.6);
-      } else if (hovered && props.canPlay) {
+      } else if (
+        hovered &&
+        isPlayableCell(board, props.meId, props.canPlay, hovered.row, hovered.col)
+      ) {
         ringFor(hovered.row, hovered.col, alpha(colors.accent, 0.6), 1.6);
       }
       const lastMove = board.lastMove;
@@ -664,7 +670,9 @@ export function Board3D({
     [colors, palette, theme],
   );
 
-  drawRef.current = draw;
+  useEffect(() => {
+    drawRef.current = draw;
+  }, [draw]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -761,7 +769,11 @@ export function Board3D({
       props.onCancel();
       return;
     }
-    if (!isPlayableCell(props.chain, props.meId, props.canPlay, cell.row, cell.col)) return;
+    if (!isPlayableCell(props.chain, props.meId, props.canPlay, cell.row, cell.col)) {
+      // Tapping a cell that cannot take an orb also clears a pending confirmation.
+      props.onCancel();
+      return;
+    }
     props.onPlace(cell.row, cell.col);
   };
 
@@ -794,7 +806,9 @@ export function Board3D({
 
   const label = selected
     ? `Chain Reaction 3D board. Row ${selected.row + 1}, column ${selected.col + 1} selected. Activate it again to confirm.`
-    : "Chain Reaction 3D board. Use arrow keys to move and Enter to place an orb.";
+    : canPlay
+      ? "Chain Reaction 3D board. Use arrow keys to move and Enter to place an orb."
+      : "Chain Reaction 3D board. Use arrow keys to move; clicking places only on your turn.";
 
   return (
     <div className="board-block board-block--3d" ref={wrapperRef}>
@@ -808,6 +822,7 @@ export function Board3D({
           aria-label={label}
           aria-rowcount={chain.rows}
           aria-colcount={chain.cols}
+          onPointerDown={(event) => event.currentTarget.focus()}
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
           onClick={handleClick}

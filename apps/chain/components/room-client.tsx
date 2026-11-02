@@ -66,6 +66,7 @@ export function RoomClient({ code }: { code: string }) {
   useEffect(() => {
     if (joined || gateName) return;
     const stored = readStoredNickname();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate stored name
     if (stored) setGateName(stored);
   }, [gateName, joined]);
 
@@ -204,7 +205,9 @@ function ConnectedRoom({
     onEvent: handleEvent,
   });
 
-  playerIdRef.current = playerId;
+  useEffect(() => {
+    playerIdRef.current = playerId;
+  }, [playerId]);
 
   const me = snapshot?.players.find((player) => player.id === playerId) ?? null;
   const isHost = snapshot ? snapshot.hostId === playerId : createdByHost;
@@ -246,6 +249,8 @@ function ConnectedRoom({
   useEffect(() => {
     if (!error) return;
     if (FATAL_CODES.has(error.code)) return;
+    // Bridge the socket's error event into a transient toast and consume it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToast({ message: error.message, error: true });
     clearError();
   }, [clearError, error]);
@@ -258,6 +263,9 @@ function ConnectedRoom({
 
   useEffect(() => {
     if (!snapshot) return;
+    // Results are only meaningful for the game that just ended; drop them as
+    // soon as the room moves on so a restart starts from a clean slate.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (snapshot.phase !== "game-over") setFinished(null);
   }, [snapshot]);
 

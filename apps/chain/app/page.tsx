@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   CHAIN_BOARD_PRESETS,
+  CHAIN_PALETTES,
   MAX_NICKNAME_LENGTH,
+  resolveChainPalette,
 } from "@yaply/shared/constants";
 import type { GameSettings } from "@yaply/shared/types";
 import { ArrowRightIcon, PlayIcon, UsersIcon, WifiIcon } from "@/components/icons";
@@ -29,10 +31,14 @@ import {
 } from "@/lib/chain-settings";
 
 const PLAYERS = [
-  { name: "Mara", color: "#4cb3f0", orbs: 12 },
-  { name: "Jules", color: "#f2b33d", orbs: 9 },
-  { name: "Niko", color: "#e5484d", orbs: 7 },
-  { name: "Ari", color: "#c6f24e", orbs: 4 },
+  { name: "Mara", orbs: 12 },
+  { name: "Jules", orbs: 9 },
+  { name: "Niko", orbs: 7 },
+  { name: "Ari", orbs: 4 },
+  { name: "Bea", orbs: 3 },
+  { name: "Theo", orbs: 2 },
+  { name: "Iris", orbs: 1 },
+  { name: "Sam", orbs: 1 },
 ];
 
 export default function Home() {
@@ -50,6 +56,9 @@ export default function Home() {
   useEffect(() => {
     const storedName = readStoredNickname();
     const stored = readLocalConfig(storedName);
+    // Hydrate the persisted table once the client mounts; the server cannot
+    // read localStorage, so this intentionally happens in an effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedName) setNickname(storedName);
     setSettings(localConfigToSettings(stored));
     setHydrated(true);
@@ -130,7 +139,17 @@ export default function Home() {
     router.push(`/room/${code}?name=${encodeURIComponent(name)}`);
   };
 
-  const paletteLabel = useMemo(() => settings.palette ?? "classic", [settings.palette]);
+  const palette = useMemo(
+    () => resolveChainPalette(settings.palette, settings.customColors),
+    [settings.palette, settings.customColors],
+  );
+  const paletteName = useMemo(
+    () =>
+      settings.palette === "custom"
+        ? "Custom"
+        : CHAIN_PALETTES.find((entry) => entry.id === settings.palette)?.name ?? "Classic",
+    [settings.palette],
+  );
 
   return (
     <div className="app-shell">
@@ -171,11 +190,11 @@ export default function Home() {
                   {board.rows} × {board.cols} · {settings.gridStyle === "2d" ? "2D" : "3D"}
                 </span>
               </div>
-              <MiniBoard />
+              <MiniBoard rows={board.rows} cols={board.cols} colors={palette} />
               <div className="preview-players">
-                {PLAYERS.slice(0, playerCount).map((player) => (
+                {PLAYERS.slice(0, playerCount).map((player, index) => (
                   <span className="preview-chip" key={player.name}>
-                    <i style={{ background: player.color }} />
+                    <i style={{ background: palette[index % palette.length] }} />
                     {player.name}
                     <span className="faint num">{player.orbs}</span>
                   </span>
@@ -200,7 +219,7 @@ export default function Home() {
               </div>
               <div className="fact">
                 <p className="fact-label">Palette</p>
-                <p className="fact-value fact-value--cap">{paletteLabel}</p>
+                <p className="fact-value fact-value--cap">{paletteName}</p>
               </div>
             </div>
           </section>

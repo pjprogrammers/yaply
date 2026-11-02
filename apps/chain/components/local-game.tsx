@@ -104,6 +104,8 @@ export function LocalGame({ nickname }: { nickname: string }) {
   const now = useNow(250);
 
   useEffect(() => {
+    // A fresh table starts from a clean chain whenever the roster/size change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChain(makeState());
     cpuGuard.current = "";
     autoGuard.current = "";
@@ -125,6 +127,8 @@ export function LocalGame({ nickname }: { nickname: string }) {
     for (const explosion of last.explosions) {
       keys.add(`${explosion.row}:${explosion.col}`);
     }
+    // Pulse the cells touched by the latest move, then fade them out.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFlash(keys);
     const timer = window.setTimeout(() => setFlash(new Set()), 560);
     return () => window.clearTimeout(timer);
@@ -479,6 +483,7 @@ export function LocalGameGate() {
 
   useEffect(() => {
     if (nameParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync route name
       setNickname(nameParam);
       return;
     }
