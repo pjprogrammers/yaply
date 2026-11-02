@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, ClockIcon, UsersIcon } from "@/components/icons";
+import { ArrowLeftIcon, ClockIcon, UsersIcon, WifiIcon } from "@/components/icons";
 import { MiniBoard } from "@/components/mini-board";
 import { Topbar } from "@/components/topbar";
 
@@ -30,8 +30,8 @@ export default function HowToPlay() {
 
         <div className="fact-strip" style={{ marginTop: 0, marginBottom: 16 }}>
           <div className="fact">
-            <p className="fact-label">Board</p>
-            <p className="fact-value">6 × 9</p>
+            <p className="fact-label">Boards</p>
+            <p className="fact-value">5×7 – 10×14</p>
           </div>
           <div className="fact">
             <p className="fact-label">Players</p>
@@ -88,8 +88,7 @@ export default function HowToPlay() {
                   <span className="mass-cell">2</span>
                 </div>
                 <p className="mass-caption">
-                  This 3 × 3 model shows the same rule as the 6 × 9 board: corners 2, edges 3,
-                  middle 4.
+                  The same rule applies on every board size: corners 2, edges 3, middle 4.
                 </p>
               </div>
 
@@ -132,10 +131,14 @@ export default function HowToPlay() {
               <span className="pill">
                 <ClockIcon size={11} /> 30–60s turns
               </span>
+              <span className="pill">
+                <WifiIcon size={11} /> 2D / 3D
+              </span>
             </div>
             <p className="subline" style={{ marginTop: 10 }}>
-              The host sets the room size and turn clock in the lobby. Settings lock when the game
-              starts and reopen before a rematch.
+              The setup screen sets players, board size, palette, theme, grid style, confirm moves
+              and CPU difficulty. Online, the host can change the same options in the lobby; settings
+              lock when the game starts and reopen before a rematch.
             </p>
             <div className="form-actions">
               <Link href="/" className="btn btn--primary">

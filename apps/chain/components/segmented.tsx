@@ -8,6 +8,7 @@ type SegmentedProps<T extends string | number> = {
   onChange: (value: T) => void;
   disabled?: boolean;
   label: string;
+  wrap?: boolean;
 };
 
 export function Segmented<T extends string | number>({
@@ -16,9 +17,10 @@ export function Segmented<T extends string | number>({
   onChange,
   disabled = false,
   label,
+  wrap = false,
 }: SegmentedProps<T>) {
   return (
-    <div className="seg" role="group" aria-label={label}>
+    <div className={`seg ${wrap ? "seg--wrap" : ""}`} role="group" aria-label={label}>
       {options.map((option) => (
         <button
           key={String(option.value)}

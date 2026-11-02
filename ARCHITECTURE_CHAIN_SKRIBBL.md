@@ -138,12 +138,18 @@ phase and for the wrong player.
 ## Connection lifecycle and resilience
 
 - A `room.welcome` event returns a per-player resume token. The client stores it
-  in `sessionStorage` keyed by game and room.
+  in `sessionStorage` keyed by game and room, and backs it up to `localStorage`
+  when the tab closes or the player leaves.
 - On reconnect, the client sends `room.join` with the token. The server restores
   the same seat, score, and connection state.
-- A disconnected player keeps their seat for 30 seconds
-  (`RECONNECT_GRACE_PERIOD_MS`). In Skribbl, a disconnected drawer ends the round
-  after the grace period; in Chain, the turn timer continues.
+- A player who disconnects or explicitly leaves mid-match keeps their seat for
+  30 seconds (`RECONNECT_GRACE_PERIOD_MS`). In Skribbl, a disconnected drawer
+  ends the round after the grace period; in Chain, the turn timer continues.
+- After the grace period, a Skribbl player removed mid-match is kept as a
+  reserved departure. Joining again with the same token restores their seat and
+  score until that match ends. Departed seats count toward `maxPlayers`.
+- Players may join a Skribbl room in any phase. New late joiners start on zero
+  and can play the current round; existing players keep their score.
 - Opening the same seat in another tab replaces the old socket with close code
   `4000`; the old client stops reconnecting instead of fighting for the seat.
 - The client reconnects with capped exponential backoff and queues up to 100
@@ -232,5 +238,6 @@ The test suite covers:
   checked at allocation and again at create time, but the space is finite.
 - Spectators are not supported; every socket must join as a player.
 - The UI currently supports English only (`language: "en"`).
-- Reconnect tokens live in `sessionStorage`, so a new browser session joins as a
-  new player.
+- Reconnect tokens live in `sessionStorage` with a `localStorage` fallback; a
+  new browser session joins as a new player only when no recoverable token
+  exists.

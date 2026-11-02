@@ -21,15 +21,25 @@ export type RoomError = {
 };
 
 const TOKEN_PREFIX = "yaply:resume:";
+const TOKEN_BACKUP_PREFIX = "yaply:resume-backup:";
 
 function tokenKey(game: GameKind, code: string): string {
   return `${TOKEN_PREFIX}${game}:${code.toLowerCase()}`;
 }
 
+function backupKey(game: GameKind, code: string): string {
+  return `${TOKEN_BACKUP_PREFIX}${game}:${code.toLowerCase()}`;
+}
+
 function readToken(game: GameKind, code: string): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.sessionStorage.getItem(tokenKey(game, code));
+    // The session copy belongs to the tab that is currently in a room. The
+    // local copy is only a recovery path for a closed tab or an explicit leave.
+    return (
+      window.sessionStorage.getItem(tokenKey(game, code)) ??
+      window.localStorage.getItem(backupKey(game, code))
+    );
   } catch {
     return null;
   }
@@ -39,8 +49,20 @@ function writeToken(game: GameKind, code: string, token: string): void {
   if (typeof window === "undefined") return;
   try {
     window.sessionStorage.setItem(tokenKey(game, code), token);
+    // The active tab owns the seat now; a second tab should not be handed the
+    // same token and kick this one unless this tab actually goes away.
+    window.localStorage.removeItem(backupKey(game, code));
   } catch {
     // Storage can be unavailable in private windows. Reconnect then falls back to a new join.
+  }
+}
+
+function backupToken(game: GameKind, code: string, token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(backupKey(game, code), token);
+  } catch {
+    // Storage can be unavailable in private windows.
   }
 }
 
@@ -59,6 +81,7 @@ export function useGameRoom({
   const [error, setError] = useState<RoomError | null>(null);
 
   const socketRef = useRef<GameSocket | null>(null);
+  const tokenRef = useRef<string | null>(null);
   const eventRef = useRef(onEvent);
   const settingsRef = useRef(settings);
   eventRef.current = onEvent;
@@ -69,6 +92,9 @@ export function useGameRoom({
     setPlayerId(null);
     setError(null);
 
+    const resumeToken = readToken(game, code);
+    tokenRef.current = resumeToken;
+
     const socket = new GameSocket({
       baseUrl,
       code,
@@ -76,21 +102,30 @@ export function useGameRoom({
       nickname,
       create,
       settings: settingsRef.current,
-      resumeToken: readToken(game, code),
+      resumeToken,
       onSnapshot: setSnapshot,
       onStatus: setStatus,
       onWelcome: (id, token) => {
         setPlayerId(id);
+        tokenRef.current = token;
         writeToken(game, code, token);
       },
       onError: (errorCode, message) => setError({ code: errorCode, message }),
       onEvent: (event) => eventRef.current?.(event),
     });
 
+    // Browsers do not reliably deliver a final socket frame on close, so keep
+    // the seat token recoverable if this tab disappears mid-match.
+    const handlePageHide = () => {
+      if (tokenRef.current) backupToken(game, code, tokenRef.current);
+    };
+    window.addEventListener("pagehide", handlePageHide);
+
     socketRef.current = socket;
     socket.connect();
 
     return () => {
+      window.removeEventListener("pagehide", handlePageHide);
       socket.close();
       socketRef.current = null;
     };
@@ -103,7 +138,11 @@ export function useGameRoom({
   const leave = useCallback(() => {
     socketRef.current?.send({ type: "room.leave" });
     socketRef.current?.close();
-  }, []);
+    // Keep the token. If the match is still running the server holds this
+    // player's seat and score, so coming back restores it instead of starting
+    // at zero. The backup also covers a later join from a fresh tab.
+    if (tokenRef.current) backupToken(game, code, tokenRef.current);
+  }, [game, code]);
 
   const clearError = useCallback(() => setError(null), []);
 

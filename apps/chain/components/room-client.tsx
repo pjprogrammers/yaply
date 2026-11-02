@@ -5,20 +5,25 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSettings, Ranking } from "@yaply/shared/types";
 import type { ServerEvent } from "@yaply/shared/events";
-import { DEFAULT_GAME_SETTINGS, MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
+import {
+  CHAIN_BOARD_PRESETS,
+  CHAIN_PALETTES,
+  CHAIN_THEMES,
+  MAX_NICKNAME_LENGTH,
+} from "@yaply/shared/constants";
 import { useCountdown, useGameRoom, useNow } from "@yaply/shared/react";
 import {
   inviteUrl,
-  numberParam,
   readStoredNickname,
   REALTIME_URL,
   storeNickname,
 } from "@/lib/config";
+import { settingsFromSearchParams } from "@/lib/chain-settings";
 import { Board } from "./board";
 import { Chat, type ChatMessage } from "./chat";
 import { CheckIcon, ClockIcon, CopyIcon, PlayIcon } from "./icons";
 import { PlayerList } from "./player-list";
-import { Segmented } from "./segmented";
+import { ChainSettingsFields } from "./settings-controls";
 import { Topbar } from "./topbar";
 import { MAIN_URL } from "@/lib/config";
 
@@ -65,13 +70,10 @@ export function RoomClient({ code }: { code: string }) {
   }, [gateName, joined]);
 
   const isHost = searchParams.get("host") === "1";
+  const query = searchParams.toString();
   const settings = useMemo<GameSettings>(
-    () => ({
-      ...DEFAULT_GAME_SETTINGS,
-      maxPlayers: numberParam(searchParams.get("max"), 6, 2, 8),
-      turnTimeSeconds: numberParam(searchParams.get("turn"), 45, 15, 120),
-    }),
-    [searchParams],
+    () => settingsFromSearchParams(new URLSearchParams(query)),
+    [query],
   );
 
   if (!joined) {
@@ -222,6 +224,24 @@ function ConnectedRoom({
     chain?.turnPlayerId === playerId;
   const eliminated = chain?.eliminatedPlayerIds.includes(playerId ?? "") ?? false;
   const fatal = error && FATAL_CODES.has(error.code) ? error : null;
+
+  const boardPreset = CHAIN_BOARD_PRESETS[roomSettings.boardSize ?? "medium"];
+  const paletteName =
+    roomSettings.palette === "custom"
+      ? "Custom"
+      : CHAIN_PALETTES.find((entry) => entry.id === roomSettings.palette)?.name ??
+        CHAIN_PALETTES[0].name;
+  const themeName =
+    CHAIN_THEMES.find((entry) => entry.id === (roomSettings.theme ?? "dark"))?.label ??
+    CHAIN_THEMES[0].label;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.chainTheme = roomSettings.theme ?? "dark";
+    return () => {
+      delete root.dataset.chainTheme;
+    };
+  }, [roomSettings.theme]);
 
   useEffect(() => {
     if (!error) return;
@@ -421,46 +441,58 @@ function ConnectedRoom({
                   <h2 className="card-title">Room settings</h2>
                   {isHost ? <span className="pill">Host</span> : <span className="pill">Host sets these</span>}
                 </div>
-                <div className="settings-list">
-                  <div className="setting-row">
-                    <span className="setting-label">Max players</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Max players"
-                        value={roomSettings.maxPlayers}
-                        options={[
-                          { label: "4", value: 4 },
-                          { label: "6", value: 6 },
-                          { label: "8", value: 8 },
-                        ]}
-                        onChange={(value) =>
-                          updateSettings({
-                            maxPlayers: Math.max(value, snapshot.players.length),
-                          })
-                        }
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.maxPlayers}</span>
-                    )}
+                {isHost ? (
+                  <ChainSettingsFields
+                    value={{
+                      ...roomSettings,
+                      maxPlayers: Math.max(roomSettings.maxPlayers, snapshot.players.length),
+                      playerCount: Math.max(roomSettings.playerCount ?? roomSettings.maxPlayers, snapshot.players.length),
+                    }}
+                    onChange={updateSettings}
+                    showTurnClock
+                  />
+                ) : (
+                  <div className="settings-list">
+                    <div className="setting-row">
+                      <span className="setting-label">Players</span>
+                      <span className="setting-value">
+                        {snapshot.players.length} / {roomSettings.maxPlayers}
+                      </span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Board</span>
+                      <span className="setting-value">
+                        {boardPreset.rows} × {boardPreset.cols}
+                      </span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Palette</span>
+                      <span className="setting-value">{paletteName}</span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Theme</span>
+                      <span className="setting-value">{themeName}</span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Grid</span>
+                      <span className="setting-value">
+                        {(roomSettings.gridStyle ?? "3d") === "2d" ? "2D" : "3D"}
+                      </span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Confirm moves</span>
+                      <span className="setting-value">
+                        {roomSettings.confirmMoves ? "On" : "Off"}
+                      </span>
+                    </div>
+                    <div className="setting-row">
+                      <span className="setting-label">Turn clock</span>
+                      <span className="setting-value num">
+                        {roomSettings.turnTimeSeconds ?? 45}s
+                      </span>
+                    </div>
                   </div>
-                  <div className="setting-row">
-                    <span className="setting-label">Turn clock</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Turn clock"
-                        value={roomSettings.turnTimeSeconds ?? 45}
-                        options={[
-                          { label: "30s", value: 30 },
-                          { label: "45s", value: 45 },
-                          { label: "60s", value: 60 },
-                        ]}
-                        onChange={(value) => updateSettings({ turnTimeSeconds: value })}
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.turnTimeSeconds ?? 45}s</span>
-                    )}
-                  </div>
-                </div>
+                )}
               </section>
 
               <section className="card">
@@ -526,6 +558,9 @@ function ConnectedRoom({
                     canPlay={canPlay}
                     onPlace={(row, col) => send({ type: "chain.place", row, col })}
                     flash={flash}
+                    gridStyle={roomSettings.gridStyle}
+                    confirmMoves={roomSettings.confirmMoves}
+                    theme={roomSettings.theme}
                   />
                 ) : (
                   <div className="empty">Setting up the board…</div>

@@ -14,6 +14,11 @@ import {
   CHAIN_MAX_MOVES,
   DEFAULT_GAME_SETTINGS,
   EMPTY_ROOM_TTL_MS,
+  chainBoardDimensions,
+  isChainBoardSize,
+  isChainPaletteId,
+  resolveChainPalette,
+  sanitizeCustomColors,
   MAX_CHAT_LENGTH,
   MAX_INVALID_MESSAGES,
   MAX_MESSAGE_BYTES,
@@ -47,6 +52,11 @@ type StoredPlayer = Player & {
   lastSeen: number;
 };
 
+type DepartedPlayer = StoredPlayer & {
+  /** Skribbl turn the seat was released in, used to reset per-round flags. */
+  departedTurnNumber: number;
+};
+
 type WordChoice = {
   id: string;
   word: string;
@@ -58,6 +68,12 @@ type StoredState = {
   phase: GamePhase;
   hostId: string;
   players: StoredPlayer[];
+  /**
+   * Seats removed during an active match. Keeping them here means a player who
+   * leaves or drops off can return with the score they had, instead of being
+   * seated as a brand-new player on zero.
+   */
+  departedPlayers: DepartedPlayer[];
   settings: GameSettings;
   roundNumber: number;
   drawerId: string | null;
@@ -125,8 +141,22 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKind): GameSettings {
+  const maxPlayers = clamp(
+    input?.maxPlayers ?? input?.playerCount ?? DEFAULT_GAME_SETTINGS.maxPlayers,
+    2,
+    game === "chain" ? 8 : 12,
+  );
+  const playerCount = clamp(
+    input?.playerCount ?? maxPlayers,
+    2,
+    game === "chain" ? 8 : 12,
+  );
+  const requestedPalette = input?.palette;
+  const palette = isChainPaletteId(requestedPalette) ? requestedPalette : "classic";
+  const customColors = palette === "custom" ? sanitizeCustomColors(input?.customColors) : [];
+
   return {
-    maxPlayers: clamp(input?.maxPlayers ?? DEFAULT_GAME_SETTINGS.maxPlayers, 2, game === "chain" ? 8 : 12),
+    maxPlayers,
     rounds: clamp(input?.rounds ?? DEFAULT_GAME_SETTINGS.rounds, 1, 10),
     drawingTimeSeconds: clamp(
       input?.drawingTimeSeconds ?? DEFAULT_GAME_SETTINGS.drawingTimeSeconds,
@@ -134,13 +164,30 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       180,
     ),
     language: "en",
-    allowLateJoin: false,
+    allowLateJoin: input?.allowLateJoin ?? DEFAULT_GAME_SETTINGS.allowLateJoin,
     wordCount: clamp(input?.wordCount ?? DEFAULT_GAME_SETTINGS.wordCount ?? 3, 2, 5),
     turnTimeSeconds: clamp(
       input?.turnTimeSeconds ?? DEFAULT_GAME_SETTINGS.turnTimeSeconds ?? 45,
       15,
       120,
     ),
+    playerCount,
+    boardSize: isChainBoardSize(input?.boardSize)
+      ? input.boardSize
+      : DEFAULT_GAME_SETTINGS.boardSize ?? "medium",
+    palette,
+    customColors,
+    theme:
+      input?.theme === "light" || input?.theme === "neon" || input?.theme === "dark"
+        ? input.theme
+        : "dark",
+    gridStyle: input?.gridStyle === "2d" ? "2d" : "3d",
+    confirmMoves: input?.confirmMoves ?? false,
+    vsCpu: input?.vsCpu ?? false,
+    cpuDifficulty:
+      input?.cpuDifficulty === "easy" || input?.cpuDifficulty === "hard"
+        ? input.cpuDifficulty
+        : "medium",
   };
 }
 
@@ -152,6 +199,7 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     phase: "lobby",
     hostId: "",
     players: [],
+    departedPlayers: [],
     settings: { ...DEFAULT_GAME_SETTINGS },
     roundNumber: 0,
     drawerId: null,
@@ -659,11 +707,32 @@ export class GameRoom {
     this.room.hostId = next?.id ?? "";
   }
 
-  private newPlayer(nickname: string): StoredPlayer {
+  private paletteColors(): string[] {
+    // Skribbl keeps its own colour rotation; only Chain uses player palettes.
+    if (this.room.game !== "chain") return PLAYER_COLORS;
+    return resolveChainPalette(this.room.settings.palette, this.room.settings.customColors);
+  }
+
+  private nextPlayerColor(): string {
+    const colors = this.paletteColors();
     const usedColors = new Set(this.room.players.map((player) => player.color));
-    const color =
-      PLAYER_COLORS.find((candidate) => !usedColors.has(candidate)) ??
-      PLAYER_COLORS[this.room.players.length % PLAYER_COLORS.length];
+    return (
+      colors.find((candidate) => !usedColors.has(candidate)) ??
+      colors[this.room.players.length % colors.length] ??
+      PLAYER_COLORS[this.room.players.length % PLAYER_COLORS.length]
+    );
+  }
+
+  /** Re-applies the selected palette to every seat, keeping colours distinct. */
+  private applyPaletteToPlayers() {
+    const colors = this.paletteColors();
+    this.room.players.forEach((player, index) => {
+      player.color = colors[index % colors.length] ?? PLAYER_COLORS[index % PLAYER_COLORS.length];
+    });
+  }
+
+  private newPlayer(nickname: string): StoredPlayer {
+    const color = this.nextPlayerColor();
 
     return {
       id: crypto.randomUUID(),
@@ -836,7 +905,7 @@ export class GameRoom {
   }
 
   private async handleJoin(ws: WebSocket, event: Extract<ClientEvent, { type: "room.join" }>) {
-    if (this.room.players.length === 0) {
+    if (this.room.players.length === 0 && this.room.departedPlayers.length === 0) {
       this.rejectEntry(
         ws,
         "room.join",
@@ -871,6 +940,9 @@ export class GameRoom {
       : undefined;
 
     if (resumed) {
+      this.room.departedPlayers = this.room.departedPlayers.filter(
+        (player) => player.resumeToken !== event.resumeToken,
+      );
       this.attachSocket(ws, resumed);
       this.sendWelcome(ws, resumed);
       this.sendPrivateState(ws, resumed.id);
@@ -886,31 +958,73 @@ export class GameRoom {
       return;
     }
 
-    if (event.resumeToken && this.room.phase !== "lobby") {
-      this.rejectEntry(
-        ws,
-        "room.join",
-        "RESUME_FAILED",
-        "That seat has expired. Wait for the next round or ask the host for a new room.",
+    const departed = event.resumeToken
+      ? this.room.departedPlayers.find((player) => player.resumeToken === event.resumeToken)
+      : undefined;
+
+    if (departed) {
+      // This player left (or timed out) during the current match. Restore the
+      // same seat and score instead of starting them over at zero.
+      this.room.departedPlayers = this.room.departedPlayers.filter(
+        (player) => player.id !== departed.id,
       );
+      // Only carry the "already guessed" flag into the same turn. If the match
+      // moved on while this player was away, they get a fresh guess.
+      if (departed.departedTurnNumber !== this.room.turnNumber) {
+        departed.guessedCorrectly = false;
+      } else if (
+        departed.guessedCorrectly &&
+        !this.room.guessedPlayerIds.includes(departed.id)
+      ) {
+        this.room.guessedPlayerIds.push(departed.id);
+      }
+      departed.connected = true;
+      departed.lastSeen = Date.now();
+      this.room.players.push(departed);
+      if (!this.room.roundOrder.includes(departed.id)) {
+        this.room.roundOrder.push(departed.id);
+      }
+
+      this.attachSocket(ws, departed);
+      this.sendWelcome(ws, departed);
+      this.sendPrivateState(ws, departed.id);
+      this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
+      this.broadcast({ type: "room.player.joined", playerId: departed.id });
+      this.broadcastSnapshot();
+      this.broadcastSystemChat(`${departed.nickname} rejoined the room.`);
+      logRoom("info", "room.rejoined_match", {
+        game: this.room.game,
+        code: safeCode(this.room.code),
+        phase: this.room.phase,
+        players: this.room.players.length,
+      });
+      await this.commit();
       return;
     }
 
-    if (this.room.phase !== "lobby") {
-      this.rejectEntry(
-        ws,
-        "room.join",
-        "ROOM_IN_PROGRESS",
-        "That game is already in progress. Ask the host to start a rematch.",
-      );
-      return;
+    if (event.resumeToken) {
+      // The seat can be gone because the player left, the reconnect grace
+      // period expired, or the token was copied from another room. Treat the
+      // join as a fresh seat instead of locking the player out mid-match.
+      logRoom("info", "room.resume_fallback", {
+        game: this.room.game,
+        code: safeCode(this.room.code),
+        phase: this.room.phase,
+        players: this.room.players.length,
+      });
     }
 
-    if (this.room.players.length >= this.room.settings.maxPlayers) {
+    // Departed seats keep their slot for the current match so a returning
+    // player can reclaim their score. New players can use any remaining slot.
+    const seatedPlayers = this.room.players.length + this.room.departedPlayers.length;
+    if (seatedPlayers >= this.room.settings.maxPlayers) {
       this.rejectEntry(ws, "room.join", "ROOM_FULL", "That room is full.");
       return;
     }
 
+    // Late joiners are welcome in every phase. They start with no score and
+    // join the turn order from the next turn onward; during an active drawing
+    // round they can guess immediately against the current word.
     const player = this.newPlayer(event.nickname);
     this.room.players.push(player);
     this.room.roundOrder.push(player.id);
@@ -936,7 +1050,26 @@ export class GameRoom {
     this.sockets.delete(ws);
     this.socketState.delete(ws);
     this.playerSockets.delete(player.id);
-    this.removePlayer(player.id, "left");
+
+    const midMatch =
+      this.room.game === "skribbl" &&
+      (this.room.phase === "choosing" ||
+        this.room.phase === "drawing" ||
+        this.room.phase === "round-result");
+
+    if (midMatch) {
+      // An explicit leave during a match keeps the seat for the reconnect grace
+      // period, exactly like a dropped connection. If the player comes back in
+      // time they resume the same score instead of starting over at zero.
+      player.connected = false;
+      player.lastSeen = Date.now();
+      this.room.lastActivity = Date.now();
+      this.broadcast({ type: "room.player.left", playerId: player.id });
+      this.broadcastSystemChat(`${player.nickname} left the room.`);
+    } else {
+      this.removePlayer(player.id, "left");
+    }
+
     this.broadcastSnapshot();
     try {
       ws.close(1000, "Left room");
@@ -982,6 +1115,8 @@ export class GameRoom {
 
     this.room.settings = sanitizeSettings({ ...this.room.settings, ...settings }, this.room.game);
     this.room.settings.maxPlayers = Math.max(this.room.settings.maxPlayers, this.room.players.length);
+    this.room.settings.playerCount = this.room.settings.maxPlayers;
+    if (this.room.game === "chain") this.applyPaletteToPlayers();
     this.broadcastSnapshot();
     await this.commit();
   }
@@ -998,6 +1133,9 @@ export class GameRoom {
     this.room.wordChoices = [];
     this.room.guessedPlayerIds = [];
     this.room.revealedIndices = [];
+    // A rematch is a new match, so scores and departed seats from the previous
+    // one must not carry over.
+    this.room.departedPlayers = [];
     this.room.endsAt = null;
     this.room.roundStartedAt = null;
     this.room.roundEndsAt = null;
@@ -1008,12 +1146,16 @@ export class GameRoom {
     this.room.roundOrder = this.room.players.map((player) => player.id);
     this.shuffle(this.room.roundOrder);
     this.room.lastActivity = Date.now();
+    this.applyPaletteToPlayers();
 
     if (this.room.game === "chain") {
+      const board = chainBoardDimensions(this.room.settings.boardSize);
       this.room.chain = createChainState(
         this.room.roundOrder,
         Date.now(),
         this.room.settings.turnTimeSeconds ?? 45,
+        board.rows,
+        board.cols,
       );
       this.room.phase = "playing";
       this.room.roundNumber = 1;
@@ -1402,6 +1544,8 @@ export class GameRoom {
     this.room.wordChoices = [];
     this.room.guessedPlayerIds = [];
     this.room.strokes = [];
+    // The match is over, so there is no score left to reclaim.
+    this.room.departedPlayers = [];
 
     const rankings = this.rankings();
     this.broadcast({ type: "game.finished", rankings, winnerId: rankings[0]?.playerId });
@@ -1674,6 +1818,26 @@ export class GameRoom {
     ) {
       if (this.room.game === "chain") this.finishChain(this.room.players[0]?.id ?? null);
       else this.finishSkribbl();
+    }
+
+    // Preserve a skribbl seat for the rest of the match. The player keeps their
+    // score and can reclaim it by joining again with the same resume token.
+    if (
+      this.room.game === "skribbl" &&
+      this.room.players.length > 0 &&
+      (this.room.phase === "choosing" ||
+        this.room.phase === "drawing" ||
+        this.room.phase === "round-result")
+    ) {
+      this.room.departedPlayers = this.room.departedPlayers.filter(
+        (entry) => entry.id !== player.id && entry.resumeToken !== player.resumeToken,
+      );
+      this.room.departedPlayers.push({
+        ...player,
+        connected: false,
+        lastSeen: Date.now(),
+        departedTurnNumber: this.room.turnNumber,
+      });
     }
 
     this.broadcastSystemChat(`${player.nickname} ${reason === "left" ? "left the room" : "disconnected"}.`);

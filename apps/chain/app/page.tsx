@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
-import { ArrowRightIcon, PlayIcon, UsersIcon } from "@/components/icons";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CHAIN_BOARD_PRESETS,
+  MAX_NICKNAME_LENGTH,
+} from "@yaply/shared/constants";
+import type { GameSettings } from "@yaply/shared/types";
+import { ArrowRightIcon, PlayIcon, UsersIcon, WifiIcon } from "@/components/icons";
 import { MiniBoard } from "@/components/mini-board";
-import { Segmented } from "@/components/segmented";
+import { ChainSettingsFields } from "@/components/settings-controls";
 import { Topbar } from "@/components/topbar";
 import {
   cleanRoomCode,
@@ -15,6 +19,14 @@ import {
   readStoredNickname,
   storeNickname,
 } from "@/lib/config";
+import {
+  defaultLocalConfig,
+  localConfigToSettings,
+  normalizeLocalConfig,
+  readLocalConfig,
+  settingsToSearchParams,
+  writeLocalConfig,
+} from "@/lib/chain-settings";
 
 const PLAYERS = [
   { name: "Mara", color: "#4cb3f0", orbs: 12 },
@@ -26,19 +38,53 @@ const PLAYERS = [
 export default function Home() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
+  const [settings, setSettings] = useState<GameSettings>(() =>
+    localConfigToSettings(defaultLocalConfig()),
+  );
+  const [hydrated, setHydrated] = useState(false);
   const [roomCode, setRoomCode] = useState("");
-  const [maxPlayers, setMaxPlayers] = useState(6);
-  const [turnTime, setTurnTime] = useState(45);
   const [error, setError] = useState("");
   const [createError, setCreateError] = useState("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredNickname();
-    if (stored) setNickname(stored);
+    const storedName = readStoredNickname();
+    const stored = readLocalConfig(storedName);
+    if (storedName) setNickname(storedName);
+    setSettings(localConfigToSettings(stored));
+    setHydrated(true);
   }, []);
 
+  // Persist every change so the next visit opens with the same table.
+  useEffect(() => {
+    if (!hydrated) return;
+    writeLocalConfig(
+      normalizeLocalConfig(
+        {
+          ...settings,
+          nickname,
+          playerCount: settings.playerCount ?? settings.maxPlayers,
+        },
+        nickname,
+      ),
+    );
+  }, [hydrated, nickname, settings]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.chainTheme = settings.theme ?? "dark";
+    return () => {
+      delete root.dataset.chainTheme;
+    };
+  }, [settings.theme]);
+
+  const playerCount = Math.max(2, Math.min(8, settings.playerCount ?? settings.maxPlayers ?? 4));
+  const board = CHAIN_BOARD_PRESETS[settings.boardSize ?? "medium"];
   const displayName = () => nickname.trim() || "Player";
+
+  const patchSettings = (patch: Partial<GameSettings>) => {
+    setSettings((current) => ({ ...current, ...patch }));
+  };
 
   const createRoom = async () => {
     if (creating) return;
@@ -48,12 +94,10 @@ export default function Home() {
     setCreating(true);
     try {
       const code = await createRoomCode();
-      const params = new URLSearchParams({
-        name,
-        host: "1",
-        max: String(maxPlayers),
-        turn: String(turnTime),
-      });
+      const params = settingsToSearchParams(
+        { ...settings, vsCpu: false },
+        { name, host: "1" },
+      );
       router.push(`/room/${code}?${params.toString()}`);
     } catch (cause) {
       setCreateError(
@@ -63,6 +107,16 @@ export default function Home() {
       );
       setCreating(false);
     }
+  };
+
+  const startLocal = (mode: "solo" | "nearby") => {
+    const name = displayName();
+    storeNickname(name);
+    const params = settingsToSearchParams(
+      { ...settings, vsCpu: mode === "solo" ? settings.vsCpu : false },
+      { name, mode: mode === "nearby" ? "nearby" : "solo" },
+    );
+    router.push(`/play?${params.toString()}`);
   };
 
   const joinRoom = () => {
@@ -75,6 +129,8 @@ export default function Home() {
     storeNickname(name);
     router.push(`/room/${code}?name=${encodeURIComponent(name)}`);
   };
+
+  const paletteLabel = useMemo(() => settings.palette ?? "classic", [settings.palette]);
 
   return (
     <div className="app-shell">
@@ -111,11 +167,13 @@ export default function Home() {
                   <span className="status-dot" data-status="connected" />
                   Board preview
                 </span>
-                <span className="pill pill--accent">Move 34</span>
+                <span className="pill pill--accent">
+                  {board.rows} × {board.cols} · {settings.gridStyle === "2d" ? "2D" : "3D"}
+                </span>
               </div>
               <MiniBoard />
               <div className="preview-players">
-                {PLAYERS.map((player) => (
+                {PLAYERS.slice(0, playerCount).map((player) => (
                   <span className="preview-chip" key={player.name}>
                     <i style={{ background: player.color }} />
                     {player.name}
@@ -124,7 +182,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="paper-caption">
-                <span>Mara's corner is one orb from popping</span>
+                <span>Mara&apos;s corner is one orb from popping</span>
                 <span className="num">0:31 left</span>
               </p>
             </div>
@@ -132,31 +190,33 @@ export default function Home() {
             <div className="fact-strip">
               <div className="fact">
                 <p className="fact-label">Board</p>
-                <p className="fact-value">6 × 9</p>
+                <p className="fact-value">
+                  {board.rows} × {board.cols}
+                </p>
               </div>
               <div className="fact">
                 <p className="fact-label">Players</p>
-                <p className="fact-value">2–8</p>
+                <p className="fact-value">{playerCount}</p>
               </div>
               <div className="fact">
-                <p className="fact-label">Turn clock</p>
-                <p className="fact-value">30–60s</p>
+                <p className="fact-label">Palette</p>
+                <p className="fact-value fact-value--cap">{paletteLabel}</p>
               </div>
             </div>
           </section>
 
-          <aside className="rail">
+          <aside className="rail home-rail">
             <section className="card">
               <div className="card-head">
                 <div>
-                  <h2 className="card-title">Enter the arena</h2>
+                  <h2 className="card-title">Game setup</h2>
                   <p className="small faint" style={{ marginTop: 3 }}>
-                    No account, no install.
+                    Every setting applies to the game you start.
                   </p>
                 </div>
                 <span className="pill">
                   <UsersIcon size={11} />
-                  Live room
+                  {playerCount}
                 </span>
               </div>
 
@@ -172,55 +232,55 @@ export default function Home() {
                 />
               </label>
 
-              <div className="settings-list" style={{ marginTop: 18 }}>
-                <div className="setting-row">
-                  <span className="setting-label">Max players</span>
-                  <Segmented
-                    label="Max players"
-                    value={maxPlayers}
-                    options={[
-                      { label: "4", value: 4 },
-                      { label: "6", value: 6 },
-                      { label: "8", value: 8 },
-                    ]}
-                    onChange={setMaxPlayers}
-                  />
-                </div>
-                <div className="setting-row">
-                  <span className="setting-label">Turn clock</span>
-                  <Segmented
-                    label="Turn clock"
-                    value={turnTime}
-                    options={[
-                      { label: "30s", value: 30 },
-                      { label: "45s", value: 45 },
-                      { label: "60s", value: 60 },
-                    ]}
-                    onChange={setTurnTime}
-                  />
-                </div>
-              </div>
+              <div className="setup-divider" />
 
-              <button
-                className="btn btn--primary btn--block btn--lg"
-                type="button"
-                onClick={createRoom}
-                disabled={creating}
-                style={{ marginTop: 18 }}
-              >
-                <PlayIcon size={15} />
-                {creating ? "Creating room…" : "Create a room"}
-              </button>
-              {createError && (
-                <p className="small" style={{ color: "var(--negative)", marginTop: 8 }}>
-                  {createError}
+              <ChainSettingsFields
+                value={settings}
+                onChange={patchSettings}
+                showCpu
+                showTurnClock
+              />
+
+              <div className="setup-actions">
+                <button
+                  className="btn btn--primary btn--block btn--lg"
+                  type="button"
+                  onClick={() => startLocal("solo")}
+                >
+                  <PlayIcon size={15} />
+                  Play
+                </button>
+                <button
+                  className="btn btn--block"
+                  type="button"
+                  onClick={() => startLocal("nearby")}
+                >
+                  <UsersIcon size={15} />
+                  Nearby multiplayer
+                </button>
+                <button
+                  className="btn btn--block"
+                  type="button"
+                  onClick={createRoom}
+                  disabled={creating}
+                >
+                  <WifiIcon size={15} />
+                  {creating ? "Creating room…" : "Online multiplayer"}
+                </button>
+                <p className="setup-note">
+                  {settings.vsCpu
+                    ? `Play fills seats 2–${playerCount} with ${settings.cpuDifficulty ?? "medium"} CPUs.`
+                    : "Play is pass-and-play on this device. Nearby is the same, without CPUs."}
                 </p>
-              )}
+                {createError && (
+                  <p className="small" style={{ color: "var(--negative)" }}>{createError}</p>
+                )}
+              </div>
 
               <div className="divider" style={{ margin: "20px 0 18px" }} />
 
               <div className="field">
-                <span className="field-label">Join with a code</span>
+                <span className="field-label">Join an online room</span>
                 <div className="join-row">
                   <div className="code-input-wrap">
                     <input

@@ -341,9 +341,15 @@ affected frontend.
 - Worker-level limits: 30 room creations and 60 WebSocket upgrades per client
   per minute. These are per Worker isolate and are a best-effort abuse control;
   Cloudflare account limits remain the final backstop.
-- Reconnect tokens are stored in `sessionStorage` per game and room. The server
-  holds a disconnected seat for 30 seconds. A brand-new browser or tab does not
-  inherit another player's identity.
+- Reconnect tokens are stored in `sessionStorage` per game and room, with a
+  `localStorage` recovery copy written when a tab closes or a player leaves.
+  The server holds a disconnected or explicitly left seat for 30 seconds, then
+  keeps any mid-match Skribbl seat as a reserved departure so the same player
+  can rejoin with their score. A brand-new browser or tab does not inherit
+  another player's identity while the original tab is still connected.
+- Players can join a Skribbl match in any phase. Late joiners start on zero,
+  enter the turn order from the next turn, and can guess the current drawing
+  round; returning players reclaim their existing seat and score instead.
 - Observability: structured JSON logs cover room allocation failures, origin
   rejections, upgrade rate limits, protocol mismatches, reconnect/disconnect
   outcomes, per-client socket caps, room expiry, and Durable Object errors.

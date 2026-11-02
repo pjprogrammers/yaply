@@ -715,7 +715,7 @@ describe("Security and abuse controls", () => {
     expect(sockets[0].events("room.snapshot")).toHaveLength(staleSnapshots);
   });
 
-  it("refuses a resume token from a different room while a game is running", async () => {
+  it("joins as a new player when a resume token belongs to another room", async () => {
     const { sockets, tokens } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     await sockets[0].message({ type: "room.start" });
 
@@ -731,7 +731,11 @@ describe("Security and abuse controls", () => {
       resumeToken: tokens[0],
     });
 
-    expect(socket.last("room.error").code).toBe("RESUME_FAILED");
+    expect(socket.last("room.error")).toBeUndefined();
+    expect(socket.last("room.welcome").playerId).toBeTruthy();
+    expect(socket.last("room.snapshot").snapshot.players.map((player: any) => player.nickname)).toContain(
+      "Mallory",
+    );
   });
 
   it("closes a socket after too many invalid messages", async () => {
@@ -966,6 +970,336 @@ describe("Skribbl edge cases", () => {
     const word = drawer.last("game.word.selected").word;
     return { ...joined, drawerIndex, drawer, word };
   }
+
+  it("lets a player who left mid-round rejoin and play the current round", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+      "Dave",
+    ]);
+    const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await sockets[guesserIndex].message({ type: "room.leave" });
+    await flush();
+    // The seat is held through the reconnect grace period instead of being
+    // dropped immediately, so an accidental leave can be undone.
+    expect((harness.room as any).room.players).toHaveLength(4);
+    expect(
+      (harness.room as any).room.players.find(
+        (player: any) => player.id === playerIds[guesserIndex],
+      ).connected,
+    ).toBe(false);
+
+    const rejoined = harness.connect();
+    await rejoined.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+
+    expect(rejoined.last("room.error")).toBeUndefined();
+    const rejoinedId = rejoined.last("room.welcome").playerId;
+    const snapshot = rejoined.last("room.snapshot").snapshot;
+    expect(snapshot.players).toHaveLength(4);
+    expect(snapshot.players.some((player: any) => player.id === rejoinedId)).toBe(true);
+    expect((harness.room as any).room.roundOrder).toContain(rejoinedId);
+
+    await rejoined.message({ type: "chat.guess", text: word });
+    const scored = rejoined
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === rejoinedId);
+    expect(scored.score).toBeGreaterThan(0);
+  });
+
+  it("preserves a player's match score when they leave and rejoin", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+    ]);
+    const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
+    const guesser = sockets[guesserIndex];
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await guesser.message({ type: "chat.guess", text: word });
+    const scoreBefore = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).score;
+    expect(scoreBefore).toBeGreaterThan(0);
+
+    await guesser.message({ type: "room.leave" });
+    await flush();
+    expect((harness.room as any).room.players).toHaveLength(3);
+    expect(
+      (harness.room as any).room.players.find(
+        (player: any) => player.id === playerIds[guesserIndex],
+      ).connected,
+    ).toBe(false);
+
+    const rejoined = harness.connect();
+    await rejoined.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+
+    expect(rejoined.last("room.error")).toBeUndefined();
+    expect(rejoined.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
+    const restored = rejoined
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.score).toBe(scoreBefore);
+    expect(restored.connected).toBe(true);
+    // They already guessed in this turn, so they must not be able to farm the
+    // same word twice by leaving and rejoining.
+    expect(restored.guessedCorrectly).toBe(true);
+    expect((harness.room as any).room.guessedPlayerIds).toContain(playerIds[guesserIndex]);
+  });
+
+  it("keeps a two-player match recoverable when one player leaves after scoring", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+    ]);
+    const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await sockets[guesserIndex].message({ type: "chat.guess", text: word });
+    const scoreBefore = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).score;
+    expect(scoreBefore).toBeGreaterThan(0);
+    expect((harness.room as any).room.phase).toBe("round-result");
+
+    await sockets[guesserIndex].message({ type: "room.leave" });
+    await flush();
+    // Leaving does not end the match immediately; the seat stays recoverable
+    // for the reconnect grace period even when only two players remain.
+    expect((harness.room as any).room.phase).toBe("round-result");
+    expect((harness.room as any).room.players).toHaveLength(2);
+
+    const rejoined = harness.connect();
+    await rejoined.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+
+    expect(rejoined.last("room.error")).toBeUndefined();
+    expect(rejoined.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
+    const restored = rejoined
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.score).toBe(scoreBefore);
+  });
+
+  it("lets a rejoining player guess again once the next round starts", async () => {
+    const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+    ]);
+    const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await sockets[guesserIndex].message({ type: "chat.guess", text: word });
+    await sockets[guesserIndex].message({ type: "room.leave" });
+    await flush();
+
+    // Finish the current round and let the server advance to the next turn.
+    (harness.room as any).room.endsAt = Date.now() - 1;
+    await harness.room.alarm();
+    (harness.room as any).room.roundEndsAt = Date.now() - 1;
+    await harness.room.alarm();
+    expect((harness.room as any).room.phase).toBe("choosing");
+
+    const rejoined = harness.connect();
+    await rejoined.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+      resumeToken: token,
+    });
+
+    const restored = rejoined
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.guessedCorrectly).toBe(false);
+    expect((harness.room as any).room.guessedPlayerIds).not.toContain(playerIds[guesserIndex]);
+  });
+
+  it("lets a player join while a word is being chosen and guess that round", async () => {
+    const { harness, sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawer = sockets[playerIds.indexOf(snapshot.drawerId)];
+    const choices = drawer.last("game.word.choices").choices;
+
+    const late = harness.connect();
+    await late.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Carol",
+    });
+    expect(late.last("room.error")).toBeUndefined();
+    expect(late.last("room.snapshot").snapshot.phase).toBe("choosing");
+    expect(late.last("room.snapshot").snapshot.players).toHaveLength(3);
+
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = drawer.last("game.word.selected").word;
+    expect(late.last("room.snapshot").snapshot.phase).toBe("drawing");
+
+    const lateId = late.last("room.welcome").playerId;
+    await late.message({ type: "chat.guess", text: word });
+    const scored = late
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === lateId);
+    expect(scored.score).toBeGreaterThan(0);
+  });
+
+  it("still enforces capacity for late joiners", async () => {
+    const harness = await makeRoom("skribbl");
+    const host = harness.connect();
+    await host.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Alice",
+      settings: { maxPlayers: 2 },
+    });
+    const bob = harness.connect();
+    await bob.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Bob",
+    });
+    await host.message({ type: "room.start" });
+
+    const late = harness.connect();
+    await late.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Carol",
+    });
+
+    expect(late.last("room.error").code).toBe("ROOM_FULL");
+    expect((harness.room as any).room.players).toHaveLength(2);
+  });
+
+  it("reserves a departed seat against new players until the match ends", async () => {
+    const joined = await createAndJoin("skribbl", ["Alice", "Bob", "Carol"]);
+    const { harness, sockets, playerIds } = joined;
+    await sockets[0].message({
+      type: "room.settings.update",
+      settings: { maxPlayers: 3 },
+    });
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const choices = sockets[drawerIndex].last("game.word.choices").choices;
+    await sockets[drawerIndex].message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = sockets[drawerIndex].last("game.word.selected").word;
+
+    const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
+    await sockets[guesserIndex].message({ type: "chat.guess", text: word });
+    const scoreBefore = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).score;
+    const token = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).resumeToken;
+
+    await sockets[guesserIndex].message({ type: "room.leave" });
+    await flush();
+    const record = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    );
+    record.lastSeen = Date.now() - 31_000;
+    await harness.room.alarm();
+    expect((harness.room as any).room.departedPlayers).toHaveLength(1);
+
+    const late = harness.connect();
+    await late.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Mallory",
+    });
+    expect(late.last("room.error").code).toBe("ROOM_FULL");
+
+    const rejoined = harness.connect();
+    await rejoined.message({
+      type: "room.join",
+      protocolVersion: 1,
+      game: "skribbl",
+      code: "abc123",
+      nickname: "Returning",
+      resumeToken: token,
+    });
+    expect(rejoined.last("room.error")).toBeUndefined();
+    expect(rejoined.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
+    const restored = rejoined
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.score).toBe(scoreBefore);
+    expect((harness.room as any).room.departedPlayers).toHaveLength(0);
+  });
+
+  it("clears departed seats and scores when a rematch starts", async () => {
+    const joined = await createAndJoin("skribbl", ["Alice", "Bob", "Carol"]);
+    const { harness, sockets, playerIds } = joined;
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const choices = sockets[drawerIndex].last("game.word.choices").choices;
+    await sockets[drawerIndex].message({ type: "game.word.choose", wordId: choices[0].id });
+
+    const room = (harness.room as any).room;
+    room.players[0].score = 40;
+    const leaverIndex = playerIds.findIndex((_, index) => index !== 0 && index !== drawerIndex);
+    await sockets[leaverIndex].message({ type: "room.leave" });
+    await flush();
+    const record = room.players.find((player: any) => player.id === playerIds[leaverIndex]);
+    record.lastSeen = Date.now() - 31_000;
+    await harness.room.alarm();
+    expect(room.departedPlayers).toHaveLength(1);
+
+    // Simulate the match finishing without clearing the seats, then rematch.
+    room.phase = "game-over";
+    await sockets[0].message({ type: "game.rematch" });
+
+    expect(room.departedPlayers).toHaveLength(0);
+    expect(room.players.every((player: any) => player.score === 0)).toBe(true);
+    expect(room.phase).toBe("choosing");
+  });
 
   it("does not score the same player twice for a repeated correct guess", async () => {
     const { sockets, playerIds, drawerIndex, word } = await startedRound(["Alice", "Bob", "Carol"]);
@@ -1300,7 +1634,7 @@ describe("Skribbl edge cases", () => {
     expect(replacement.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
   });
 
-  it("rejects an expired resume token after the reconnect grace period", async () => {
+  it("restores the same seat and score after the reconnect grace period", async () => {
     const { harness, sockets, playerIds, drawerIndex, word } = await startedRound([
       "Alice",
       "Bob",
@@ -1313,6 +1647,9 @@ describe("Skribbl edge cases", () => {
     ).resumeToken;
 
     await guesser.message({ type: "chat.guess", text: word });
+    const scoreBefore = (harness.room as any).room.players.find(
+      (player: any) => player.id === playerIds[guesserIndex],
+    ).score;
     guesser.close(1001, "gone");
     await flush();
     const record = (harness.room as any).room.players.find(
@@ -1322,6 +1659,7 @@ describe("Skribbl edge cases", () => {
 
     await harness.room.alarm();
     expect((harness.room as any).room.players).toHaveLength(2);
+    expect((harness.room as any).room.departedPlayers).toHaveLength(1);
 
     const replacement = harness.connect();
     await replacement.message({
@@ -1332,7 +1670,13 @@ describe("Skribbl edge cases", () => {
       nickname: "Bob",
       resumeToken: token,
     });
-    expect(replacement.last("room.error").code).toBe("RESUME_FAILED");
+    expect(replacement.last("room.error")).toBeUndefined();
+    expect(replacement.last("room.welcome").playerId).toBe(playerIds[guesserIndex]);
+    const restored = replacement
+      .last("room.snapshot")
+      .snapshot.players.find((player: any) => player.id === playerIds[guesserIndex]);
+    expect(restored.score).toBe(scoreBefore);
+    expect(restored.connected).toBe(true);
   });
 
   it("ignores undo and clear commands from players who are not drawing", async () => {
@@ -1532,7 +1876,7 @@ describe("Additional security and persistence", () => {
     expect(sockets[0].last("room.error").code).toBe("INVALID_EVENT");
   });
 
-  it("rejects an invalid resume token during an active game", async () => {
+  it("joins as a new player when a resume token is unknown during an active game", async () => {
     const { harness, sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     await sockets[0].message({ type: "room.start" });
 
@@ -1545,7 +1889,10 @@ describe("Additional security and persistence", () => {
       nickname: "Mallory",
       resumeToken: "not-a-real-token",
     });
-    expect(outsider.last("room.error").code).toBe("RESUME_FAILED");
+    expect(outsider.last("room.error")).toBeUndefined();
+    expect(outsider.last("room.welcome").playerId).toBeTruthy();
+    expect(outsider.last("room.snapshot").snapshot.players).toHaveLength(3);
+    expect(outsider.last("room.snapshot").snapshot.phase).not.toBe("lobby");
   });
 
   it("caps multiple sockets from one client in the same room", async () => {

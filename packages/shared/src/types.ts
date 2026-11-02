@@ -2,6 +2,12 @@ export type PlayerId = string;
 export type RoomCode = string;
 export type GameKind = "skribbl" | "chain";
 
+export type ChainBoardSize = "small" | "medium" | "large" | "xxl";
+export type ChainPaletteId = "classic" | "vivid" | "pastel" | "neon" | "mono" | "custom";
+export type ChainTheme = "dark" | "light" | "neon";
+export type ChainGridStyle = "2d" | "3d";
+export type CpuDifficulty = "easy" | "medium" | "hard";
+
 export type GamePhase =
   | "lobby"
   | "choosing"
@@ -42,6 +48,16 @@ export type GameSettings = {
   allowLateJoin: boolean;
   wordCount?: number;
   turnTimeSeconds?: number;
+  /** Desired seats for a local game. Online rooms use it as the capacity. */
+  playerCount?: number;
+  boardSize?: ChainBoardSize;
+  palette?: ChainPaletteId;
+  customColors?: string[];
+  theme?: ChainTheme;
+  gridStyle?: ChainGridStyle;
+  confirmMoves?: boolean;
+  vsCpu?: boolean;
+  cpuDifficulty?: CpuDifficulty;
 };
 
 export type ChainCell = {
