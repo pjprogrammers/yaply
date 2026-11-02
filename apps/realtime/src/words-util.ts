@@ -1,4 +1,5 @@
-import { WORDS } from "./words";
+import type { WordLanguage } from "@yaply/shared/types";
+import { WORD_ALIASES, WORDS } from "./words";
 
 export type WordPick = {
   /** The words offered to the drawer, in order. */
@@ -6,6 +7,17 @@ export type WordPick = {
   /** The updated used-word list for the room. */
   used: string[];
 };
+
+/**
+ * Japanese players may type a loanword in hiragana or katakana. Folding
+ * hiragana into katakana before comparing makes both spellings count without
+ * needing an alias for every entry.
+ */
+function foldKana(value: string): string {
+  return value.replace(/[\u3041-\u3096]/g, (character) =>
+    String.fromCharCode(character.charCodeAt(0) + 0x60),
+  );
+}
 
 function sampleWords(pool: readonly string[], count: number): string[] {
   const remaining = [...pool];
@@ -23,13 +35,13 @@ function sampleWords(pool: readonly string[], count: number): string[] {
  */
 export function pickWords(
   n: number,
-  lang: string = "en",
+  lang: WordLanguage = "en",
   exclude: Iterable<string> = [],
 ): string[] {
   const count = Math.max(0, Math.floor(n));
   if (count === 0) return [];
   const excluded = new Set(exclude);
-  const pool = (WORDS[lang] || WORDS.en).filter((word) => !excluded.has(word));
+  const pool = WORDS[lang].filter((word) => !excluded.has(word));
   return sampleWords(pool, count);
 }
 
@@ -41,11 +53,11 @@ export function pickWords(
  */
 export function pickWordChoices(
   n: number,
-  lang: string = "en",
+  lang: WordLanguage = "en",
   used: readonly string[] = [],
 ): WordPick {
   const count = Math.max(0, Math.floor(n));
-  const all = WORDS[lang] || WORDS.en;
+  const all = WORDS[lang];
   if (count === 0) return { words: [], used: [...used] };
 
   const usedSet = new Set(used);
@@ -77,11 +89,13 @@ export function maskWord(word: string): string {
 }
 
 export function normalizeGuess(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("en");
+  return foldKana(
+    value
+      .normalize("NFKC")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("en"),
+  );
 }
 
 function normalizeForWordMatch(value: string): string {
@@ -112,4 +126,28 @@ export function containsSecretWord(text: string, word: string): boolean {
 
   const compactNeedle = compactForWordMatch(word);
   return compactNeedle.length > 0 && compactForWordMatch(text).includes(compactNeedle);
+}
+
+/** The canonical word plus any accepted alternate spellings (e.g. kana readings). */
+export function acceptedAnswers(word: string): string[] {
+  return [word, ...(WORD_ALIASES[word] ?? [])];
+}
+
+/** True when `text` contains the word or one of its accepted spellings. */
+export function matchesWord(text: string, word: string): boolean {
+  return acceptedAnswers(word).some((answer) => containsSecretWord(text, answer));
+}
+
+/**
+ * True when the whole message is the word or an accepted spelling. Punctuation,
+ * spacing and separator differences are ignored, matching the behaviour of the
+ * in-message matcher.
+ */
+export function isExactGuess(text: string, word: string): boolean {
+  const guess = normalizeGuess(text);
+  const compactGuess = compactForWordMatch(text);
+  return acceptedAnswers(word).some((answer) => {
+    if (normalizeGuess(answer) === guess) return true;
+    return compactForWordMatch(answer) === compactGuess;
+  });
 }

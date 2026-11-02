@@ -18,6 +18,8 @@ export const RoomCodeSchema = z
 
 export const GameKindSchema = z.enum(["skribbl", "chain"]);
 
+export const WordLanguageSchema = z.enum(["en", "tl", "ja", "ko"]);
+
 export const ProtocolVersionSchema = z.number().int().optional();
 
 export const PointSchema = z
@@ -34,7 +36,7 @@ export const GameSettingsSchema = z
     maxPlayers: z.number().int().min(2).max(12).optional(),
     rounds: z.number().int().min(1).max(10).optional(),
     drawingTimeSeconds: z.number().int().min(30).max(180).optional(),
-    language: z.literal("en").optional(),
+    language: WordLanguageSchema.optional(),
     allowLateJoin: z.boolean().optional(),
     wordCount: z.number().int().min(2).max(5).optional(),
     turnTimeSeconds: z.number().int().min(15).max(120).optional(),
@@ -181,7 +183,7 @@ export const RoomSnapshotSchema = z.object({
     maxPlayers: z.number(),
     rounds: z.number(),
     drawingTimeSeconds: z.number(),
-    language: z.literal("en"),
+    language: WordLanguageSchema,
     allowLateJoin: z.boolean(),
     wordCount: z.number().optional(),
     turnTimeSeconds: z.number().optional(),

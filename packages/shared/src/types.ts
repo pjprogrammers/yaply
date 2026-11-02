@@ -2,6 +2,12 @@ export type PlayerId = string;
 export type RoomCode = string;
 export type GameKind = "skribbl" | "chain";
 
+/**
+ * Word pools supported by the Skribbl dictionary. `tl` is Tagalog/Filipino,
+ * `ja` is Japanese and `ko` is Korean.
+ */
+export type WordLanguage = "en" | "tl" | "ja" | "ko";
+
 export type ChainBoardSize = "small" | "medium" | "large" | "xxl";
 export type ChainPaletteId = "classic" | "vivid" | "pastel" | "neon" | "mono" | "custom";
 export type ChainTheme = "dark" | "light" | "neon";
@@ -44,7 +50,7 @@ export type GameSettings = {
   maxPlayers: number;
   rounds: number;
   drawingTimeSeconds: number;
-  language: "en";
+  language: WordLanguage;
   allowLateJoin: boolean;
   wordCount?: number;
   turnTimeSeconds?: number;

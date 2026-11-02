@@ -505,6 +505,17 @@ p {
   opacity: 0.55;
 }
 
+/* Language pickers have four options with native-script labels, so let them
+   wrap instead of overflowing a narrow settings rail. */
+.setting-row .seg {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.setting-row .seg button {
+  padding: 0 10px;
+}
+
 /* Pills, tags, status */
 
 .pill {

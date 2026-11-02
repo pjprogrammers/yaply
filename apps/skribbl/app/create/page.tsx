@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
+import { isWordLanguage, MAX_NICKNAME_LENGTH, WORD_LANGUAGES } from "@yaply/shared/constants";
+import type { WordLanguage } from "@yaply/shared/types";
 import { ArrowLeftIcon, PlayIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
 import { Topbar } from "@/components/topbar";
@@ -13,7 +14,11 @@ function CreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nameParam = (searchParams.get("name") ?? "").trim();
+  const langParam = searchParams.get("lang");
   const [nickname, setNickname] = useState(nameParam);
+  const [language, setLanguage] = useState<WordLanguage>(
+    isWordLanguage(langParam) ? langParam : "en",
+  );
   const [rounds, setRounds] = useState(3);
   const [drawTime, setDrawTime] = useState(80);
   const [words, setWords] = useState(3);
@@ -42,6 +47,7 @@ function CreateContent() {
         time: String(drawTime),
         words: String(words),
         max: String(maxPlayers),
+        lang: language,
       });
       router.push(`/room/${code}?${params.toString()}`);
     } catch (cause) {
@@ -89,6 +95,18 @@ function CreateContent() {
               </label>
 
               <div className="settings-list">
+                <div className="setting-row">
+                  <span className="setting-label">Language</span>
+                  <Segmented
+                    label="Word language"
+                    value={language}
+                    options={WORD_LANGUAGES.map(({ id, nativeLabel }) => ({
+                      label: nativeLabel,
+                      value: id,
+                    }))}
+                    onChange={setLanguage}
+                  />
+                </div>
                 <div className="setting-row">
                   <span className="setting-label">Rounds</span>
                   <Segmented

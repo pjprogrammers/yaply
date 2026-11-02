@@ -17,6 +17,7 @@ import {
   chainBoardDimensions,
   isChainBoardSize,
   isChainPaletteId,
+  isWordLanguage,
   resolveChainPalette,
   sanitizeCustomColors,
   MAX_CHAT_LENGTH,
@@ -36,7 +37,7 @@ import {
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
-import { pickWordChoices, normalizeGuess, containsSecretWord } from "./words-util";
+import { pickWordChoices, isExactGuess, matchesWord, containsSecretWord } from "./words-util";
 import { calculateGuessPoints, calculateDrawerPoints } from "./scoring";
 import {
   applyChainMove,
@@ -168,7 +169,7 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       30,
       180,
     ),
-    language: "en",
+    language: isWordLanguage(input?.language) ? input.language : "en",
     allowLateJoin: input?.allowLateJoin ?? DEFAULT_GAME_SETTINGS.allowLateJoin,
     wordCount: clamp(input?.wordCount ?? DEFAULT_GAME_SETTINGS.wordCount ?? 3, 2, 5),
     turnTimeSeconds: clamp(
@@ -619,7 +620,9 @@ export class GameRoom {
     const revealed = new Set(this.room.revealedIndices);
     return [...this.room.selectedWord]
       .map((character, index) => {
-        if (character === " " || !/[a-z0-9]/i.test(character) || revealed.has(index)) return character;
+        if (character === " " || !/[\p{L}\p{N}]/u.test(character) || revealed.has(index)) {
+          return character;
+        }
         return "_";
       })
       .join("");
@@ -1119,7 +1122,13 @@ export class GameRoom {
     }
     if (this.room.phase !== "lobby") return;
 
+    const previousLanguage = this.room.settings.language;
     this.room.settings = sanitizeSettings({ ...this.room.settings, ...settings }, this.room.game);
+    if (this.room.settings.language !== previousLanguage) {
+      // The bag belongs to the previous language; starting a fresh cycle keeps
+      // words from another pool out of this room's history.
+      this.room.usedWords = [];
+    }
     this.room.settings.maxPlayers = Math.max(this.room.settings.maxPlayers, this.room.players.length);
     this.room.settings.playerCount = this.room.settings.maxPlayers;
     if (this.room.game === "chain") this.applyPaletteToPlayers();
@@ -1228,7 +1237,7 @@ export class GameRoom {
     this.room.chooseEndsAt = Date.now() + CHOOSE_TIME_MS;
     const pick = pickWordChoices(
       this.room.settings.wordCount ?? 3,
-      "en",
+      this.room.settings.language,
       this.room.usedWords ?? [],
     );
     this.room.usedWords = pick.used;
@@ -1398,11 +1407,7 @@ export class GameRoom {
     const alreadyGuessed =
       this.room.guessedPlayerIds.includes(player.id) || player.guessedCorrectly;
 
-    if (
-      isDrawing &&
-      (isDrawer || alreadyGuessed) &&
-      containsSecretWord(trimmed, selectedWord)
-    ) {
+    if (isDrawing && (isDrawer || alreadyGuessed) && matchesWord(trimmed, selectedWord)) {
       this.sendSecretMessage(player, trimmed);
       return;
     }
@@ -1417,19 +1422,18 @@ export class GameRoom {
       return;
     }
 
-    const guess = normalizeGuess(trimmed);
-    const answer = normalizeGuess(selectedWord);
+    const correct = isExactGuess(trimmed, selectedWord);
 
     if (alreadyGuessed) {
-      if (guess !== answer) this.broadcastChat(player, trimmed);
+      if (!correct) this.broadcastChat(player, trimmed);
       return;
     }
 
-    if (guess !== answer) {
+    if (!correct) {
       // A player who has not guessed yet can still accidentally reveal the word
       // inside a longer sentence. Keep that message private as well, but do not
       // award points: only an exact guess counts as correct.
-      if (containsSecretWord(trimmed, selectedWord)) {
+      if (matchesWord(trimmed, selectedWord)) {
         this.sendSecretMessage(player, trimmed);
       } else {
         this.broadcastChat(player, trimmed);
@@ -1958,7 +1962,7 @@ export class GameRoom {
     if (!this.room.selectedWord) return [];
     return [...this.room.selectedWord]
       .map((character, index) => ({ character, index }))
-      .filter(({ character }) => /[a-z0-9]/i.test(character))
+      .filter(({ character }) => /[\p{L}\p{N}]/u.test(character))
       .map(({ index }) => index);
   }
 

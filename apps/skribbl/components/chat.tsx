@@ -60,6 +60,7 @@ function getMessageType(message: ChatMessage): ChatMessageType {
 export function Chat({ messages, onSend, disabled = false, placeholder, hint }: ChatProps) {
   const [value, setValue] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const composingRef = useRef(false);
 
   useEffect(() => {
     const list = listRef.current;
@@ -69,6 +70,9 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    // Enter can confirm an IME candidate (Japanese/Korean). Never send the
+    // half-composed string when that happens.
+    if (composingRef.current) return;
     const text = value.trim();
     if (!text || disabled) return;
     onSend(text);
@@ -120,6 +124,20 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
           className="input input--chat"
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)
+            ) {
+              event.preventDefault();
+            }
+          }}
           maxLength={MAX_CHAT_LENGTH}
           placeholder={disabled ? "Guess sent" : placeholder ?? "Type a guess…"}
           disabled={disabled}

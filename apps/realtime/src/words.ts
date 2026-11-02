@@ -1,3 +1,8 @@
+import type { WordLanguage } from "@yaply/shared/types";
+import { INTL_WORD_CATEGORIES } from "./words-intl";
+
+export { WORD_ALIASES } from "./words-intl";
+
 /**
  * Skribbl word directory.
  *
@@ -408,6 +413,14 @@ function flattenUnique(groups: readonly (readonly string[])[]): string[] {
   return words;
 }
 
-export const WORDS: Record<string, string[]> = {
+export const WORD_CATEGORIES_BY_LANGUAGE = {
+  en: WORD_CATEGORIES,
+  ...INTL_WORD_CATEGORIES,
+} as const;
+
+export const WORDS: Record<WordLanguage, string[]> = {
   en: flattenUnique(Object.values(WORD_CATEGORIES)),
+  tl: flattenUnique(Object.values(INTL_WORD_CATEGORIES.tl)),
+  ja: flattenUnique(Object.values(INTL_WORD_CATEGORIES.ja)),
+  ko: flattenUnique(Object.values(INTL_WORD_CATEGORIES.ko)),
 };

@@ -5,9 +5,31 @@ import type {
   ChainTheme,
   CpuDifficulty,
   GameSettings,
+  WordLanguage,
 } from "./types";
 
 export const PROTOCOL_VERSION = 1;
+
+/**
+ * Word pools a Skribbl room can draw from. The label is the English name, the
+ * native label is what the picker shows to players.
+ */
+export const WORD_LANGUAGES: ReadonlyArray<{
+  id: WordLanguage;
+  label: string;
+  nativeLabel: string;
+}> = [
+  { id: "en", label: "English", nativeLabel: "English" },
+  { id: "tl", label: "Filipino", nativeLabel: "Filipino" },
+  { id: "ja", label: "Japanese", nativeLabel: "日本語" },
+  { id: "ko", label: "Korean", nativeLabel: "한국어" },
+];
+
+export const WORD_LANGUAGE_IDS = WORD_LANGUAGES.map((language) => language.id);
+
+export function isWordLanguage(value: unknown): value is WordLanguage {
+  return typeof value === "string" && WORD_LANGUAGE_IDS.includes(value as WordLanguage);
+}
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   maxPlayers: 8,

@@ -5,7 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameSettings, Ranking, Stroke } from "@yaply/shared/types";
 import type { ServerEvent } from "@yaply/shared/events";
-import { DEFAULT_GAME_SETTINGS, MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
+import {
+  DEFAULT_GAME_SETTINGS,
+  isWordLanguage,
+  MAX_NICKNAME_LENGTH,
+  WORD_LANGUAGES,
+} from "@yaply/shared/constants";
 import { useCountdown, useGameRoom, useNow } from "@yaply/shared/react";
 import {
   inviteUrl,
@@ -105,8 +110,9 @@ export function RoomClient({ code }: { code: string }) {
   }, [gateName, joined]);
 
   const isHost = searchParams.get("host") === "1";
-  const settings = useMemo<GameSettings>(
-    () => ({
+  const settings = useMemo<GameSettings>(() => {
+    const language = searchParams.get("lang");
+    return {
       ...DEFAULT_GAME_SETTINGS,
       rounds: numberParam(searchParams.get("rounds"), DEFAULT_GAME_SETTINGS.rounds, 1, 10),
       drawingTimeSeconds: numberParam(
@@ -117,9 +123,9 @@ export function RoomClient({ code }: { code: string }) {
       ),
       wordCount: numberParam(searchParams.get("words"), DEFAULT_GAME_SETTINGS.wordCount ?? 3, 2, 5),
       maxPlayers: numberParam(searchParams.get("max"), DEFAULT_GAME_SETTINGS.maxPlayers, 2, 12),
-    }),
-    [searchParams],
-  );
+      language: isWordLanguage(language) ? language : DEFAULT_GAME_SETTINGS.language,
+    };
+  }, [searchParams]);
 
   if (!joined) {
     const submit = (event: React.FormEvent) => {
@@ -591,6 +597,25 @@ function ConnectedRoom({
                   {isHost ? <span className="pill">Host</span> : <span className="pill">Host sets these</span>}
                 </div>
                 <div className="settings-list">
+                  <div className="setting-row">
+                    <span className="setting-label">Language</span>
+                    {isHost ? (
+                      <Segmented
+                        label="Word language"
+                        value={roomSettings.language}
+                        options={WORD_LANGUAGES.map(({ id, nativeLabel }) => ({
+                          label: nativeLabel,
+                          value: id,
+                        }))}
+                        onChange={(value) => updateSettings({ language: value })}
+                      />
+                    ) : (
+                      <span className="setting-value">
+                        {WORD_LANGUAGES.find((entry) => entry.id === roomSettings.language)
+                          ?.nativeLabel ?? "English"}
+                      </span>
+                    )}
+                  </div>
                   <div className="setting-row">
                     <span className="setting-label">Rounds</span>
                     {isHost ? (
