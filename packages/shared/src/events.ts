@@ -5,6 +5,8 @@ import type {
   Point,
   Ranking,
   RoomSnapshot,
+  SmashInput,
+  SmashMatchSnapshot,
 } from "./types";
 
 export type ClientEvent =
@@ -40,6 +42,8 @@ export type ClientEvent =
   | { type: "chat.guess"; text: string }
   | { type: "chain.place"; row: number; col: number }
   | { type: "chain.surrender" }
+  | { type: "smash.input"; input: SmashInput }
+  | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
   | { type: "game.rematch" }
   | { type: "room.sync" };
 
@@ -93,6 +97,8 @@ export type ServerEvent =
     }
   | { type: "chain.move"; move: ChainMove; snapshot: RoomSnapshot }
   | { type: "chain.turn.timeout"; playerId: string }
+  | { type: "smash.input"; playerId: string; input: SmashInput }
+  | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
   | {
       type: "game.finished";
       rankings: Ranking[];

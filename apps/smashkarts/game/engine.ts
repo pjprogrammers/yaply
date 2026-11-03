@@ -10,14 +10,22 @@ import { getMap } from "./maps";
 import type { GameStore } from "./store";
 import type {
   BotBrain,
+  EngineMode,
   GameOptions,
   GameSnapshot,
   KartSnapshot,
   MapDef,
+  OnlinePlayer,
   PickupSnapshot,
   VehicleInput,
   WeaponId,
 } from "./types";
+import type {
+  SmashInput,
+  SmashKartSnapshot,
+  SmashMatchSnapshot,
+  SmashWinner,
+} from "@yaply/shared/types";
 
 interface KartActor {
   id: string;
@@ -29,6 +37,10 @@ interface KartActor {
   z: number;
   y: number;
   yaw: number;
+  /** Guest replication target, smoothed by the renderer between snapshots. */
+  netX: number;
+  netZ: number;
+  netYaw: number;
   vx: number;
   vz: number;
   vy: number;
@@ -72,6 +84,9 @@ interface Projectile {
   splash: number;
   targetId: string | null;
   mesh: THREE.Object3D;
+  /** Guest-only targets copied from the latest host snapshot. */
+  netPosition: THREE.Vector3 | null;
+  netVelocity: THREE.Vector3 | null;
 }
 
 interface MineActor {
@@ -120,6 +135,10 @@ function wrapAngle(angle: number): number {
 
 function damp(current: number, target: number, rate: number, dt: number): number {
   return current + (target - current) * (1 - Math.exp(-rate * dt));
+}
+
+function dampAngle(current: number, target: number, rate: number, dt: number): number {
+  return wrapAngle(current + wrapAngle(target - current) * (1 - Math.exp(-rate * dt)));
 }
 
 function shuffle<T>(items: readonly T[]): T[] {
@@ -179,10 +198,29 @@ export class GameEngine {
   private pointerFire = false;
   private keyFire = false;
 
+  private readonly role: EngineMode;
+  private readonly localPlayerId: string;
+  private readonly round: number;
+  private readonly onlineRoster = new Map<string, OnlinePlayer>();
+  private readonly remoteInputs = new Map<string, VehicleInput>();
+  private lastInputSent = 0;
+  private lastSentInput: SmashInput | null = null;
+  private lastSnapshotSent = 0;
+  private snapshotOverSent = false;
+  private netMatchSeconds = 0;
+  private winner: GameSnapshot["winner"] = null;
+  private seededPhase: "playing" | "over" | null = null;
+
   constructor(container: HTMLElement, options: GameOptions, store: GameStore) {
     this.container = container;
     this.store = store;
     this.options = options;
+    this.role = options.mode ?? "local";
+    this.localPlayerId = options.localPlayerId ?? PLAYER_ID;
+    this.round = options.round ?? 1;
+    for (const player of options.roster ?? []) {
+      this.onlineRoster.set(player.id, player);
+    }
     this.arenaMap = getMap(options.mapId);
     this.muted = store.getSnapshot().muted;
     this.timeLeft = options.duration;
@@ -220,6 +258,14 @@ export class GameEngine {
     this.buildKarts();
     this.buildPickups();
     this.placeAtSpawns();
+    if (options.seedSnapshot && options.seedSnapshot.round === this.round) {
+      if (this.role === "online-host") {
+        this.applySeedSnapshot(options.seedSnapshot);
+      } else if (this.role === "online-guest") {
+        this.applyRemoteSnapshot(options.seedSnapshot, true);
+      }
+      this.seededPhase = options.seedSnapshot.phase;
+    }
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -236,9 +282,10 @@ export class GameEngine {
       return;
     }
     this.started = true;
-    this.mode = "playing";
+    this.mode = this.seededPhase === "over" ? "over" : "playing";
+    if (this.mode === "playing") this.winner = null;
     this.audio.unlock();
-    this.store.set({ phase: "playing", timeLeft: this.timeLeft });
+    this.store.set({ phase: this.mode, timeLeft: this.timeLeft, winner: this.winner });
     this.snapCamera();
     this.lastFrame = performance.now();
     this.raf = requestAnimationFrame(this.frame);
@@ -246,7 +293,9 @@ export class GameEngine {
   }
 
   pause() {
-    if (this.mode !== "playing") {
+    // Online matches cannot be frozen by one client: the host keeps the
+    // simulation authoritative and guests would desync behind a local pause.
+    if (this.role !== "local" || this.mode !== "playing") {
       return;
     }
     this.mode = "paused";
@@ -259,7 +308,7 @@ export class GameEngine {
   }
 
   resume() {
-    if (this.mode !== "paused") {
+    if (this.role !== "local" || this.mode !== "paused") {
       return;
     }
     this.mode = "playing";
@@ -270,6 +319,9 @@ export class GameEngine {
   }
 
   togglePause() {
+    if (this.role !== "local") {
+      return;
+    }
     if (this.mode === "playing") {
       this.pause();
     } else if (this.mode === "paused") {
@@ -314,9 +366,18 @@ export class GameEngine {
   }
 
   private onVisibility = () => {
-    if (document.hidden && this.mode === "playing") {
-      this.pause();
+    if (!document.hidden) {
+      return;
     }
+    if (this.role === "local" && this.mode === "playing") {
+      this.pause();
+      return;
+    }
+    // Online play must keep running, but a hidden tab should never hold the
+    // throttle open after the player stops looking at the game.
+    this.keys.clear();
+    this.pointerFire = false;
+    this.keyFire = false;
   };
 
   private resize() {
@@ -392,6 +453,40 @@ export class GameEngine {
   };
 
   private buildKarts() {
+    if (this.role !== "local") {
+      const roster = [...this.onlineRoster.values()];
+      if (!roster.some((entry) => entry.id === this.localPlayerId)) {
+        roster.unshift({
+          id: this.localPlayerId,
+          name: this.options.playerName || "Driver",
+          color: this.options.color,
+          connected: true,
+        });
+        this.onlineRoster.set(this.localPlayerId, roster[0]);
+      }
+
+      for (const entry of roster) {
+        if (this.karts.some((kart) => kart.id === entry.id)) continue;
+        this.karts.push(
+          this.createKart(entry.id, entry.name, entry.color, entry.id === this.localPlayerId, null),
+        );
+      }
+
+      this.player =
+        this.karts.find((kart) => kart.id === this.localPlayerId) ?? this.karts[0];
+      if (!this.player) {
+        this.player = this.createKart(
+          this.localPlayerId,
+          this.options.playerName || "Driver",
+          this.options.color,
+          true,
+          null,
+        );
+        this.karts.push(this.player);
+      }
+      return;
+    }
+
     const bots = shuffle(BOT_NAMES).slice(0, Math.max(0, Math.min(7, this.options.botCount)));
     const botColors = shuffle([...BOT_COLORS]);
 
@@ -440,6 +535,9 @@ export class GameEngine {
       z: 0,
       y: 0,
       yaw: 0,
+      netX: 0,
+      netZ: 0,
+      netYaw: 0,
       vx: 0,
       vz: 0,
       vy: 0,
@@ -493,9 +591,28 @@ export class GameEngine {
 
   private placeAtSpawns() {
     const spawns = shuffle(this.arenaMap.spawns);
+    const limit = this.arenaMap.size / 2 - 3;
     this.karts.forEach((kart, index) => {
       const spawn = spawns[index % spawns.length];
-      this.spawnAt(kart, spawn[0], spawn[1]);
+      const lap = Math.floor(index / spawns.length);
+      let x = spawn[0];
+      let z = spawn[1];
+      if (lap > 0) {
+        // Maps have eight grid slots. Online rooms can hold up to 40, so fan
+        // extra karts out in rings instead of stacking them on one spawn.
+        const radius = 2.6 * lap;
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const angle = index * 2.399963 + attempt * 0.7;
+          const candidateX = clamp(spawn[0] + Math.cos(angle) * radius, -limit, limit);
+          const candidateZ = clamp(spawn[1] + Math.sin(angle) * radius, -limit, limit);
+          if (!this.pointBlocked(candidateX, candidateZ, KART.radius + 0.6)) {
+            x = candidateX;
+            z = candidateZ;
+            break;
+          }
+        }
+      }
+      this.spawnAt(kart, x, z);
     });
   }
 
@@ -504,6 +621,9 @@ export class GameEngine {
     kart.z = z;
     kart.y = 0;
     kart.yaw = Math.atan2(-x, -z);
+    kart.netX = kart.x;
+    kart.netZ = kart.z;
+    kart.netYaw = kart.yaw;
     kart.vx = 0;
     kart.vz = 0;
     kart.vy = 0;
@@ -547,18 +667,30 @@ export class GameEngine {
     }
 
     if (this.mode === "playing") {
-      this.accumulator += dt;
-      let guard = 0;
-      while (this.accumulator >= STEP && guard < 5) {
-        this.step(STEP);
-        this.accumulator -= STEP;
-        guard += 1;
+      if (this.role === "online-guest") {
+        // Guests render the host's authoritative frames. Input is still read
+        // locally so steering feels immediate, but the host applies movement.
+        this.elapsed += dt;
+        this.updatePlayerInput();
+        this.sendGuestInput(now);
+      } else {
+        this.accumulator += dt;
+        let guard = 0;
+        while (this.accumulator >= STEP && guard < 5) {
+          this.step(STEP);
+          this.accumulator -= STEP;
+          guard += 1;
+        }
       }
     }
 
     this.world.animate(now / 1000, dt);
     this.sparks.update(dt);
     this.smoke.update(dt);
+    if (this.role === "online-guest") {
+      this.interpolateGuestProjectiles(dt);
+      this.animateGuestMines();
+    }
     this.updateVisuals(dt);
     this.updateCamera(dt);
     this.renderer.render(this.scene, this.camera);
@@ -566,6 +698,7 @@ export class GameEngine {
     if (now - this.lastPublish > 90) {
       this.lastPublish = now;
       this.publish();
+      this.emitSnapshot(now);
     }
   };
 
@@ -617,6 +750,451 @@ export class GameEngine {
     this.player.input.steer = (right ? 1 : 0) - (left ? 1 : 0);
     this.player.input.drift = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     this.player.input.fire = this.pointerFire || this.keyFire;
+  }
+
+  private sendGuestInput(now: number) {
+    if (this.role !== "online-guest" || !this.options.onInput) return;
+    const input: SmashInput = this.player.alive
+      ? {
+          throttle: this.player.input.throttle,
+          steer: this.player.input.steer,
+          drift: this.player.input.drift,
+          fire: this.player.input.fire,
+        }
+      : { throttle: 0, steer: 0, drift: false, fire: false };
+
+    const previous = this.lastSentInput;
+    const changed =
+      !previous ||
+      previous.throttle !== input.throttle ||
+      previous.steer !== input.steer ||
+      previous.drift !== input.drift ||
+      previous.fire !== input.fire;
+    // Send on every edge immediately so a quick trigger tap is not lost, then
+    // keep a 50 ms heartbeat so the host cannot hold stale controls.
+    if (!changed && now - this.lastInputSent < 50) return;
+    this.lastInputSent = now;
+    this.lastSentInput = input;
+    this.options.onInput(input);
+  }
+
+  /** Applies a guest's controls to its kart on the authoritative host. */
+  setRemoteInput(playerId: string, input: SmashInput) {
+    if (this.role !== "online-host" || playerId === this.localPlayerId) return;
+    const kart = this.karts.find((entry) => entry.id === playerId);
+    if (!kart) return;
+    const next: VehicleInput = {
+      throttle: input.throttle,
+      steer: input.steer,
+      drift: input.drift,
+      fire: input.fire,
+    };
+    this.remoteInputs.set(playerId, next);
+    kart.input = next;
+  }
+
+  /**
+   * Adds, updates and removes online karts as players join or leave. Called
+   * from the room snapshot, so it also works for mid-match joins.
+   */
+  syncRoster(players: OnlinePlayer[]) {
+    if (this.role === "local") return;
+    const next = new Map(players.map((player) => [player.id, player]));
+    if (!next.has(this.localPlayerId)) {
+      const local =
+        this.karts.find((kart) => kart.id === this.localPlayerId) ??
+        this.karts.find((kart) => kart.isPlayer);
+      if (local) {
+        next.set(local.id, {
+          id: local.id,
+          name: local.name,
+          color: local.color,
+          connected: true,
+        });
+      }
+    }
+
+    for (const entry of next.values()) {
+      this.onlineRoster.set(entry.id, entry);
+      const existing = this.karts.find((kart) => kart.id === entry.id);
+      if (existing) {
+        existing.name = entry.name;
+        existing.color = entry.color;
+        if (!entry.connected) {
+          this.remoteInputs.set(entry.id, {
+            throttle: 0,
+            steer: 0,
+            drift: false,
+            fire: false,
+          });
+          if (entry.id !== this.localPlayerId) {
+            existing.input = { throttle: 0, steer: 0, drift: false, fire: false };
+          }
+        }
+        continue;
+      }
+
+      const [x, z] = this.findOpenSpawn();
+      const kart = this.createKart(
+        entry.id,
+        entry.name,
+        entry.color,
+        entry.id === this.localPlayerId,
+        null,
+      );
+      this.karts.push(kart);
+      this.spawnAt(kart, x, z);
+      if (kart.isPlayer) this.player = kart;
+    }
+
+    for (let index = this.karts.length - 1; index >= 0; index -= 1) {
+      const kart = this.karts[index];
+      if (next.has(kart.id)) continue;
+      kart.visual.group.removeFromParent();
+      disposeObject(kart.visual.group);
+      this.karts.splice(index, 1);
+    }
+
+    const local = this.karts.find((kart) => kart.id === this.localPlayerId);
+    if (local) this.player = local;
+  }
+
+  private findOpenSpawn(): [number, number] {
+    const limit = this.arenaMap.size / 2 - 4;
+    const spawns = this.arenaMap.spawns;
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      const spawn = spawns[attempt % spawns.length];
+      const ring = Math.floor(attempt / spawns.length);
+      const angle = attempt * 2.399963;
+      const radius = ring === 0 ? 0 : 2.2 + ring * 1.8;
+      const x = clamp(spawn[0] + Math.cos(angle) * radius, -limit, limit);
+      const z = clamp(spawn[1] + Math.sin(angle) * radius, -limit, limit);
+      if (this.pointBlocked(x, z, KART.radius + 0.7)) continue;
+      const crowded = this.karts.some(
+        (kart) => kart.alive && Math.hypot(kart.x - x, kart.z - z) < KART.radius * 2.2,
+      );
+      if (crowded) continue;
+      return [x, z];
+    }
+    const spawn = spawns[Math.floor(Math.random() * spawns.length)];
+    return [spawn[0], spawn[1]];
+  }
+
+  /** Seeds a promoted host from the last authoritative guest frame. */
+  private applySeedSnapshot(snapshot: SmashMatchSnapshot) {
+    if (snapshot.round !== this.round) return;
+    this.timeLeft = snapshot.timeLeft;
+    this.elapsed = snapshot.matchSeconds;
+    this.netMatchSeconds = snapshot.matchSeconds;
+    this.winner = snapshot.winner;
+    this.syncFeed(snapshot);
+    this.applyPickupStates(snapshot);
+
+    for (const kartSnapshot of snapshot.karts) {
+      const kart = this.ensureKart(kartSnapshot);
+      this.applyNetKart(kart, kartSnapshot, true);
+    }
+
+    // Keep ids monotonic across a host transfer. Guests still hold the frames
+    // they saw from the old host for a moment, so handing out an id that is
+    // already on screen would merge two different objects into one visual.
+    this.projectileId = snapshot.projectiles.reduce(
+      (max, projectile) => Math.max(max, projectile.id),
+      this.projectileId,
+    );
+    this.mineId = snapshot.mines.reduce((max, mine) => Math.max(max, mine.id), this.mineId);
+
+    // Projectiles and mines are transient: dropping them avoids handing a new
+    // host half-simulated explosions it never authored.
+    this.clearGuestProjectiles();
+    this.clearGuestMines();
+  }
+
+  /** Applies one host frame to a guest's renderer. */
+  applyRemoteSnapshot(snapshot: SmashMatchSnapshot, immediate = false) {
+    if (this.role !== "online-guest" || snapshot.round !== this.round) return;
+
+    this.timeLeft = snapshot.timeLeft;
+    this.netMatchSeconds = snapshot.matchSeconds;
+    this.winner = snapshot.winner;
+    this.syncFeed(snapshot);
+    this.applyPickupStates(snapshot);
+    this.syncGuestProjectiles(snapshot);
+    this.syncGuestMines(snapshot);
+
+    for (const kartSnapshot of snapshot.karts) {
+      const kart = this.ensureKart(kartSnapshot);
+      this.applyNetKart(kart, kartSnapshot, immediate);
+    }
+
+    if (snapshot.phase === "over" && this.mode !== "over") {
+      this.mode = "over";
+      this.keys.clear();
+      this.pointerFire = false;
+      this.keyFire = false;
+      this.audio.setEngine(0, false, false, false);
+      this.winner = snapshot.winner ?? this.bestKartWinner();
+      this.store.set({ phase: "over", winner: this.winner, timeLeft: 0 });
+      this.publish();
+    }
+  }
+
+  private ensureKart(snapshot: SmashKartSnapshot): KartActor {
+    const existing = this.karts.find((kart) => kart.id === snapshot.id);
+    if (existing) return existing;
+
+    const [x, z] = this.findOpenSpawn();
+    const kart = this.createKart(
+      snapshot.id,
+      snapshot.name,
+      snapshot.color,
+      snapshot.id === this.localPlayerId,
+      null,
+    );
+    this.karts.push(kart);
+    this.spawnAt(kart, x, z);
+    this.onlineRoster.set(snapshot.id, {
+      id: snapshot.id,
+      name: snapshot.name,
+      color: snapshot.color,
+      connected: true,
+    });
+    if (kart.isPlayer) this.player = kart;
+    return kart;
+  }
+
+  private applyNetKart(kart: KartActor, snapshot: SmashKartSnapshot, immediate: boolean) {
+    const wasAlive = kart.alive;
+    const previousHp = kart.hp;
+
+    kart.netX = snapshot.x;
+    kart.netZ = snapshot.z;
+    kart.netYaw = snapshot.yaw;
+    if (immediate) {
+      kart.x = snapshot.x;
+      kart.z = snapshot.z;
+      kart.yaw = snapshot.yaw;
+    }
+    kart.hp = snapshot.hp;
+    // Snapshots do not carry spawn protection. Guests never run the timer
+    // that would expire it, so clear it here instead of showing a permanent
+    // spawn shield around every remote kart.
+    kart.invuln = 0;
+    kart.shieldTime = snapshot.shield;
+    kart.boostTime = snapshot.boost;
+    kart.slowTime = snapshot.slow;
+    kart.weapon = snapshot.weapon;
+    kart.ammo = snapshot.ammo;
+    kart.kills = snapshot.kills;
+    kart.deaths = snapshot.deaths;
+    kart.shots = snapshot.shots;
+    kart.hits = snapshot.hits;
+    kart.alive = snapshot.alive;
+    kart.respawnIn = snapshot.respawnIn;
+    kart.speed = snapshot.speed;
+    kart.drifting = snapshot.drifting;
+    kart.driftCharge = snapshot.driftCharge;
+    kart.visual.group.visible = snapshot.alive;
+
+    if (snapshot.id === this.localPlayerId) {
+      if (snapshot.alive && snapshot.hp < previousHp) {
+        this.audio.hit();
+        this.shake = Math.max(this.shake, 0.18);
+      }
+      if (wasAlive && !snapshot.alive) {
+        this.audio.explosion();
+        this.shake = Math.max(this.shake, 1);
+      }
+    }
+  }
+
+  private syncFeed(snapshot: SmashMatchSnapshot) {
+    this.feed.length = 0;
+    this.feed.push(...snapshot.feed.slice(0, 6));
+    this.feedId = this.feed.reduce((max, entry) => Math.max(max, entry.id), this.feedId);
+  }
+
+  private applyPickupStates(snapshot: SmashMatchSnapshot) {
+    for (const state of snapshot.pickups) {
+      const pickup = this.pickups.find((entry) => entry.id === state.id);
+      if (!pickup) continue;
+      pickup.active = state.active;
+      pickup.visual.group.visible = state.active;
+    }
+  }
+
+  private syncGuestProjectiles(snapshot: SmashMatchSnapshot) {
+    const seen = new Set<number>();
+    for (const state of snapshot.projectiles) {
+      seen.add(state.id);
+      let projectile = this.projectiles.find((entry) => entry.id === state.id);
+      if (!projectile) {
+        const mesh = state.kind === "missile" ? this.buildMissileMesh() : this.buildBoltMesh(WEAPONS.pulse.color);
+        this.scene.add(mesh);
+        projectile = {
+          id: state.id,
+          ownerId: "",
+          kind: state.kind,
+          position: new THREE.Vector3(state.x, state.y, state.z),
+          velocity: new THREE.Vector3(state.vx, state.vy, state.vz),
+          speed: Math.hypot(state.vx, state.vy, state.vz) || 1,
+          life: 1,
+          damage: 0,
+          splash: 0,
+          targetId: null,
+          mesh,
+          netPosition: null,
+          netVelocity: null,
+        };
+        this.projectiles.push(projectile);
+      }
+      projectile.netPosition = new THREE.Vector3(state.x, state.y, state.z);
+      projectile.netVelocity = new THREE.Vector3(state.vx, state.vy, state.vz);
+      // Let the frame loop ease toward the new target instead of snapping the
+      // mesh on every 10 Hz frame.
+      if (projectile.netVelocity.lengthSq() > 0.001) {
+        projectile.mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          projectile.netVelocity.clone().normalize(),
+        );
+      }
+    }
+    for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
+      const projectile = this.projectiles[index];
+      if (seen.has(projectile.id)) continue;
+      projectile.mesh.removeFromParent();
+      disposeObject(projectile.mesh);
+      this.projectiles.splice(index, 1);
+    }
+  }
+
+  private syncGuestMines(snapshot: SmashMatchSnapshot) {
+    const seen = new Set<number>();
+    for (const state of snapshot.mines) {
+      seen.add(state.id);
+      if (this.mines.some((mine) => mine.id === state.id)) continue;
+      const { group, lamp } = this.buildMineVisual(state.x, state.z);
+      this.scene.add(group);
+      this.mines.push({
+        id: state.id,
+        ownerId: "",
+        x: state.x,
+        z: state.z,
+        arm: 0,
+        life: 1,
+        mesh: group,
+        lamp,
+      });
+    }
+    for (let index = this.mines.length - 1; index >= 0; index -= 1) {
+      const mine = this.mines[index];
+      if (seen.has(mine.id)) continue;
+      mine.mesh.removeFromParent();
+      disposeObject(mine.mesh);
+      this.mines.splice(index, 1);
+    }
+  }
+
+  private clearGuestProjectiles() {
+    for (const projectile of this.projectiles) {
+      projectile.mesh.removeFromParent();
+      disposeObject(projectile.mesh);
+    }
+    this.projectiles.length = 0;
+  }
+
+  private clearGuestMines() {
+    for (const mine of this.mines) {
+      mine.mesh.removeFromParent();
+      disposeObject(mine.mesh);
+    }
+    this.mines.length = 0;
+  }
+
+  private interpolateGuestProjectiles(dt: number) {
+    const rate = 1 - Math.exp(-22 * dt);
+    for (const projectile of this.projectiles) {
+      if (!projectile.netPosition) continue;
+      projectile.position.lerp(projectile.netPosition, rate);
+      projectile.mesh.position.copy(projectile.position);
+    }
+  }
+
+  private animateGuestMines() {
+    for (const mine of this.mines) {
+      const material = mine.lamp.material as THREE.MeshBasicMaterial;
+      material.transparent = true;
+      material.opacity = Math.sin(this.elapsed * 7) > 0 ? 1 : 0.15;
+    }
+  }
+
+  private buildMatchSnapshot(): SmashMatchSnapshot {
+    const karts: SmashKartSnapshot[] = this.karts.map((kart) => ({
+      id: kart.id,
+      name: kart.name,
+      color: kart.color,
+      x: kart.x,
+      z: kart.z,
+      yaw: kart.yaw,
+      hp: Math.max(0, kart.hp),
+      shield: kart.shieldTime,
+      boost: kart.boostTime,
+      slow: kart.slowTime,
+      weapon: kart.weapon,
+      ammo: kart.weapon === "pulse" ? 0 : kart.ammo,
+      kills: kart.kills,
+      deaths: kart.deaths,
+      shots: kart.shots,
+      hits: kart.hits,
+      alive: kart.alive,
+      respawnIn: Math.max(0, kart.respawnIn),
+      speed: Math.abs(kart.speed),
+      drifting: kart.drifting,
+      driftCharge: kart.driftCharge,
+    }));
+
+    return {
+      phase: this.mode === "over" ? "over" : "playing",
+      round: this.round,
+      mapId: this.arenaMap.id,
+      timeLeft: this.timeLeft,
+      killTarget: this.options.killTarget,
+      matchSeconds: this.elapsed,
+      karts,
+      pickups: this.pickups.map((pickup) => ({ id: pickup.id, active: pickup.active })),
+      projectiles: this.projectiles.map((projectile) => ({
+        id: projectile.id,
+        kind: projectile.kind,
+        x: projectile.position.x,
+        y: projectile.position.y,
+        z: projectile.position.z,
+        vx: projectile.velocity.x,
+        vy: projectile.velocity.y,
+        vz: projectile.velocity.z,
+      })),
+      mines: this.mines.map((mine) => ({ id: mine.id, x: mine.x, z: mine.z })),
+      feed: this.feed.map((entry) => ({ ...entry })),
+      winner: this.winner,
+    };
+  }
+
+  private emitSnapshot(now: number, force = false) {
+    if (this.role !== "online-host" || !this.options.onSnapshot) return;
+    if (this.mode !== "playing" && this.mode !== "over") return;
+    if (this.mode === "over" && this.snapshotOverSent) return;
+    if (!force && now - this.lastSnapshotSent < 100) return;
+    const snapshot = this.buildMatchSnapshot();
+    this.lastSnapshotSent = now;
+    this.options.onSnapshot(snapshot);
+    if (snapshot.phase === "over") this.snapshotOverSent = true;
+  }
+
+  private bestKartWinner(): SmashWinner | null {
+    const best = [...this.karts].sort(
+      (a, b) => b.kills - a.kills || a.deaths - b.deaths,
+    )[0];
+    if (!best) return null;
+    return { id: best.id, name: best.name, color: best.color, kills: best.kills };
   }
 
   private firePressedFor(kart: KartActor) {
@@ -950,6 +1528,8 @@ export class GameEngine {
       splash: 0,
       targetId: null,
       mesh,
+      netPosition: null,
+      netVelocity: null,
     });
     this.sparks.spawn({
       x: origin.x,
@@ -990,6 +1570,8 @@ export class GameEngine {
       splash: 7,
       targetId: target?.id ?? null,
       mesh,
+      netPosition: null,
+      netVelocity: null,
     });
   }
 
@@ -1058,14 +1640,7 @@ export class GameEngine {
     return group;
   }
 
-  private dropMine(kart: KartActor) {
-    if (this.mines.length >= 10) {
-      const oldest = this.mines.shift();
-      if (oldest) {
-        oldest.mesh.removeFromParent();
-        disposeObject(oldest.mesh);
-      }
-    }
+  private buildMineVisual(x: number, z: number): { group: THREE.Group; lamp: THREE.Mesh } {
     const group = new THREE.Group();
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.7, 0.7, 0.22, 12),
@@ -1086,10 +1661,21 @@ export class GameEngine {
     );
     lamp.position.y = 0.38;
     group.add(lamp);
+    group.position.set(x, 0, z);
+    return { group, lamp };
+  }
 
+  private dropMine(kart: KartActor) {
+    if (this.mines.length >= 10) {
+      const oldest = this.mines.shift();
+      if (oldest) {
+        oldest.mesh.removeFromParent();
+        disposeObject(oldest.mesh);
+      }
+    }
     const x = kart.x - Math.sin(kart.yaw) * 2.3;
     const z = kart.z - Math.cos(kart.yaw) * 2.3;
-    group.position.set(x, 0, z);
+    const { group, lamp } = this.buildMineVisual(x, z);
     this.scene.add(group);
     this.mines.push({
       id: ++this.mineId,
@@ -1471,19 +2057,24 @@ export class GameEngine {
       champion = sorted[0];
     }
 
+    this.winner = champion
+      ? {
+          id: champion.id,
+          name: champion.name,
+          color: champion.color,
+          kills: champion.kills,
+        }
+      : null;
+
     this.store.set({
       phase: "over",
-      winner: champion
-        ? {
-            id: champion.id,
-            name: champion.name,
-            color: champion.color,
-            kills: champion.kills,
-          }
-        : null,
+      winner: this.winner,
       timeLeft: 0,
     });
     this.publish();
+    if (this.role === "online-host") {
+      this.emitSnapshot(performance.now(), true);
+    }
   }
 
   private findAimTarget(kart: KartActor, cone = 0.9, range = 62): KartActor | null {
@@ -1720,27 +2311,25 @@ export class GameEngine {
 
   private updatePickups(dt: number) {
     for (const pickup of this.pickups) {
-      if (!pickup.active) {
-        pickup.timer -= dt;
-        if (pickup.timer <= 0) {
-          pickup.active = true;
-          pickup.visual.group.visible = true;
-          pickup.phase = Math.random() * Math.PI * 2;
-        }
-        continue;
+      if (pickup.active) continue;
+      pickup.timer -= dt;
+      if (pickup.timer <= 0) {
+        pickup.active = true;
+        pickup.visual.group.visible = true;
+        pickup.phase = Math.random() * Math.PI * 2;
       }
-      const bob = Math.sin(this.elapsed * 2 + pickup.phase) * 0.16;
-      pickup.visual.icon.position.y = 2.5 + bob;
-      pickup.visual.icon.rotation.y += dt * 1.4;
-      pickup.visual.ring.rotation.z += dt * 0.8;
-      pickup.visual.column.rotation.y += dt * 0.4;
-      const pulse = 0.65 + Math.sin(this.elapsed * 3 + pickup.phase) * 0.16;
-      (pickup.visual.ring.material as THREE.MeshBasicMaterial).opacity = pulse;
     }
   }
 
   private updateVisuals(dt: number) {
     for (const kart of this.karts) {
+      if (this.role === "online-guest") {
+        // Snapshots arrive around 10 Hz; easing between authoritative targets
+        // keeps remote karts from teleporting across the arena.
+        kart.x = damp(kart.x, kart.netX, 22, dt);
+        kart.z = damp(kart.z, kart.netZ, 22, dt);
+        kart.yaw = dampAngle(kart.yaw, kart.netYaw, 22, dt);
+      }
       const visual = kart.visual;
       if (!kart.alive) {
         visual.group.visible = false;
@@ -1804,7 +2393,10 @@ export class GameEngine {
       const glowScale = 1 + Math.sin(this.elapsed * 18) * 0.08 + (boosting ? 0.25 : 0);
       visual.boostGlow.scale.set(glowScale, glowScale, 1);
 
-      const target = this.findAimTarget(kart);
+      const target =
+        this.role === "local" || kart.id === this.localPlayerId
+          ? this.findAimTarget(kart)
+          : null;
       kart.lockId = target?.id ?? null;
       let aimYaw = kart.yaw;
       if (target) {
@@ -1826,6 +2418,13 @@ export class GameEngine {
       if (!pickup.active) continue;
       pickup.visual.group.rotation.y += dt * 0.2;
       pickup.visual.group.position.y = Math.sin(this.elapsed * 1.6 + pickup.phase) * 0.05;
+      const bob = Math.sin(this.elapsed * 2 + pickup.phase) * 0.16;
+      pickup.visual.icon.position.y = 2.5 + bob;
+      pickup.visual.icon.rotation.y += dt * 1.4;
+      pickup.visual.ring.rotation.z += dt * 0.8;
+      pickup.visual.column.rotation.y += dt * 0.4;
+      const pulse = 0.65 + Math.sin(this.elapsed * 3 + pickup.phase) * 0.16;
+      (pickup.visual.ring.material as THREE.MeshBasicMaterial).opacity = pulse;
     }
 
     for (const mine of this.mines) {
@@ -1963,9 +2562,11 @@ export class GameEngine {
       feed: [...this.feed],
       muted: this.muted,
       aimTargetId: this.player.lockId,
-      matchSeconds: this.elapsed,
+      matchSeconds:
+        this.role === "online-guest" ? this.netMatchSeconds : this.elapsed,
       shots: this.player.shots,
       hits: this.player.hits,
+      winner: this.winner,
       fps: this.fps,
     });
   }

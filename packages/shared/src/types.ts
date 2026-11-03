@@ -1,6 +1,6 @@
 export type PlayerId = string;
 export type RoomCode = string;
-export type GameKind = "skribbl" | "chain";
+export type GameKind = "skribbl" | "chain" | "smashkarts";
 
 /**
  * Word pools supported by the Skribbl dictionary. `tl` is Tagalog/Filipino,
@@ -13,6 +13,9 @@ export type ChainPaletteId = "classic" | "vivid" | "pastel" | "neon" | "mono" | 
 export type ChainTheme = "dark" | "light" | "neon";
 export type ChainGridStyle = "2d" | "3d";
 export type CpuDifficulty = "easy" | "medium" | "hard";
+
+export type SmashMapId = "foundry" | "scrapyard" | "rooftop";
+export type SmashWeaponId = "pulse" | "missile" | "mine" | "shield" | "turbo" | "shock";
 
 export type GamePhase =
   | "lobby"
@@ -64,6 +67,12 @@ export type GameSettings = {
   confirmMoves?: boolean;
   vsCpu?: boolean;
   cpuDifficulty?: CpuDifficulty;
+  /** Smash Karts arena selected by the host. */
+  mapId?: SmashMapId;
+  /** Smash Karts wreck target. */
+  killTarget?: number;
+  /** Smash Karts match clock in seconds. */
+  durationSeconds?: number;
 };
 
 export type ChainCell = {
@@ -102,6 +111,94 @@ export type Ranking = {
   playerId: PlayerId;
   nickname: string;
   score: number;
+};
+
+/** Controls a Smash Karts guest sends to the authoritative host. */
+export type SmashInput = {
+  throttle: number;
+  steer: number;
+  drift: boolean;
+  fire: boolean;
+};
+
+export type SmashKartSnapshot = {
+  id: PlayerId;
+  name: string;
+  color: string;
+  x: number;
+  z: number;
+  yaw: number;
+  hp: number;
+  shield: number;
+  boost: number;
+  slow: number;
+  weapon: SmashWeaponId;
+  ammo: number;
+  kills: number;
+  deaths: number;
+  shots: number;
+  hits: number;
+  alive: boolean;
+  respawnIn: number;
+  speed: number;
+  drifting: boolean;
+  driftCharge: number;
+};
+
+export type SmashPickupSnapshot = {
+  id: number;
+  active: boolean;
+};
+
+export type SmashProjectileSnapshot = {
+  id: number;
+  kind: "bolt" | "missile";
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+};
+
+export type SmashMineSnapshot = {
+  id: number;
+  x: number;
+  z: number;
+};
+
+export type SmashFeedEntry = {
+  id: number;
+  killer: string;
+  victim: string;
+  weapon: SmashWeaponId;
+  self: boolean;
+};
+
+export type SmashWinner = {
+  id: PlayerId;
+  name: string;
+  color: string;
+  kills: number;
+};
+
+/**
+ * Authoritative Smash Karts match state broadcast by the host. Guests render
+ * this directly, which keeps the Worker free of the Three.js simulation.
+ */
+export type SmashMatchSnapshot = {
+  phase: "playing" | "over";
+  round: number;
+  mapId: SmashMapId;
+  timeLeft: number;
+  killTarget: number;
+  matchSeconds: number;
+  karts: SmashKartSnapshot[];
+  pickups: SmashPickupSnapshot[];
+  projectiles: SmashProjectileSnapshot[];
+  mines: SmashMineSnapshot[];
+  feed: SmashFeedEntry[];
+  winner: SmashWinner | null;
 };
 
 export type RoomSnapshot = {

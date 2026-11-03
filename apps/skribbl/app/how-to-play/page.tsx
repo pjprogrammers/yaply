@@ -122,11 +122,11 @@ export default function HowToPlay() {
               again before a rematch.
             </p>
             <div className="form-actions">
-              <Link href="/" className="btn btn--primary">
+              <Link href="/create" className="btn btn--primary">
                 Create a room
               </Link>
-              <Link href="/create" className="btn btn--ghost">
-                Open room setup
+              <Link href="/join" className="btn btn--ghost">
+                Join with a code
               </Link>
             </div>
           </section>

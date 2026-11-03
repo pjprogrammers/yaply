@@ -141,8 +141,11 @@ export default function HowToPlay() {
               lock when the game starts and reopen before a rematch.
             </p>
             <div className="form-actions">
-              <Link href="/" className="btn btn--primary">
-                Create a room
+              <Link href="/create" className="btn btn--primary">
+                Set up a game
+              </Link>
+              <Link href="/join" className="btn btn--ghost">
+                Join a room
               </Link>
             </div>
           </section>

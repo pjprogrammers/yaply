@@ -6,6 +6,7 @@ import {
   ROOM_CODE_PATTERN,
 } from "@yaply/shared/constants";
 import { GameKindSchema } from "@yaply/shared/schemas";
+import type { GameKind } from "@yaply/shared/types";
 
 export { GameRoom };
 
@@ -130,7 +131,7 @@ function allowSocketUpgrade(request: Request): boolean {
   return takeFromBucket(upgradeBuckets, clientKey(request), WS_UPGRADES_PER_MINUTE);
 }
 
-function roomKey(game: "skribbl" | "chain", code: string): string {
+function roomKey(game: GameKind, code: string): string {
   return `${game}:${code}`;
 }
 
@@ -146,7 +147,7 @@ function generateRoomCode(): string {
 
 async function reserveRoom(
   env: Env,
-  game: "skribbl" | "chain",
+  game: GameKind,
   code: string,
 ): Promise<{ reserved: boolean; reason?: string }> {
   try {
@@ -309,7 +310,7 @@ export default {
       }
 
       const gameParam = url.searchParams.get("game");
-      if (gameParam !== "chain" && gameParam !== "skribbl") {
+      if (gameParam !== "chain" && gameParam !== "skribbl" && gameParam !== "smashkarts") {
         return json({ error: "A valid game is required." }, 400, corsHeaders(request, env));
       }
 

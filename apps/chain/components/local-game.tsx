@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CPU_DIFFICULTIES,
   CHAIN_BOARD_PRESETS,
+  MAX_NICKNAME_LENGTH,
   resolveChainPalette,
 } from "@yaply/shared/constants";
 import {
@@ -22,7 +23,12 @@ import { Board } from "./board";
 import { ClockIcon, PlayIcon } from "./icons";
 import { PlayerList } from "./player-list";
 import { Topbar } from "./topbar";
-import { MAIN_URL, readStoredNickname } from "@/lib/config";
+import {
+  MAIN_URL,
+  readStoredNickname,
+  readStoredPassPlayerNames,
+  storePassPlayerNames,
+} from "@/lib/config";
 import { settingsFromSearchParams } from "@/lib/chain-settings";
 
 type Seat = {
@@ -32,15 +38,25 @@ type Seat = {
   color: string;
 };
 
+type LocalMode = "solo" | "pass";
+
 type LocalSettings = GameSettings & {
   rows: number;
   cols: number;
-  mode: "solo" | "nearby";
+  mode: LocalMode;
   difficultyLabel: string;
 };
 
-function buildSeats(settings: GameSettings, mode: "solo" | "nearby", nickname: string): Seat[] {
-  const count = Math.max(2, Math.min(8, settings.playerCount ?? settings.maxPlayers ?? 4));
+function countSeats(settings: GameSettings): number {
+  return Math.max(2, Math.min(8, settings.playerCount ?? settings.maxPlayers ?? 4));
+}
+
+function buildSeats(
+  settings: GameSettings,
+  mode: LocalMode,
+  names: readonly string[],
+): Seat[] {
+  const count = countSeats(settings);
   const colors = resolveChainPalette(settings.palette, settings.customColors);
   const cpu = mode === "solo" && Boolean(settings.vsCpu);
   const difficulty =
@@ -53,11 +69,7 @@ function buildSeats(settings: GameSettings, mode: "solo" | "nearby", nickname: s
       id: `seat-${index + 1}`,
       nickname: isCpu
         ? `CPU ${index} · ${difficulty}`
-        : index === 0
-          ? nickname || "You"
-          : mode === "nearby"
-            ? `Player ${index + 1}`
-            : `Player ${index + 1}`,
+        : names[index]?.trim() || (index === 0 ? "You" : `Player ${index + 1}`),
       kind: isCpu ? "cpu" : "human",
       color: colors[index % colors.length],
     };
@@ -71,7 +83,11 @@ export function LocalGame({ nickname }: { nickname: string }) {
     const params = new URLSearchParams(query);
     const base = settingsFromSearchParams(params);
     const board = CHAIN_BOARD_PRESETS[base.boardSize ?? "medium"];
-    const mode = params.get("mode") === "nearby" ? "nearby" : "solo";
+    const requestedMode = params.get("mode");
+    // `nearby` was the old name for the same shared-device mode; keep old
+    // bookmarked links working.
+    const mode: LocalMode =
+      requestedMode === "pass" || requestedMode === "nearby" ? "pass" : "solo";
     const difficultyLabel =
       CPU_DIFFICULTIES.find((entry) => entry.id === (base.cpuDifficulty ?? "medium"))?.label ??
       "Medium";
@@ -85,11 +101,65 @@ export function LocalGame({ nickname }: { nickname: string }) {
     };
   }, [query]);
 
-  const seats = useMemo(
-    () => buildSeats(settings, settings.mode, nickname),
-    [settings, nickname],
+  const seatCount = countSeats(settings);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
+  const namesHydrated = useRef(settings.mode !== "pass");
+
+  const defaultNames = useMemo(
+    () =>
+      Array.from({ length: seatCount }, (_, index) =>
+        index === 0 ? nickname.trim() || "You" : `Player ${index + 1}`,
+      ),
+    [nickname, seatCount],
   );
-  const order = useMemo(() => seats.map((seat) => seat.id), [seats]);
+
+  const inputNames = useMemo(
+    () =>
+      Array.from(
+        { length: seatCount },
+        (_, index) => playerNames[index] ?? defaultNames[index],
+      ),
+    [defaultNames, playerNames, seatCount],
+  );
+
+  const resolvedNames = useMemo(
+    () => inputNames.map((name, index) => name.trim() || defaultNames[index]),
+    [defaultNames, inputNames],
+  );
+
+  useEffect(() => {
+    if (settings.mode !== "pass" || namesHydrated.current) return;
+    namesHydrated.current = true;
+    const stored = readStoredPassPlayerNames();
+    if (stored.length === 0) return;
+    // localStorage is only available after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlayerNames(stored);
+  }, [settings.mode]);
+
+  const renamePlayer = (index: number, value: string) => {
+    // Keep names for seats that are not active in this match (for example if
+    // the host previously played with eight players) instead of truncating the
+    // saved list to the current player count.
+    const next = Array.from(
+      { length: Math.max(seatCount, playerNames.length) },
+      (_, seat) =>
+        seat === index ? value : playerNames[seat] ?? defaultNames[seat] ?? "",
+    );
+    setPlayerNames(next);
+    storePassPlayerNames(
+      next.map((name, seat) => name.trim() || defaultNames[seat] || ""),
+    );
+  };
+
+  const seats = useMemo(
+    () => buildSeats(settings, settings.mode, resolvedNames),
+    [resolvedNames, settings],
+  );
+  const order = useMemo(
+    () => Array.from({ length: seatCount }, (_, index) => `seat-${index + 1}`),
+    [seatCount],
+  );
   const turnTime = settings.turnTimeSeconds ?? 45;
 
   const makeState = useCallback(
@@ -264,14 +334,14 @@ export function LocalGame({ nickname }: { nickname: string }) {
       <Topbar>
         <div className="room-bar">
           <div>
-            <div className="room-bar-label">{settings.mode === "nearby" ? "Nearby" : "Local"}</div>
+            <div className="room-bar-label">{settings.mode === "pass" ? "Pass & play" : "Local"}</div>
             <div className="room-code">
               {settings.rows} × {settings.cols}
             </div>
           </div>
           <span className="status">
             <span className="status-dot" data-status="connected" />
-            {settings.mode === "nearby" ? "Pass & play" : "On this device"}
+            On this device
           </span>
           <div className="room-bar-actions">
             <button className="btn btn--sm" type="button" onClick={restart}>
@@ -293,14 +363,16 @@ export function LocalGame({ nickname }: { nickname: string }) {
             <div className="chain-head">
               <div className="chain-head-main">
                 <span className="chain-head-title">
-                  {settings.mode === "nearby" ? "Nearby match" : "Local match"} · {chain.moveCount}{" "}
+                  {settings.mode === "pass" ? "Pass & play match" : "Local match"} · {chain.moveCount}{" "}
                   moves
                 </span>
                 <span className="chain-head-sub">
                   {gameOver
                     ? "Final board"
                     : canPlay
-                      ? "Your turn — pick a cell"
+                      ? settings.mode === "pass"
+                        ? `${currentSeat?.nickname ?? "Player"}'s turn — pick a cell`
+                        : "Your turn — pick a cell"
                       : currentSeat
                         ? currentSeat.kind === "cpu"
                           ? `${currentSeat.nickname} is thinking`
@@ -400,6 +472,33 @@ export function LocalGame({ nickname }: { nickname: string }) {
           </section>
 
           <aside className="rail">
+            {settings.mode === "pass" && (
+              <section className="card">
+                <div className="card-head">
+                  <h2 className="card-title">Player names</h2>
+                  <span className="pill">Saved on this device</span>
+                </div>
+                <div className="settings-list">
+                  {inputNames.map((name, index) => (
+                    <label className="field" key={`player-name-${index}`}>
+                      <span className="field-label">Player {index + 1}</span>
+                      <input
+                        className="input"
+                        value={name}
+                        onChange={(event) => renamePlayer(index, event.target.value)}
+                        maxLength={MAX_NICKNAME_LENGTH}
+                        placeholder={defaultNames[index]}
+                        autoComplete="off"
+                        aria-label={`Player ${index + 1} name`}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="small faint" style={{ marginTop: 12 }}>
+                  Names are saved in this browser for the next pass-and-play match.
+                </p>
+              </section>
+            )}
             <section className="card">
               <div className="rail-head">
                 <span className="rail-title">Table</span>

@@ -14,24 +14,58 @@ import {
   type PlayerSettings,
 } from "@/lib/settings";
 
+type LobbyMode = "bots" | "online";
+
 interface LobbyProps {
   initial: PlayerSettings;
   onStart: (settings: PlayerSettings) => void;
+  onCreateRoom: (settings: PlayerSettings) => Promise<void>;
+  onJoinRoom: (code: string, settings: PlayerSettings) => void;
 }
 
-export function Lobby({ initial, onStart }: LobbyProps) {
+export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps) {
   const [name, setName] = useState(initial.name);
   const [color, setColor] = useState(initial.color);
   const [mapId, setMapId] = useState(initial.mapId);
   const [botCount, setBotCount] = useState(initial.botCount);
   const [killTarget, setKillTarget] = useState(initial.killTarget);
   const [duration, setDuration] = useState(initial.duration);
+  const [mode, setMode] = useState<LobbyMode>("bots");
+  const [joinCode, setJoinCode] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   const selected = MAP_LIST.find((map) => map.id === mapId) ?? MAP_LIST[0];
   const paint = KART_COLORS.find((entry) => entry.hex === color) ?? KART_COLORS[0];
 
+  function currentSettings() {
+    return normalizeSettings({ name, color, mapId, botCount, killTarget, duration });
+  }
+
   function submit() {
-    onStart(normalizeSettings({ name, color, mapId, botCount, killTarget, duration }));
+    onStart(currentSettings());
+  }
+
+  async function createRoom() {
+    if (creating) return;
+    setCreating(true);
+    setError("");
+    try {
+      await onCreateRoom(currentSettings());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create the room.");
+      setCreating(false);
+    }
+  }
+
+  function joinRoom() {
+    const code = joinCode.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (code.length !== 6) {
+      setError("Enter the six-character room code.");
+      return;
+    }
+    setError("");
+    onJoinRoom(code, currentSettings());
   }
 
   return (
@@ -52,8 +86,9 @@ export function Lobby({ initial, onStart }: LobbyProps) {
         <div className="pb-6 pt-3">
           <h1 className="display text-[clamp(54px,9vw,112px)]">Garage</h1>
           <p className="mt-2 max-w-[54ch] text-sm leading-relaxed text-ash sm:text-base">
-            Pick a paint, a map, and a bot count. Everything is local, nothing is
-            ranked, and the only rule is to keep moving.
+            Pick a paint, a map, and a bot count for a local scrap. Or open a room,
+            share the code, and let up to 40 friends pile in — late arrivals can
+            join a match already in progress.
           </p>
         </div>
 
@@ -61,7 +96,8 @@ export function Lobby({ initial, onStart }: LobbyProps) {
           className="lobby-grid"
           onSubmit={(event) => {
             event.preventDefault();
-            submit();
+            if (mode === "bots") submit();
+            else joinRoom();
           }}
         >
           <div className="lobby-panel">
@@ -97,6 +133,28 @@ export function Lobby({ initial, onStart }: LobbyProps) {
             </div>
 
             <div className="lobby-field">
+              <span id="mode-label">Match mode</span>
+              <div className="choice-row" role="group" aria-labelledby="mode-label">
+                <button
+                  type="button"
+                  className={`choice ${mode === "bots" ? "is-active" : ""}`}
+                  aria-pressed={mode === "bots"}
+                  onClick={() => setMode("bots")}
+                >
+                  Bots
+                </button>
+                <button
+                  type="button"
+                  className={`choice ${mode === "online" ? "is-active" : ""}`}
+                  aria-pressed={mode === "online"}
+                  onClick={() => setMode("online")}
+                >
+                  With friends
+                </button>
+              </div>
+            </div>
+
+            <div className="lobby-field">
               <span id="map-label">Arena</span>
               <div className="grid gap-1.5" role="group" aria-labelledby="map-label">
                 {MAP_LIST.map((map) => (
@@ -119,22 +177,53 @@ export function Lobby({ initial, onStart }: LobbyProps) {
               </div>
             </div>
 
-            <div className="lobby-field">
-              <span id="bots-label">Bots</span>
-              <div className="choice-row" role="group" aria-labelledby="bots-label">
-                {BOT_OPTIONS.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`choice ${value === botCount ? "is-active" : ""}`}
-                    aria-pressed={value === botCount}
-                    onClick={() => setBotCount(value)}
-                  >
-                    {value}
-                  </button>
-                ))}
+            {mode === "bots" ? (
+              <div className="lobby-field">
+                <span id="bots-label">Bots</span>
+                <div className="choice-row" role="group" aria-labelledby="bots-label">
+                  {BOT_OPTIONS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`choice ${value === botCount ? "is-active" : ""}`}
+                      aria-pressed={value === botCount}
+                      onClick={() => setBotCount(value)}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="lobby-field">
+                <span id="join-label">Join a room</span>
+                <div className="flex gap-2">
+                  <input
+                    className="text-input"
+                    value={joinCode}
+                    maxLength={6}
+                    onChange={(event) => {
+                      setJoinCode(event.target.value);
+                      setError("");
+                    }}
+                    placeholder="ABC123"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-labelledby="join-label"
+                  />
+                  <button
+                    type="button"
+                    className="button button-outline shrink-0"
+                    onClick={joinRoom}
+                  >
+                    Join
+                  </button>
+                </div>
+                <span className="hud-label">
+                  Up to 40 drivers · late join enabled · no bots
+                </span>
+              </div>
+            )}
 
             <div className="lobby-field">
               <span id="target-label">Wrecks to win</span>
@@ -201,13 +290,35 @@ export function Lobby({ initial, onStart }: LobbyProps) {
                   <dd className="display text-xl">{selected.boostPads.length}</dd>
                 </div>
               </dl>
-              <button type="submit" className="button button-primary w-full sm:w-auto">
-                Enter the arena
-                <span aria-hidden="true">→</span>
-              </button>
+              {mode === "bots" ? (
+                <button type="submit" className="button button-primary w-full sm:w-auto">
+                  Enter the arena
+                  <span aria-hidden="true">→</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="button button-primary w-full sm:w-auto"
+                  onClick={createRoom}
+                  disabled={creating}
+                >
+                  {creating ? "Opening room…" : "Create a room"}
+                  <span aria-hidden="true">→</span>
+                </button>
+              )}
+              {error ? (
+                <p className="text-sm font-bold text-[var(--signal)]" role="alert">
+                  {error}
+                </p>
+              ) : null}
               <p className="text-xs leading-relaxed text-ash">
-                {botCount} bots · first to {killTarget} · {duration / 60} minute
-                {duration === 60 ? "" : "s"} · keyboard and mouse. Press Esc to pause.
+                {mode === "bots"
+                  ? `${botCount} bots · first to ${killTarget} · ${duration / 60} minute${
+                      duration === 60 ? "" : "s"
+                    } · keyboard and mouse. Press Esc to pause.`
+                  : `Online room · first to ${killTarget} · ${duration / 60} minute${
+                      duration === 60 ? "" : "s"
+                    } · 40 seats · friends can join mid-match.`}
               </p>
             </div>
           </div>

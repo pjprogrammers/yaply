@@ -7,6 +7,7 @@ import type {
   Player,
   Ranking,
   RoomSnapshot,
+  SmashMatchSnapshot,
   Stroke,
 } from "@yaply/shared/types";
 import type { ClientEvent, ServerEvent } from "@yaply/shared/events";
@@ -17,6 +18,7 @@ import {
   chainBoardDimensions,
   isChainBoardSize,
   isChainPaletteId,
+  isSmashMapId,
   isWordLanguage,
   resolveChainPalette,
   sanitizeCustomColors,
@@ -24,6 +26,8 @@ import {
   MAX_INVALID_MESSAGES,
   MAX_MESSAGE_BYTES,
   MAX_POINTS_PER_STROKE,
+  MAX_SMASH_MESSAGE_BYTES,
+  MAX_SMASH_SOCKETS_PER_ROOM,
   MAX_SOCKETS_PER_CLIENT_PER_ROOM,
   MAX_SOCKETS_PER_ROOM,
   MAX_STROKE_POINTS_PER_ROUND,
@@ -34,6 +38,12 @@ import {
   RECONNECT_GRACE_PERIOD_MS,
   ROOM_INACTIVITY_EXPIRY_MS,
   ROOM_RESERVATION_TTL_MS,
+  SMASH_DURATION_MAX_SECONDS,
+  SMASH_DURATION_MIN_SECONDS,
+  SMASH_KILL_TARGET_MAX,
+  SMASH_KILL_TARGET_MIN,
+  SMASH_MAX_PLAYERS,
+  SMASH_PLAYER_COLORS,
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
@@ -96,6 +106,12 @@ type StoredState = {
   revealedIndices: number[];
   strokes: Stroke[];
   chain: ChainState | null;
+  /**
+   * Last authoritative snapshot relayed by the Smash Karts host. It is kept
+   * separate from `RoomSnapshot` so a 40-kart match state is not serialized on
+   * every lobby event. New mid-match joiners receive it once after joining.
+   */
+  lastSmashState: SmashMatchSnapshot | null;
   version: number;
   createdAt: number;
   lastActivity: number;
@@ -124,6 +140,8 @@ const DRAWER_GRACE_MS = 15_000;
 const CHOOSE_TIME_MS = 20_000;
 const ROUND_RESULT_MS = 5_000;
 const SNAPSHOT_SYNC_COOLDOWN_MS = 1_000;
+/** A stalled Smash Karts host is replaced quickly so the match can continue. */
+const SMASH_HOST_TRANSFER_MS = 6_000;
 const SECRET_MESSAGE_PLACEHOLDER = "Secret message hidden.";
 const SECRET_MESSAGE_REDACTED = "••••••";
 
@@ -147,15 +165,17 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKind): GameSettings {
+  const maxAllowed = game === "smashkarts" ? SMASH_MAX_PLAYERS : game === "chain" ? 8 : 12;
+  const defaultMax = game === "smashkarts" ? SMASH_MAX_PLAYERS : DEFAULT_GAME_SETTINGS.maxPlayers;
   const maxPlayers = clamp(
-    input?.maxPlayers ?? input?.playerCount ?? DEFAULT_GAME_SETTINGS.maxPlayers,
+    input?.maxPlayers ?? input?.playerCount ?? defaultMax,
     2,
-    game === "chain" ? 8 : 12,
+    maxAllowed,
   );
   const playerCount = clamp(
     input?.playerCount ?? maxPlayers,
     2,
-    game === "chain" ? 8 : 12,
+    maxAllowed,
   );
   const requestedPalette = input?.palette;
   const palette = isChainPaletteId(requestedPalette) ? requestedPalette : "classic";
@@ -194,6 +214,17 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       input?.cpuDifficulty === "easy" || input?.cpuDifficulty === "hard"
         ? input.cpuDifficulty
         : "medium",
+    mapId: isSmashMapId(input?.mapId) ? input.mapId : "foundry",
+    killTarget: clamp(
+      input?.killTarget ?? DEFAULT_GAME_SETTINGS.killTarget ?? 20,
+      SMASH_KILL_TARGET_MIN,
+      SMASH_KILL_TARGET_MAX,
+    ),
+    durationSeconds: clamp(
+      input?.durationSeconds ?? DEFAULT_GAME_SETTINGS.durationSeconds ?? 300,
+      SMASH_DURATION_MIN_SECONDS,
+      SMASH_DURATION_MAX_SECONDS,
+    ),
   };
 }
 
@@ -223,6 +254,7 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     revealedIndices: [],
     strokes: [],
     chain: null,
+    lastSmashState: null,
     version: 0,
     createdAt: now,
     lastActivity: now,
@@ -241,6 +273,7 @@ export class GameRoom {
   private playerSockets = new Map<string, WebSocket>();
   private socketState = new Map<WebSocket, SocketState>();
   private ready: Promise<void>;
+  private lastSmashPersistAt = 0;
 
   constructor(ctx: DurableObjectState, env: any) {
     this.ctx = ctx;
@@ -254,7 +287,12 @@ export class GameRoom {
   private async load(): Promise<void> {
     const stored = await this.ctx.storage.get<Partial<StoredState>>("room");
     if (!stored || !stored.code) return;
-    const game: GameKind = stored.game === "chain" ? "chain" : "skribbl";
+    const game: GameKind =
+      stored.game === "chain"
+        ? "chain"
+        : stored.game === "smashkarts"
+          ? "smashkarts"
+          : "skribbl";
     // Merge over a fresh state so rooms written by an older build gain any
     // fields added since, instead of starting with `undefined` values.
     this.room = { ...createEmptyState(stored.code, game), ...stored, game };
@@ -334,7 +372,14 @@ export class GameRoom {
       const payload = typeof body === "object" && body !== null
         ? (body as { game?: unknown; code?: unknown })
         : {};
-      const game = payload.game === "chain" ? "chain" : payload.game === "skribbl" ? "skribbl" : null;
+      const game =
+        payload.game === "chain"
+          ? "chain"
+          : payload.game === "skribbl"
+            ? "skribbl"
+            : payload.game === "smashkarts"
+              ? "smashkarts"
+              : null;
       const code = typeof payload.code === "string" ? payload.code.toLowerCase() : "";
       if (!game || !/^[a-z0-9]{6}$/.test(code)) {
         return new Response(JSON.stringify({ reserved: false, reason: "invalid" }), {
@@ -384,10 +429,11 @@ export class GameRoom {
       return new Response("Invalid room code", { status: 400 });
     }
 
-    const game = url.searchParams.get("game");
-    if (game !== "chain" && game !== "skribbl") {
+    const gameParam = url.searchParams.get("game");
+    if (gameParam !== "chain" && gameParam !== "skribbl" && gameParam !== "smashkarts") {
       return new Response("Invalid game", { status: 400 });
     }
+    const game: GameKind = gameParam;
     this.requestedCode = code;
     this.requestedGame = game;
 
@@ -395,7 +441,8 @@ export class GameRoom {
       return new Response("Expected websocket", { status: 400 });
     }
 
-    if (this.sockets.size >= MAX_SOCKETS_PER_ROOM) {
+    const socketCap = game === "smashkarts" ? MAX_SMASH_SOCKETS_PER_ROOM : MAX_SOCKETS_PER_ROOM;
+    if (this.sockets.size >= socketCap) {
       return new Response("Too many connections for this room", { status: 429 });
     }
 
@@ -452,7 +499,11 @@ export class GameRoom {
 
       state.lastMessageAt = Date.now();
 
-      if (new TextEncoder().encode(raw).byteLength > MAX_MESSAGE_BYTES) {
+      const messageLimit =
+        (this.requestedGame ?? this.room.game) === "smashkarts"
+          ? MAX_SMASH_MESSAGE_BYTES
+          : MAX_MESSAGE_BYTES;
+      if (new TextEncoder().encode(raw).byteLength > messageLimit) {
         this.rejectMessage(ws, "MESSAGE_TOO_LARGE", "That message is too large.");
         return;
       }
@@ -661,6 +712,14 @@ export class GameRoom {
     }
   }
 
+  private sendSmashState(ws: WebSocket) {
+    if (this.room.game !== "smashkarts" || !this.room.lastSmashState) return;
+    // Send this before room.snapshot. The client uses room.snapshot to mount
+    // the arena, and a reconnecting host must already hold the seed when that
+    // happens or it would restart the match from zero.
+    this.send(ws, { type: "smash.snapshot", snapshot: this.room.lastSmashState });
+  }
+
   private attachSocket(ws: WebSocket, player: StoredPlayer) {
     const previous = this.playerSockets.get(player.id);
     if (previous && previous !== ws) {
@@ -678,6 +737,9 @@ export class GameRoom {
     player.connected = true;
     player.lastSeen = Date.now();
     this.room.lastActivity = Date.now();
+    // A room can briefly have no host after its last connected player dropped
+    // while the rest of the seats were still in their grace period.
+    if (!this.room.hostId) this.room.hostId = player.id;
   }
 
   private async handleSocketClose(ws: WebSocket) {
@@ -717,7 +779,8 @@ export class GameRoom {
   }
 
   private paletteColors(): string[] {
-    // Skribbl keeps its own colour rotation; only Chain uses player palettes.
+    // Smash Karts has its own 40-seat grid; Chain uses player palettes.
+    if (this.room.game === "smashkarts") return SMASH_PLAYER_COLORS;
     if (this.room.game !== "chain") return PLAYER_COLORS;
     return resolveChainPalette(this.room.settings.palette, this.room.settings.customColors);
   }
@@ -830,6 +893,12 @@ export class GameRoom {
       case "chain.surrender":
         await this.handleChainSurrender(ws);
         break;
+      case "smash.input":
+        this.handleSmashInput(ws, event.input);
+        break;
+      case "smash.snapshot":
+        await this.handleSmashSnapshot(ws, event.snapshot);
+        break;
       case "game.rematch":
         await this.handleRematch(ws);
         break;
@@ -844,6 +913,7 @@ export class GameRoom {
           state.lastSyncAt = now;
         }
         this.sendPrivateState(ws, this.sockets.get(ws) ?? "");
+        this.sendSmashState(ws);
         this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
         break;
       }
@@ -955,6 +1025,7 @@ export class GameRoom {
       this.attachSocket(ws, resumed);
       this.sendWelcome(ws, resumed);
       this.sendPrivateState(ws, resumed.id);
+      this.sendSmashState(ws);
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcastSnapshot();
       logRoom("info", "room.reconnected", {
@@ -997,6 +1068,7 @@ export class GameRoom {
       this.attachSocket(ws, departed);
       this.sendWelcome(ws, departed);
       this.sendPrivateState(ws, departed.id);
+      this.sendSmashState(ws);
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcast({ type: "room.player.joined", playerId: departed.id });
       this.broadcastSnapshot();
@@ -1041,6 +1113,7 @@ export class GameRoom {
     this.attachSocket(ws, player);
     this.sendWelcome(ws, player);
     this.broadcast({ type: "room.player.joined", playerId: player.id });
+    this.sendSmashState(ws);
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
     this.broadcastSnapshot();
     this.broadcastSystemChat(`${player.nickname} joined the room.`);
@@ -1137,6 +1210,7 @@ export class GameRoom {
   }
 
   private startGame() {
+    const previousRound = this.room.roundNumber;
     for (const player of this.room.players) {
       player.score = 0;
       player.guessedCorrectly = false;
@@ -1176,6 +1250,18 @@ export class GameRoom {
       this.room.phase = "playing";
       this.room.roundNumber = 1;
       this.syncChainScores();
+      this.broadcastSnapshot();
+      return;
+    }
+
+    if (this.room.game === "smashkarts") {
+      // The host client owns the match simulation. The Worker only advances
+      // the round number so late snapshots from a rematch's previous round are
+      // rejected, and clears the relayed state until the host seeds it.
+      this.room.phase = "playing";
+      this.room.roundNumber = previousRound + 1;
+      this.room.lastSmashState = null;
+      this.room.roundOrder = this.room.players.map((player) => player.id);
       this.broadcastSnapshot();
       return;
     }
@@ -1755,6 +1841,116 @@ export class GameRoom {
     else if (this.room.chain.moveCount >= CHAIN_MAX_MOVES) this.finishChain(this.chainLeader());
   }
 
+  private handleSmashInput(
+    ws: WebSocket,
+    input: Extract<ClientEvent, { type: "smash.input" }>["input"],
+  ) {
+    const player = this.socketPlayer(ws);
+    if (!player || this.room.game !== "smashkarts" || this.room.phase !== "playing") return;
+    // The host simulates every kart itself, so relaying a host-authored input
+    // back to the host would double-apply it.
+    if (player.id === this.room.hostId) return;
+
+    const hostSocket = this.playerSockets.get(this.room.hostId);
+    if (!hostSocket) return;
+    this.send(hostSocket, { type: "smash.input", playerId: player.id, input });
+  }
+
+  private async handleSmashSnapshot(ws: WebSocket, snapshot: SmashMatchSnapshot) {
+    const player = this.socketPlayer(ws);
+    if (
+      !player ||
+      player.id !== this.room.hostId ||
+      this.room.game !== "smashkarts" ||
+      this.room.phase !== "playing"
+    ) {
+      return;
+    }
+    // A rematch resets the engine while an old snapshot can still be in flight.
+    if (snapshot.round !== this.room.roundNumber) return;
+
+    const seated = new Map(this.room.players.map((entry) => [entry.id, entry]));
+    const seen = new Set<string>();
+    const karts = snapshot.karts
+      .filter((kart) => {
+        if (!seated.has(kart.id) || seen.has(kart.id)) return false;
+        seen.add(kart.id);
+        return true;
+      })
+      .map((kart) => {
+        // The room owns identity and paint; never let one client spoof another
+        // player's nickname or colour through the relayed snapshot.
+        const roomPlayer = seated.get(kart.id)!;
+        return { ...kart, name: roomPlayer.nickname, color: roomPlayer.color };
+      });
+
+    const sanitized: SmashMatchSnapshot = {
+      ...snapshot,
+      mapId: this.room.settings.mapId ?? snapshot.mapId,
+      killTarget: this.room.settings.killTarget ?? snapshot.killTarget,
+      karts,
+    };
+
+    for (const kart of karts) {
+      const roomPlayer = seated.get(kart.id);
+      // Keep the room leaderboard correct for late joiners and reconnects
+      // without making the Worker simulate the match.
+      if (roomPlayer) roomPlayer.score = kart.kills;
+    }
+
+    this.room.lastSmashState = sanitized;
+    this.room.lastActivity = Date.now();
+    this.broadcast({ type: "smash.snapshot", snapshot: sanitized });
+
+    if (sanitized.phase === "over") {
+      this.finishSmash(sanitized);
+    }
+
+    // Snapshots arrive around 10 Hz. Persisting every frame would hammer
+    // Durable Object storage, but keeping a recent copy lets a hibernating
+    // room seed late joiners.
+    const now = Date.now();
+    if (sanitized.phase === "over" || now - this.lastSmashPersistAt >= 2_000) {
+      this.lastSmashPersistAt = now;
+      await this.persist();
+      await this.scheduleAlarm();
+    }
+  }
+
+  private finishSmash(snapshot: SmashMatchSnapshot) {
+    if (this.room.game !== "smashkarts" || this.room.phase !== "playing") return;
+
+    const karts = new Map(snapshot.karts.map((kart) => [kart.id, kart]));
+    const rankings: Ranking[] = this.room.players
+      .map((player) => {
+        const kart = karts.get(player.id);
+        const kills = kart?.kills ?? player.score;
+        player.score = kills;
+        return {
+          playerId: player.id,
+          nickname: player.nickname,
+          score: kills,
+          deaths: kart?.deaths ?? 0,
+          joinedAt: player.joinedAt,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.deaths - b.deaths ||
+          a.joinedAt - b.joinedAt,
+      )
+      .map(({ playerId, nickname, score }) => ({ playerId, nickname, score }));
+
+    this.room.phase = "game-over";
+    this.room.endsAt = null;
+    const winnerId = rankings[0]?.playerId ?? null;
+    const winner = this.player(winnerId);
+    if (winner) this.broadcastSystemChat(`${winner.nickname} won the match.`);
+    this.broadcast({ type: "game.finished", rankings, winnerId: winnerId ?? undefined });
+    this.broadcastSnapshot();
+  }
+
   private async handleRematch(ws: WebSocket) {
     const player = this.socketPlayer(ws);
     if (!player || player.id !== this.room.hostId) {
@@ -1787,6 +1983,15 @@ export class GameRoom {
     this.room.roundOrder = this.room.roundOrder.filter((id) => id !== playerId);
     this.room.guessedPlayerIds = this.room.guessedPlayerIds.filter((id) => id !== playerId);
     this.playerSockets.delete(playerId);
+
+    if (this.room.game === "smashkarts" && this.room.lastSmashState) {
+      // Drop the seat from the cached snapshot immediately instead of waiting
+      // for the host's next frame, so a new joiner never sees a ghost kart.
+      this.room.lastSmashState = {
+        ...this.room.lastSmashState,
+        karts: this.room.lastSmashState.karts.filter((kart) => kart.id !== playerId),
+      };
+    }
 
     if (this.room.hostId === playerId) {
       this.transferHost();
@@ -1830,6 +2035,7 @@ export class GameRoom {
 
     if (
       this.room.players.length < 2 &&
+      this.room.game !== "smashkarts" &&
       this.room.phase !== "lobby" &&
       this.room.phase !== "game-over"
     ) {
@@ -1913,6 +2119,22 @@ export class GameRoom {
 
     if (this.room.game === "chain" && this.room.phase === "playing" && this.room.chain?.turnEndsAt) {
       deadlines.push(this.room.chain.turnEndsAt);
+    }
+
+    if (
+      this.room.game === "smashkarts" &&
+      (this.room.phase === "playing" || this.room.phase === "game-over")
+    ) {
+      const host = this.player(this.room.hostId);
+      const hasConnectedGuest =
+        host &&
+        this.room.players.some((player) => player.connected && player.id !== host.id);
+      // Only arm the short host-transfer timer when there is actually someone
+      // to promote. Otherwise a room with every seat disconnected would wake
+      // every second until the normal reconnect grace expires.
+      if (host && !host.connected && hasConnectedGuest) {
+        deadlines.push(host.lastSeen + SMASH_HOST_TRANSFER_MS);
+      }
     }
 
     for (const player of this.room.players) {
@@ -2052,6 +2274,22 @@ export class GameRoom {
     } else if (this.room.game === "chain" && this.room.phase === "playing") {
       if (this.room.chain?.turnEndsAt && now >= this.room.chain.turnEndsAt) {
         await this.handleChainTimeout();
+        changed = true;
+      }
+    } else if (
+      this.room.game === "smashkarts" &&
+      (this.room.phase === "playing" || this.room.phase === "game-over")
+    ) {
+      const host = this.player(this.room.hostId);
+      const next =
+        host && !host.connected
+          ? this.room.players.find((player) => player.connected && player.id !== host.id)
+          : undefined;
+      if (host && !host.connected && next && now - host.lastSeen >= SMASH_HOST_TRANSFER_MS) {
+        // The old host keeps its seat for the reconnect grace period. If it
+        // comes back it returns as a guest so two engines never race.
+        this.room.hostId = next.id;
+        this.broadcastSystemChat(`${next.nickname} is now hosting the match.`);
         changed = true;
       }
     }

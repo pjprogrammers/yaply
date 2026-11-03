@@ -4,9 +4,12 @@ import {
   createRoomCode,
   inviteUrl,
   numberParam,
+  PASS_PLAYER_NAMES_KEY,
   readStoredNickname,
+  readStoredPassPlayerNames,
   roomPath,
   storeNickname,
+  storePassPlayerNames,
 } from "./config";
 
 afterEach(() => {
@@ -81,6 +84,29 @@ describe("chain room config", () => {
   it("treats storage as optional outside the browser", () => {
     expect(readStoredNickname()).toBe("");
     expect(() => storeNickname("Alice")).not.toThrow();
+    expect(readStoredPassPlayerNames()).toEqual([]);
+    expect(() => storePassPlayerNames(["Alice"])).not.toThrow();
+  });
+
+  it("persists pass-and-play player names in the browser", () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          values.set(key, value);
+        },
+      },
+    });
+
+    storePassPlayerNames([" Alice ", "", "Bob", "x".repeat(40)]);
+    expect(readStoredPassPlayerNames()).toEqual(["Alice", "", "Bob", "x".repeat(16)]);
+
+    values.set(PASS_PLAYER_NAMES_KEY, "{not json");
+    expect(readStoredPassPlayerNames()).toEqual([]);
+
+    values.set(PASS_PLAYER_NAMES_KEY, JSON.stringify({ names: ["Alice"] }));
+    expect(readStoredPassPlayerNames()).toEqual([]);
   });
 
   it("uses NEXT_PUBLIC_REALTIME_URL and NEXT_PUBLIC_MAIN_URL when set", async () => {

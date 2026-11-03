@@ -14,6 +14,9 @@ interface HudProps {
   engineRef: { current: GameEngine | null };
   onQuit: () => void;
   onRestart: () => void;
+  online?: boolean;
+  canRematch?: boolean;
+  onRematch?: () => void;
 }
 
 interface Toast {
@@ -28,7 +31,15 @@ function formatTime(seconds: number): string {
   return `${minutes}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
+export function Hud({
+  store,
+  engineRef,
+  onQuit,
+  onRestart,
+  online = false,
+  canRematch = false,
+  onRematch,
+}: HudProps) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [toast, setToast] = useState<Toast | null>(null);
   const previousWeapon = useRef<WeaponId | null>(null);
@@ -41,6 +52,9 @@ export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
   const standings = [...snapshot.karts].sort(
     (a, b) => b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name),
   );
+  // A 40-seat room should not push the live table past the viewport. The final
+  // screen still lists everyone; during the match the rail shows the top pack.
+  const standingsShown = standings.slice(0, 8);
   const lockTarget =
     snapshot.karts.find((kart) => kart.id === snapshot.aimTargetId) ?? null;
   const winner = snapshot.winner;
@@ -191,19 +205,28 @@ export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
             >
               <SoundIcon muted={snapshot.muted} />
             </button>
-            <button
-              type="button"
-              className="hud-button"
-              onClick={() => engineRef.current?.togglePause()}
-              aria-label="Pause game"
-            >
-              <PauseIcon />
-              <span className="hidden sm:inline">Pause</span>
-            </button>
+            {!online ? (
+              <button
+                type="button"
+                className="hud-button"
+                onClick={() => engineRef.current?.togglePause()}
+                aria-label="Pause game"
+              >
+                <PauseIcon />
+                <span className="hidden sm:inline">Pause</span>
+              </button>
+            ) : (
+              <button type="button" className="hud-button" onClick={onQuit}>
+                <span className="hidden sm:inline">Leave room</span>
+                <span className="sm:hidden">Leave</span>
+              </button>
+            )}
           </div>
 
           <div className="hud-panel hidden w-[190px] p-2 md:block">
-            <div className="hud-label mb-1">Standings</div>
+            <div className="hud-label mb-1">
+              Standings{standings.length > standingsShown.length ? ` · top ${standingsShown.length}` : ""}
+            </div>
             <table className="score-table">
               <thead>
                 <tr>
@@ -217,7 +240,7 @@ export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
                 </tr>
               </thead>
               <tbody>
-                {standings.map((kart) => (
+                {standingsShown.map((kart) => (
                   <tr key={kart.id} className={kart.isPlayer ? "is-player" : undefined}>
                     <td className="max-w-[110px] truncate">
                       <span className="mr-1 inline-block h-2 w-2" style={{ backgroundColor: kart.color }} />
@@ -289,7 +312,7 @@ export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
         <KeyHint k="WASD" label="drive" />
         <KeyHint k="Shift" label="drift" />
         <KeyHint k="LMB" label="fire" />
-        <KeyHint k="Esc" label="pause" />
+        {!online ? <KeyHint k="Esc" label="pause" /> : null}
       </div>
 
       {!player.alive && snapshot.phase === "playing" ? (
@@ -453,11 +476,27 @@ export function Hud({ store, engineRef, onQuit, onRestart }: HudProps) {
             </div>
 
             <div className="modal-actions">
-              <button type="button" className="button button-primary" onClick={onRestart}>
-                Run it back
-              </button>
+              {online ? (
+                canRematch ? (
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={onRematch ?? onRestart}
+                  >
+                    Run it back
+                  </button>
+                ) : (
+                  <span className="flex items-center px-1 text-sm text-ash">
+                    Waiting for the host to start a rematch.
+                  </span>
+                )
+              ) : (
+                <button type="button" className="button button-primary" onClick={onRestart}>
+                  Run it back
+                </button>
+              )}
               <button type="button" className="button button-outline" onClick={onQuit}>
-                Change arena
+                {online ? "Leave room" : "Change arena"}
               </button>
             </div>
           </div>

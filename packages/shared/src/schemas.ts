@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { MAX_CHAT_LENGTH, MAX_NICKNAME_LENGTH, MAX_STROKE_ID_LENGTH, MAX_STROKE_POINTS_PER_MESSAGE } from "./constants";
+import {
+  MAX_CHAT_LENGTH,
+  MAX_NICKNAME_LENGTH,
+  MAX_STROKE_ID_LENGTH,
+  MAX_STROKE_POINTS_PER_MESSAGE,
+  SMASH_MAX_PLAYERS,
+} from "./constants";
 
 const noControlCharacters = (value: string) => !/[\u0000-\u001f\u007f]/.test(value);
 
@@ -16,7 +22,7 @@ export const RoomCodeSchema = z
   .regex(/^[a-z0-9]{6}$/i, "Room codes are six letters or digits")
   .transform((value) => value.toLowerCase());
 
-export const GameKindSchema = z.enum(["skribbl", "chain"]);
+export const GameKindSchema = z.enum(["skribbl", "chain", "smashkarts"]);
 
 export const WordLanguageSchema = z.enum(["en", "tl", "ja", "ko"]);
 
@@ -33,14 +39,14 @@ export const StrokeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colour m
 
 export const GameSettingsSchema = z
   .object({
-    maxPlayers: z.number().int().min(2).max(12).optional(),
+    maxPlayers: z.number().int().min(2).max(SMASH_MAX_PLAYERS).optional(),
     rounds: z.number().int().min(1).max(10).optional(),
     drawingTimeSeconds: z.number().int().min(30).max(180).optional(),
     language: WordLanguageSchema.optional(),
     allowLateJoin: z.boolean().optional(),
     wordCount: z.number().int().min(2).max(5).optional(),
     turnTimeSeconds: z.number().int().min(15).max(120).optional(),
-    playerCount: z.number().int().min(2).max(8).optional(),
+    playerCount: z.number().int().min(2).max(SMASH_MAX_PLAYERS).optional(),
     boardSize: z.enum(["small", "medium", "large", "xxl"]).optional(),
     palette: z.enum(["classic", "vivid", "pastel", "neon", "mono", "custom"]).optional(),
     customColors: z.array(StrokeColorSchema).max(8).optional(),
@@ -49,6 +55,118 @@ export const GameSettingsSchema = z
     confirmMoves: z.boolean().optional(),
     vsCpu: z.boolean().optional(),
     cpuDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
+    mapId: z.enum(["foundry", "scrapyard", "rooftop"]).optional(),
+    killTarget: z.number().int().min(5).max(100).optional(),
+    durationSeconds: z.number().int().min(60).max(1800).optional(),
+  })
+  .strict();
+
+export const SmashInputSchema = z
+  .object({
+    throttle: z.number().min(-1).max(1),
+    steer: z.number().min(-1).max(1),
+    drift: z.boolean(),
+    fire: z.boolean(),
+  })
+  .strict();
+
+const SmashWeaponSchema = z.enum(["pulse", "missile", "mine", "shield", "turbo", "shock"]);
+const SmashPositionSchema = z.number().finite().min(-512).max(512);
+
+export const SmashKartSnapshotSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    name: z.string().min(1).max(32),
+    color: StrokeColorSchema,
+    x: SmashPositionSchema,
+    z: SmashPositionSchema,
+    yaw: z.number().finite().min(-Math.PI * 8).max(Math.PI * 8),
+    hp: z.number().finite().min(0).max(1000),
+    shield: z.number().finite().min(0).max(120),
+    boost: z.number().finite().min(0).max(120),
+    slow: z.number().finite().min(0).max(120),
+    weapon: SmashWeaponSchema,
+    ammo: z.number().int().min(0).max(100),
+    kills: z.number().int().min(0).max(100000),
+    deaths: z.number().int().min(0).max(100000),
+    shots: z.number().int().min(0).max(1000000),
+    hits: z.number().int().min(0).max(1000000),
+    alive: z.boolean(),
+    respawnIn: z.number().finite().min(0).max(120),
+    speed: z.number().finite().min(0).max(200),
+    drifting: z.boolean(),
+    driftCharge: z.number().finite().min(0).max(20),
+  })
+  .strict();
+
+export const SmashMatchSnapshotSchema = z
+  .object({
+    phase: z.enum(["playing", "over"]),
+    round: z.number().int().min(0).max(1_000_000),
+    mapId: z.enum(["foundry", "scrapyard", "rooftop"]),
+    timeLeft: z.number().finite().min(0).max(3600),
+    killTarget: z.number().int().min(1).max(1000),
+    matchSeconds: z.number().finite().min(0).max(86_400),
+    karts: z.array(SmashKartSnapshotSchema).max(SMASH_MAX_PLAYERS),
+    pickups: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(0).max(10_000),
+            active: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(64),
+    projectiles: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(0).max(10_000_000),
+            kind: z.enum(["bolt", "missile"]),
+            x: SmashPositionSchema,
+            y: z.number().finite().min(-64).max(512),
+            z: SmashPositionSchema,
+            vx: z.number().finite().min(-512).max(512),
+            vy: z.number().finite().min(-512).max(512),
+            vz: z.number().finite().min(-512).max(512),
+          })
+          .strict(),
+      )
+      .max(128),
+    mines: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(0).max(10_000_000),
+            x: SmashPositionSchema,
+            z: SmashPositionSchema,
+          })
+          .strict(),
+      )
+      .max(64),
+    feed: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(0).max(10_000_000),
+            killer: z.string().min(1).max(32),
+            victim: z.string().min(1).max(32),
+            weapon: SmashWeaponSchema,
+            self: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(16),
+    winner: z
+      .object({
+        id: z.string().min(1).max(64),
+        name: z.string().min(1).max(32),
+        color: StrokeColorSchema,
+        kills: z.number().int().min(0).max(100000),
+      })
+      .strict()
+      .nullable(),
   })
   .strict();
 
@@ -102,6 +220,8 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("chain.surrender") }).strict(),
+  z.object({ type: z.literal("smash.input"), input: SmashInputSchema }).strict(),
+  z.object({ type: z.literal("smash.snapshot"), snapshot: SmashMatchSnapshotSchema }).strict(),
   z.object({ type: z.literal("game.rematch") }).strict(),
   z.object({ type: z.literal("room.sync") }).strict(),
 ]);
@@ -180,7 +300,7 @@ export const RoomSnapshotSchema = z.object({
   hostId: z.string(),
   players: z.array(PlayerSchema),
   settings: z.object({
-    maxPlayers: z.number(),
+    maxPlayers: z.number().int().min(2).max(SMASH_MAX_PLAYERS),
     rounds: z.number(),
     drawingTimeSeconds: z.number(),
     language: WordLanguageSchema,
@@ -196,6 +316,9 @@ export const RoomSnapshotSchema = z.object({
     confirmMoves: z.boolean().optional(),
     vsCpu: z.boolean().optional(),
     cpuDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
+    mapId: z.enum(["foundry", "scrapyard", "rooftop"]).optional(),
+    killTarget: z.number().int().min(5).max(100).optional(),
+    durationSeconds: z.number().int().min(60).max(1800).optional(),
   }),
   roundNumber: z.number(),
   drawerId: z.string().nullable(),
@@ -260,6 +383,12 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("chain.move"), move: ChainMoveSchema, snapshot: RoomSnapshotSchema }),
   z.object({ type: z.literal("chain.turn.timeout"), playerId: z.string() }),
+  z.object({
+    type: z.literal("smash.input"),
+    playerId: z.string(),
+    input: SmashInputSchema,
+  }),
+  z.object({ type: z.literal("smash.snapshot"), snapshot: SmashMatchSnapshotSchema }),
   z.object({
     type: z.literal("game.finished"),
     rankings: z.array(RankingSchema),

@@ -35,6 +35,15 @@ export function ArrowRightIcon(props: IconProps) {
   );
 }
 
+export function RefreshIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20 11a8 8 0 0 0-14.9-3M4 5v6h6" />
+      <path d="M4 13a8 8 0 0 0 14.9 3M20 19v-6h-6" />
+    </svg>
+  );
+}
+
 export function CopyIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

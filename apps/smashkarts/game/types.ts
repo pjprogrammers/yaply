@@ -1,6 +1,10 @@
+import type { SmashInput, SmashMatchSnapshot } from "@yaply/shared/types";
+
 export type MapId = "foundry" | "scrapyard" | "rooftop";
 
 export type WeaponId = "pulse" | "missile" | "mine" | "shield" | "turbo" | "shock";
+
+export type EngineMode = "local" | "online-host" | "online-guest";
 
 export type ObstacleKind =
   | "crate"
@@ -94,6 +98,13 @@ export interface MapDef {
   pickups: Array<[number, number]>;
 }
 
+export interface OnlinePlayer {
+  id: string;
+  name: string;
+  color: string;
+  connected: boolean;
+}
+
 export interface GameOptions {
   mapId: MapId;
   playerName: string;
@@ -101,6 +112,20 @@ export interface GameOptions {
   botCount: number;
   killTarget: number;
   duration: number;
+  /** Local bot matches by default; online matches pick a replication role. */
+  mode?: EngineMode;
+  /** The local player's room id when online. */
+  localPlayerId?: string;
+  /** Room roster used to build the online grid. */
+  roster?: OnlinePlayer[];
+  /** Current room round, used to reject stale snapshots after a rematch. */
+  round?: number;
+  /** Host-migration state copied into a freshly promoted host engine. */
+  seedSnapshot?: SmashMatchSnapshot | null;
+  /** Guest-to-host controls, sent at roughly 20 Hz. */
+  onInput?: (input: SmashInput) => void;
+  /** Host-to-room match snapshots, sent at roughly 10 Hz. */
+  onSnapshot?: (snapshot: SmashMatchSnapshot) => void;
 }
 
 export interface VehicleInput {

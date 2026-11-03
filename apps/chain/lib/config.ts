@@ -1,3 +1,4 @@
+import { MAX_NICKNAME_LENGTH } from "@yaply/shared/constants";
 import {
   normalizeHttpUrl,
   requestRoomCode,
@@ -67,6 +68,40 @@ export function storeNickname(nickname: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(NICKNAME_KEY, nickname);
+  } catch {
+    // Storage is optional.
+  }
+}
+
+/** Names entered for a shared-device pass-and-play table. */
+export const PASS_PLAYER_NAMES_KEY = "yaply:chain:pass-players";
+
+function sanitizeStoredPlayerNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((name): name is string => typeof name === "string")
+    .slice(0, 8)
+    .map((name) => name.trim().slice(0, MAX_NICKNAME_LENGTH));
+}
+
+export function readStoredPassPlayerNames(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PASS_PLAYER_NAMES_KEY);
+    if (!raw) return [];
+    return sanitizeStoredPlayerNames(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+export function storePassPlayerNames(names: readonly string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      PASS_PLAYER_NAMES_KEY,
+      JSON.stringify(sanitizeStoredPlayerNames(names)),
+    );
   } catch {
     // Storage is optional.
   }

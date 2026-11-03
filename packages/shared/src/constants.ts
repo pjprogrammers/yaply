@@ -5,6 +5,8 @@ import type {
   ChainTheme,
   CpuDifficulty,
   GameSettings,
+  SmashMapId,
+  SmashWeaponId,
   WordLanguage,
 } from "./types";
 
@@ -48,7 +50,34 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   confirmMoves: false,
   vsCpu: false,
   cpuDifficulty: "medium",
+  mapId: "foundry",
+  killTarget: 20,
+  durationSeconds: 300,
 };
+
+export const SMASH_MIN_PLAYERS = 2;
+export const SMASH_MAX_PLAYERS = 40;
+export const SMASH_KILL_TARGET_MIN = 5;
+export const SMASH_KILL_TARGET_MAX = 100;
+export const SMASH_DURATION_MIN_SECONDS = 60;
+export const SMASH_DURATION_MAX_SECONDS = 1800;
+export const SMASH_MAP_IDS: SmashMapId[] = ["foundry", "scrapyard", "rooftop"];
+export const SMASH_WEAPON_IDS: SmashWeaponId[] = [
+  "pulse",
+  "missile",
+  "mine",
+  "shield",
+  "turbo",
+  "shock",
+];
+
+export function isSmashMapId(value: unknown): value is SmashMapId {
+  return typeof value === "string" && SMASH_MAP_IDS.includes(value as SmashMapId);
+}
+
+export function isSmashWeaponId(value: unknown): value is SmashWeaponId {
+  return typeof value === "string" && SMASH_WEAPON_IDS.includes(value as SmashWeaponId);
+}
 
 export const ROOM_CODE_LENGTH = 6;
 /**
@@ -83,6 +112,11 @@ export const ROOM_RESERVATION_TTL_MS = 2 * 60_000;
 
 /** Hard cap on a single WebSocket frame. Larger frames are dropped unparsed. */
 export const MAX_MESSAGE_BYTES = 16 * 1024;
+/**
+ * Smash Karts snapshots carry up to 40 karts plus transient projectiles, so
+ * they get a larger frame budget without loosening the limits for other games.
+ */
+export const MAX_SMASH_MESSAGE_BYTES = 48 * 1024;
 /** Per-socket token bucket used for every client message. */
 export const MESSAGE_RATE_LIMIT = {
   capacity: 60,
@@ -94,6 +128,11 @@ export const MAX_INVALID_MESSAGES = 20;
 export const UNJOINED_SOCKET_TTL_MS = 30000;
 /** Hard cap on sockets (joined or not) attached to one room. */
 export const MAX_SOCKETS_PER_ROOM = 32;
+/**
+ * Smash Karts rooms allow 40 players. Keep extra headroom for a short overlap
+ * while dropped tabs reconnect and release their old sockets.
+ */
+export const MAX_SMASH_SOCKETS_PER_ROOM = 80;
 /**
  * Best-effort cap on sockets from one client (IP) in one room. This blunts
  * attempts to multiply the per-socket rate limit by opening many connections,
@@ -117,6 +156,53 @@ export const PLAYER_COLORS = [
   "#d97757",
   "#7dd3c7",
   "#f28ab2",
+];
+
+/**
+ * Smash Karts supports up to 40 seats, so its grid uses its own longer palette
+ * instead of repeating the eight Skribbl/Chain seat colours.
+ */
+export const SMASH_PLAYER_COLORS = [
+  "#ff5a1f",
+  "#a8e10c",
+  "#2fd4c8",
+  "#f2ecdd",
+  "#e83f8b",
+  "#3f76f0",
+  "#ffc233",
+  "#8b5cf6",
+  "#f25c54",
+  "#4ade80",
+  "#38bdf8",
+  "#facc15",
+  "#fb7185",
+  "#c084fc",
+  "#34d399",
+  "#f97316",
+  "#22d3ee",
+  "#e879f9",
+  "#84cc16",
+  "#f43f5e",
+  "#60a5fa",
+  "#fbbf24",
+  "#a3e635",
+  "#2dd4bf",
+  "#f472b6",
+  "#818cf8",
+  "#fcd34d",
+  "#a7f3d0",
+  "#fca5a5",
+  "#93c5fd",
+  "#d9f99d",
+  "#67e8f9",
+  "#fda4af",
+  "#c4b5fd",
+  "#86efac",
+  "#fde68a",
+  "#99f6e4",
+  "#f0abfc",
+  "#fdba74",
+  "#bfdbfe",
 ];
 
 export type ChainBoardPreset = {
