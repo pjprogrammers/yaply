@@ -16,7 +16,7 @@ export function GET() {
       mainUrl: MAIN_URL,
       realtimeUrl: REALTIME_URL,
       sources: {
-        site: process.env.NEXT_PUBLIC_SITE_URL ? "env" : "default",
+        site: process.env.NEXT_PUBLIC_SMASHKARTS_URL ? "env" : "default",
         main: process.env.NEXT_PUBLIC_MAIN_URL ? "env" : "default",
         realtime: process.env.NEXT_PUBLIC_REALTIME_URL ? "env" : "default",
       },

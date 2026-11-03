@@ -86,12 +86,24 @@ describe("chain room config", () => {
   it("uses NEXT_PUBLIC_REALTIME_URL and NEXT_PUBLIC_MAIN_URL when set", async () => {
     vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room/");
     vi.stubEnv("NEXT_PUBLIC_MAIN_URL", "https://main.example.com/");
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "https://chain.example.com/");
     vi.resetModules();
 
     const config = await import("./config");
 
     expect(config.REALTIME_URL).toBe("wss://rt.example.com/room");
     expect(config.MAIN_URL).toBe("https://main.example.com");
+    expect(config.SITE_URL).toBe("https://chain.example.com");
+  });
+
+  it("uses the Vercel host when NEXT_PUBLIC_CHAIN_URL is not set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "chain.example.com");
+    vi.resetModules();
+
+    const config = await import("./config");
+
+    expect(config.SITE_URL).toBe("https://chain.example.com");
   });
 
   it("does not invent a localhost realtime URL on a deployed origin", async () => {

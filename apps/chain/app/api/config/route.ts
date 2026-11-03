@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MAIN_URL, REALTIME_URL } from "@/lib/config";
+import { MAIN_URL, REALTIME_URL, SITE_URL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,12 @@ export const dynamic = "force-dynamic";
 export function GET() {
   return NextResponse.json(
     {
+      game: "chain",
+      siteUrl: SITE_URL,
       realtimeUrl: REALTIME_URL,
       mainUrl: MAIN_URL,
       sources: {
+        site: process.env.NEXT_PUBLIC_CHAIN_URL ? "env" : "default",
         realtime: process.env.NEXT_PUBLIC_REALTIME_URL ? "env" : "default",
         main: process.env.NEXT_PUBLIC_MAIN_URL ? "env" : "default",
       },

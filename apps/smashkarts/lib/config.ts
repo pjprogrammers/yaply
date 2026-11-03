@@ -4,12 +4,12 @@ import {
 } from "@yaply/shared/config";
 
 /**
- * Canonical origin of this Kart Riot deployment. `NEXT_PUBLIC_SITE_URL` wins;
- * Vercel's system variables provide a host when the project has not set it, so
- * Open Graph images do not fall back to localhost on a deployment.
+ * Canonical origin of this Kart Riot deployment. `NEXT_PUBLIC_SMASHKARTS_URL`
+ * wins; Vercel's system variables provide a host when the project has not set
+ * it, so Open Graph images do not fall back to localhost on a deployment.
  */
 export const SITE_URL = normalizeHttpUrl(
-  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_SMASHKARTS_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : process.env.VERCEL_URL

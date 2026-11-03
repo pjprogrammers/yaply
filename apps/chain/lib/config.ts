@@ -4,6 +4,22 @@ import {
   resolveRealtimeBaseUrl,
 } from "@yaply/shared/config";
 
+/**
+ * Canonical origin of this Chain Reaction deployment. `NEXT_PUBLIC_CHAIN_URL`
+ * wins; Vercel's system variables provide a host when the project has not set
+ * it, so metadata and Open Graph images do not fall back to localhost on a
+ * deployment.
+ */
+export const SITE_URL = normalizeHttpUrl(
+  process.env.NEXT_PUBLIC_CHAIN_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : undefined),
+  "http://localhost:3002",
+);
+
 export const MAIN_URL = normalizeHttpUrl(
   process.env.NEXT_PUBLIC_MAIN_URL,
   "http://localhost:3000",

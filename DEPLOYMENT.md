@@ -145,12 +145,22 @@ For local development the realtime URL can be omitted (it falls back to
 `ws://localhost:8787/room`). When the custom domain is live, use
 `NEXT_PUBLIC_MAIN_URL=https://yaply.is-cool.dev`.
 
-Kart Riot also needs the canonical origin of its own deployment so relative
-Open Graph image paths resolve correctly:
+Each game also needs the canonical origin of its own deployment so metadata and
+relative Open Graph image paths resolve correctly. Set the variable in **both**
+the game project and `yaply-web` (there it is the link to the game):
 
 ```env
-NEXT_PUBLIC_SITE_URL=https://yaply-smashkarts.vercel.app
+# yaply-skribbl + yaply-web
+NEXT_PUBLIC_SKRIBBL_URL=https://yaply-skribbl.vercel.app
+# yaply-chain + yaply-web
+NEXT_PUBLIC_CHAIN_URL=https://yaply-chain.vercel.app
+# yaply-smashkarts + yaply-web
+NEXT_PUBLIC_SMASHKARTS_URL=https://yaply-smashkarts.vercel.app
 ```
+
+For local development the URL can be omitted; the apps fall back to their Vercel
+system hostname, then to `http://localhost:3001` (Skribbl), `3002` (Chain
+Reaction) or `3003` (Kart Riot).
 
 Kart Riot currently runs its arena locally against bots. Its realtime URL is
 wired through the same config and diagnostic endpoint as the other games, but
@@ -169,12 +179,11 @@ Set each variable in the correct Vercel project:
 
 | Variable | Project |
 | --- | --- |
-| `NEXT_PUBLIC_CHAIN_URL` | `yaply-web` only |
-| `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` only |
-| `NEXT_PUBLIC_SMASHKARTS_URL` | `yaply-web` only |
+| `NEXT_PUBLIC_CHAIN_URL` | `yaply-web` **and** `yaply-chain` |
+| `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` **and** `yaply-skribbl` |
+| `NEXT_PUBLIC_SMASHKARTS_URL` | `yaply-web` **and** `yaply-smashkarts` |
 | `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
 | `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
-| `NEXT_PUBLIC_SITE_URL` | `yaply-smashkarts` only |
 
 Adding `NEXT_PUBLIC_REALTIME_URL` to the `yaply-web` project does nothing for
 the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` or `NEXT_PUBLIC_SMASHKARTS_URL` to
@@ -291,7 +300,7 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/skribbl`
-- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`
 
 **Project 3 — `yaply-chain`**
 
@@ -299,7 +308,7 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/chain`
-- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`
 
 **Project 4 — `yaply-smashkarts`**
 
@@ -307,12 +316,13 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/smashkarts`
-- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_SITE_URL`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_SMASHKARTS_URL`
 
-`NEXT_PUBLIC_SITE_URL` must be the public origin of this project
+`NEXT_PUBLIC_SMASHKARTS_URL` must be the public origin of this project
 (`https://yaply-smashkarts.vercel.app`, then
 `https://kart-riot.yaply.is-cool.dev`). The app uses it as `metadataBase` for
-the Open Graph images.
+the Open Graph images. The same variable is set on `yaply-web`, where it is the
+Kart Riot link.
 
 Installing from the repository root is required so npm workspaces can resolve
 `@yaply/shared`. If Vercel cannot read files outside the selected Root
