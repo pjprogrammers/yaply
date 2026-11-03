@@ -60,3 +60,5 @@ packages/*/dist
 next-task.md
 goal.md
 playwright.config.ts
+.opencode/
+.taste-skill/

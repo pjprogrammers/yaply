@@ -62,15 +62,15 @@ reconnect grace, and room expiry. See `ARCHITECTURE_CHAIN_SKRIBBL.md`.
 ### `apps/web`
 
 ```env
-NEXT_PUBLIC_CHAIN_URL=https://yaply-chain.vercel.app
-NEXT_PUBLIC_SKRIBBL_URL=https://yaply-skribbl.vercel.app
+NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
+NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
 ```
 
 ### `apps/skribbl` and `apps/chain`
 
 ```env
-NEXT_PUBLIC_REALTIME_URL=wss://yaply-realtime.<account>.workers.dev/room
-NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
+NEXT_PUBLIC_REALTIME_URL=wss://<realtime-worker-host>/room
+NEXT_PUBLIC_MAIN_URL=https://<main-project>.vercel.app
 ```
 
 Local development can omit `NEXT_PUBLIC_REALTIME_URL`; the client falls back to
@@ -82,7 +82,7 @@ Configured in `apps/realtime/wrangler.toml`:
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
 ```
 
 `ALLOWED_ORIGINS` is fail-closed in production. `APP_ORIGIN` is still read for

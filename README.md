@@ -37,3 +37,30 @@ npm run build
 - See `implementation.md` for detailed implementation plan
 - See `theme.md` for design system
 - See the blueprint in the problem description for full specifications
+
+
+
+
+
+## Copyright & License
+
+**Copyright © 2026 Jashan Singla. All Rights Reserved.**
+
+Yaply is proprietary software developed independently.
+
+The original source code, project-specific implementations,
+designs, branding and documentation are protected by
+applicable intellectual property laws.
+
+Public availability of this repository does not grant
+a general license to copy, modify, redistribute,
+republish or commercially exploit its proprietary
+materials.
+
+Third-party dependencies and externally licensed assets
+remain subject to their respective licenses.
+
+See the [LICENSE](./LICENSE) file for complete terms.
+
+For licensing or commercial inquiries, contact
+the copyright owner through GitHub.

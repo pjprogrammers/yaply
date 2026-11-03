@@ -24,11 +24,10 @@ new_sqlite_classes = ["GameRoom"]
 
 [env.production.vars]
 ENVIRONMENT = "production"
-# Every deployed frontend origin must be listed here (main site, Skribbl, Chain
-# Reaction, Kart Riot), including custom domains. Requests without an allowed
-# Origin are rejected in production, so a missing domain is a hard outage for
-# that site.
-ALLOWED_ORIGINS = "https://yaply.is-cool.dev,https://skribbl.yaply.is-cool.dev,https://chain.yaply.is-cool.dev,https://kart-riot.yaply.is-cool.dev,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
+# Every deployed frontend origin allowed to call the Worker. Update this list
+# when a domain changes. Requests without an allowed Origin are rejected in
+# production, so a missing domain is a hard outage for that site.
+ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
 
 [env.production.durable_objects]
 bindings = [

@@ -234,16 +234,14 @@ describe("Worker production configuration", () => {
       .map((origin) => origin.trim())
       .filter(Boolean) ?? [];
 
-  it("allows every documented production frontend origin", () => {
-    // DEPLOYMENT.md calls these the canonical production domains; omitting one
-    // makes the Worker fail closed for that deployed site.
-    expect(allowedOrigins).toEqual(
-      expect.arrayContaining([
-        "https://yaply.is-cool.dev",
-        "https://skribbl.yaply.is-cool.dev",
-        "https://chain.yaply.is-cool.dev",
-      ]),
-    );
+  it("allows every deployed frontend origin", () => {
+    // Keep this list in sync with the current Vercel project domains.
+    expect(allowedOrigins).toEqual([
+      "https://yaply-web.vercel.app",
+      "https://yaply-skribbl.vercel.app",
+      "https://yaply-chain.vercel.app",
+      "https://yaply-smashkarts.vercel.app",
+    ]);
   });
 
   it("does not allow localhost origins in production", () => {
