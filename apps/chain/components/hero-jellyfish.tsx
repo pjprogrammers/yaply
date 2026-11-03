@@ -135,38 +135,6 @@ const FRAGMENT_TENTACLE = /* glsl */ `
   }
 `;
 
-const VERTEX_PARTICLES = /* glsl */ `
-  uniform float uTime;
-  uniform float uPixelRatio;
-
-  attribute float aSeed;
-  varying float vTwinkle;
-
-  void main() {
-    vec3 p = position;
-    p.y += sin(uTime * 0.24 + aSeed * 6.2831) * 0.16;
-    p.x += cos(uTime * 0.18 + aSeed * 6.2831) * 0.07;
-    p.z += sin(uTime * 0.14 + aSeed * 12.0) * 0.05;
-
-    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
-    gl_PointSize = (1.2 + aSeed * 2.4) * uPixelRatio * (36.0 / max(1.0, -mvPosition.z));
-
-    vTwinkle = 0.35 + 0.65 * (0.5 + 0.5 * sin(uTime * 1.1 + aSeed * 20.0));
-  }
-`;
-
-const FRAGMENT_PARTICLES = /* glsl */ `
-  varying float vTwinkle;
-
-  void main() {
-    float distanceToCenter = length(gl_PointCoord - 0.5);
-    float dotShape = smoothstep(0.5, 0.02, distanceToCenter);
-    float alpha = dotShape * vTwinkle * 0.52;
-    gl_FragColor = vec4(vec3(0.64, 0.92, 1.0), alpha);
-  }
-`;
-
 type TentacleSpec = {
   angle: number;
   length: number;
@@ -268,7 +236,7 @@ export function HeroJellyfish() {
         premultipliedAlpha: true,
       });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.domElement.setAttribute("aria-hidden", "true");
       host.appendChild(renderer.domElement);
@@ -334,7 +302,7 @@ export function HeroJellyfish() {
         fragmentShader: FRAGMENT_BELL,
         uniforms: {
           ...bellUniforms,
-          uOpacity: { value: 0.32 },
+          uOpacity: { value: 0.24 },
           uBright: { value: new THREE.Color("#7ee0ff") },
         },
         transparent: true,
@@ -344,7 +312,7 @@ export function HeroJellyfish() {
       });
 
       const rim = new THREE.Mesh(bellGeometry, rimMaterial);
-      rim.scale.set(1.36, 0.68, 1.36);
+      rim.scale.set(1.34, 0.7, 1.34);
       rim.position.y = -0.02;
       swimmer.add(rim);
 
@@ -418,43 +386,6 @@ export function HeroJellyfish() {
       }));
       swimmer.add(arms);
 
-      const particleCount = 84;
-      const particlePositions = new Float32Array(particleCount * 3);
-      const particleSeeds = new Float32Array(particleCount);
-
-      for (let index = 0; index < particleCount; index++) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 0.45 + Math.random() * 1.55;
-        particlePositions[index * 3] = Math.cos(angle) * radius;
-        particlePositions[index * 3 + 1] = 1.15 - Math.random() * 3.8;
-        particlePositions[index * 3 + 2] = Math.sin(angle) * radius * 0.55;
-        particleSeeds[index] = Math.random();
-      }
-
-      const particleGeometry = new THREE.BufferGeometry();
-      particleGeometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(particlePositions, 3),
-      );
-      particleGeometry.setAttribute("aSeed", new THREE.BufferAttribute(particleSeeds, 1));
-
-      const particleUniforms = {
-        uTime: { value: 0 },
-        uPixelRatio: { value: renderer.getPixelRatio() },
-      };
-      const particles = new THREE.Points(
-        particleGeometry,
-        new THREE.ShaderMaterial({
-          vertexShader: VERTEX_PARTICLES,
-          fragmentShader: FRAGMENT_PARTICLES,
-          uniforms: particleUniforms,
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        }),
-      );
-      swimmer.add(particles);
-
       let baseX = 0;
       let baseY = 0;
       let baseScale = 0.8;
@@ -482,7 +413,6 @@ export function HeroJellyfish() {
         baseY = (0.5 - yFraction) * visibleHeight;
 
         swimmer.scale.setScalar(baseScale);
-        particleUniforms.uPixelRatio.value = renderer.getPixelRatio();
       };
 
       layout();
@@ -495,6 +425,7 @@ export function HeroJellyfish() {
       let targetY = 0;
 
       const onPointerMove = (event: PointerEvent) => {
+        if (event.pointerType !== "mouse") return;
         targetX = event.clientX / window.innerWidth - 0.5;
         targetY = event.clientY / window.innerHeight - 0.5;
       };
@@ -525,9 +456,6 @@ export function HeroJellyfish() {
         tentacleUniforms.uTime.value = time;
         glowUniforms.uTime.value = time;
         armUniforms.uTime.value = time;
-        particleUniforms.uTime.value = time;
-
-        particles.rotation.y = time * 0.015;
       };
 
       update(0.6);

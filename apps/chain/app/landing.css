@@ -372,13 +372,35 @@
   will-change: translate;
 }
 
+/* The background starfield and the jellyfish live on separate alpha canvases
+   so each scene stays clean and can pause independently. */
+.cr-starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cr-starfield canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+
+.cr-starfield[data-ready="true"] canvas {
+  opacity: 0.82;
+}
+
 /* A transparent WebGL canvas for the jellyfish. Three.js is imported after
    hydration so the first paint stays CSS-only; the canvas fades in when the
    first frame is ready. */
 .cr-jellyfish {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -398,14 +420,22 @@
 /* On compact screens the hero copy owns the stage, so the jellyfish becomes a
    quiet ambient silhouette instead of competing with the words and buttons. */
 @media (max-width: 979px) {
+  .cr-starfield[data-ready="true"] canvas {
+    opacity: 0.62;
+  }
+
   .cr-jellyfish[data-ready="true"] canvas {
-    opacity: 0.58;
+    opacity: 0.62;
   }
 }
 
 @media (max-width: 700px) {
+  .cr-starfield[data-ready="true"] canvas {
+    opacity: 0.48;
+  }
+
   .cr-jellyfish[data-ready="true"] canvas {
-    opacity: 0.32;
+    opacity: 0.46;
   }
 }
 
@@ -540,152 +570,9 @@
   margin: 0;
 }
 
-.cr-hero-orb {
-  --orb-light: #dff4ff;
-  --orb: #4cb3f0;
-  --orb-deep: #0c4d72;
-  position: absolute;
-  width: clamp(18px, 3.4vw, 46px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 31% 25%, #fff 0 6%, transparent 18%),
-    radial-gradient(
-      circle at 36% 30%,
-      var(--orb-light) 0 12%,
-      var(--orb) 40%,
-      var(--orb-deep) 78%,
-      #04121c 100%
-    );
-  box-shadow:
-    0 18px 34px rgba(0, 0, 0, 0.5),
-    0 0 40px rgba(76, 179, 240, 0.22);
-  animation: cr-hero-drift 13s ease-in-out infinite;
-}
-
-.cr-hero-orb--a {
-  top: 9%;
-  left: 45%;
-  width: clamp(16px, 2.6vw, 34px);
-  animation-delay: -4s;
-}
-
-.cr-hero-orb--b {
-  --orb-light: #fff1ce;
-  --orb: #f2b33d;
-  --orb-deep: #7b4b06;
-  top: 4%;
-  right: 3%;
-  width: clamp(22px, 3.9vw, 52px);
-  animation-delay: -8s;
-  animation-duration: 16s;
-}
-
-.cr-hero-orb--c {
-  --orb-light: #ffd7d8;
-  --orb: #e5484d;
-  --orb-deep: #68171b;
-  right: 1%;
-  bottom: 16%;
-  width: clamp(14px, 2.2vw, 28px);
-  animation-delay: -2s;
-  animation-duration: 11s;
-}
-
-.cr-hero-orb--d {
-  --orb-light: #efffc9;
-  --orb: #c6f24e;
-  --orb-deep: #4c6410;
-  left: 47%;
-  bottom: 4%;
-  width: clamp(16px, 2.8vw, 38px);
-  animation-delay: -6s;
-  animation-duration: 14s;
-}
-
-.cr-hero-slab {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid rgba(76, 179, 240, 0.28);
-  border-radius: 14px;
-  background:
-    linear-gradient(145deg, rgba(22, 42, 58, 0.92), rgba(5, 12, 18, 0.88));
-  box-shadow:
-    0 26px 50px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  transform-style: preserve-3d;
-  animation: cr-slab-drift 16s ease-in-out infinite;
-  opacity: 0.92;
-}
-
-.cr-hero-slab::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(115deg, transparent 22%, rgba(255, 255, 255, 0.07) 45%, transparent 64%);
-  pointer-events: none;
-}
-
-.cr-hero-slab > i {
-  width: 17px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, #fff 0 7%, #8ed6ff 20%, var(--cr-blue) 52%, #0b4f78 100%);
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.4),
-    0 0 16px rgba(76, 179, 240, 0.4);
-  animation: cr-slab-orb 5.5s ease-in-out infinite;
-}
-
-.cr-hero-slab > i:nth-child(2) {
-  background: radial-gradient(circle at 32% 28%, #fff 0 7%, #ffdca0 20%, var(--cr-yellow) 52%, #7b4b06 100%);
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.4),
-    0 0 16px rgba(242, 179, 61, 0.36);
-  animation-delay: -2.6s;
-}
-
-.cr-hero-slab--a {
-  top: 12%;
-  right: 2%;
-  width: 104px;
-  height: 72px;
-  transform: rotateX(18deg) rotateY(-24deg) rotateZ(-5deg);
-  animation-delay: -3s;
-}
-
-.cr-hero-slab--b {
-  right: 45%;
-  bottom: 1%;
-  width: 122px;
-  height: 80px;
-  transform: rotateX(15deg) rotateY(19deg) rotateZ(4deg);
-  animation-delay: -9s;
-  animation-duration: 19s;
-}
-
-.cr-hero-slab--c {
-  right: 1%;
-  bottom: 32%;
-  width: 90px;
-  height: 64px;
-  transform: rotateX(26deg) rotateY(-14deg) rotateZ(8deg);
-  animation-delay: -12s;
-  animation-duration: 21s;
-}
-
-.cr-hero-slab--c > i {
-  width: 13px;
-}
-
 .cr-hero-grid {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: clamp(46px, 6vw, 74px);
@@ -2461,16 +2348,6 @@
   }
 }
 
-@keyframes cr-hero-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(7px, -16px, 0);
-  }
-}
-
 @keyframes cr-slab-drift {
   0%,
   100% {
@@ -2602,9 +2479,6 @@
   .cr-demo-cell.is-popped::after,
   .cr-demo-cell.is-changed,
   .cr-mass-cell.is-center::after,
-  .cr-hero-orb,
-  .cr-hero-slab,
-  .cr-hero-slab > i,
   .cr-hero-orbit,
   .cr-demo-aura,
   .cr-demo-float,
@@ -2627,6 +2501,14 @@
   .cr-demo-rig,
   .cr-reveal[data-tilt] {
     transform: none;
+    transition: none;
+  }
+
+  .cr-jellyfish canvas {
+    transition: none;
+  }
+
+  .cr-starfield canvas {
     transition: none;
   }
 
@@ -2742,26 +2624,6 @@
     bottom: 10%;
     width: min(80vw, 560px);
     opacity: 0.34;
-  }
-
-  .cr-hero-slab {
-    display: none;
-  }
-
-  .cr-hero-orb--a,
-  .cr-hero-orb--d {
-    display: none;
-  }
-
-  .cr-hero-orb--b {
-    top: 4%;
-    right: 2%;
-  }
-
-  .cr-hero-orb--c {
-    right: auto;
-    bottom: 6%;
-    left: 2%;
   }
 }
 

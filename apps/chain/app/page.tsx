@@ -7,6 +7,7 @@ import {
 import { ArrowRightIcon, ChainMark, PlayIcon } from "@/components/icons";
 import { ChainHeroBoard } from "@/components/hero-board";
 import { HeroJellyfish } from "@/components/hero-jellyfish";
+import { HeroStarfield } from "@/components/hero-starfield";
 import { MiniBoard } from "@/components/mini-board";
 import { MotionDirector } from "@/components/motion-director";
 import { Reveal } from "@/components/reveal";
@@ -199,6 +200,7 @@ export default function Home() {
 
         <main id="main">
           <section className="cr-hero" aria-labelledby="hero-title" data-hero-parallax>
+            <HeroStarfield />
             <HeroJellyfish />
 
             <div className="cr-hero-scene" aria-hidden>
@@ -213,20 +215,6 @@ export default function Home() {
                 <i />
                 <i />
               </div>
-              <span className="cr-hero-orb cr-hero-orb--a" />
-              <span className="cr-hero-orb cr-hero-orb--b" />
-              <span className="cr-hero-orb cr-hero-orb--c" />
-              <span className="cr-hero-orb cr-hero-orb--d" />
-              <span className="cr-hero-slab cr-hero-slab--a">
-                <i />
-              </span>
-              <span className="cr-hero-slab cr-hero-slab--b">
-                <i />
-                <i />
-              </span>
-              <span className="cr-hero-slab cr-hero-slab--c">
-                <i />
-              </span>
             </div>
 
             <div className="cr-margins cr-hero-grid">
