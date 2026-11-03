@@ -7,7 +7,9 @@
  * reconnects a sample of players with their resume token.
  *
  * Local-only by default. Production use requires --allow-remote because room
- * creation and socket upgrades consume real Cloudflare quota.
+ * creation and socket upgrades consume real Cloudflare quota. Remote runs also
+ * require E2E_CHAIN_URL and E2E_SKRIBBL_URL so no deployment domain is baked
+ * into the script.
  *
  * Usage:
  *   node scripts/load-test.mjs --rooms 5
@@ -74,7 +76,14 @@ function makeCode() {
 
 function originFor(game, base) {
   if (!isLocalbase(base)) {
-    return game === "chain" ? "https://yaply-chain.vercel.app" : "https://yaply-skribbl.vercel.app";
+    const envKey = game === "chain" ? "E2E_CHAIN_URL" : "E2E_SKRIBBL_URL";
+    const configured = process.env[envKey];
+    if (!configured) {
+      throw new Error(
+        `${envKey} must be set when running the load test against a remote Worker.`,
+      );
+    }
+    return new URL(configured).origin;
   }
   return game === "chain" ? "http://localhost:3002" : "http://localhost:3001";
 }

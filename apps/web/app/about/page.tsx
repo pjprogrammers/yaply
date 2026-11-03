@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "About",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://yaply.eu.org/about",
+    url: `${SITE_URL}/about`,
     siteName: "Yaply",
     title: "About Yaply",
     description:
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Yaply browser games: Chain Reaction, Skribbl, Ludo, Who's the Spy and Smash Karts",
+        alt: "Yaply browser games — a fanned deck of game posters on a blue and yellow field",
       },
     ],
   },

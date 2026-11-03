@@ -88,7 +88,7 @@ function RoomFragment() {
   );
 }
 
-function ShareFragment() {
+function ShareFragment({ siteHost }: { siteHost: string }) {
   return (
     <div
       className="ui-panel"
@@ -100,7 +100,7 @@ function ShareFragment() {
         <span>Share the room</span>
         <span>YAP7K</span>
       </div>
-      <div className="ui-link">yaply.eu.org/room/YAP7K</div>
+      <div className="ui-link">{siteHost}/room/YAP7K</div>
       <div className="ui-kv">
         <span>Room code</span>
         <strong>YAP7K</strong>
@@ -146,31 +146,34 @@ function PlayFragment() {
   );
 }
 
-const stages = [
-  {
-    name: "Pick a game",
-    body: "Five games sit on one shelf. Chain Reaction and Skribbl are ready now; the others are close behind.",
-    fragment: <PickFragment />,
-  },
-  {
-    name: "Open a room",
-    body: "Open a room and get a short code. No account, no lobby to build by hand.",
-    fragment: <RoomFragment />,
-  },
-  {
-    name: "Send the link",
-    body: "Send the code or the link. Everyone who opens it lands in the same room.",
-    fragment: <ShareFragment />,
-  },
-  {
-    name: "Play",
-    body: "Play in the browser. Scores, turns and rematches stay in the room.",
-    fragment: <PlayFragment />,
-  },
-];
+function stageList(siteHost: string) {
+  return [
+    {
+      name: "Pick a game",
+      body: "Five games sit on one shelf. Chain Reaction and Skribbl are ready now; the others are close behind.",
+      fragment: <PickFragment />,
+    },
+    {
+      name: "Open a room",
+      body: "Open a room and get a short code. No account, no lobby to build by hand.",
+      fragment: <RoomFragment />,
+    },
+    {
+      name: "Send the link",
+      body: "Send the code or the link. Everyone who opens it lands in the same room.",
+      fragment: <ShareFragment siteHost={siteHost} />,
+    },
+    {
+      name: "Play",
+      body: "Play in the browser. Scores, turns and rematches stay in the room.",
+      fragment: <PlayFragment />,
+    },
+  ];
+}
 
-export default function Stages() {
+export default function Stages({ siteHost }: { siteHost: string }) {
   const [stage, setStage] = useState(0);
+  const stages = stageList(siteHost);
   const current = stages[stage];
 
   return (

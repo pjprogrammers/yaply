@@ -11,13 +11,11 @@ afterEach(() => {
 });
 
 describe("game URL environment variables", () => {
-  it("falls back to the Vercel deployments when no env is set", async () => {
-    const { CHAIN_REACTION_URL, SKRIBBL_URL, GAME_URL_SOURCES } =
-      await loadGameUrls();
+  it("requires the game URL env values", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "");
 
-    expect(CHAIN_REACTION_URL).toBe("https://yaply-chain.vercel.app");
-    expect(SKRIBBL_URL).toBe("https://yaply-skribbl.vercel.app");
-    expect(GAME_URL_SOURCES).toEqual({ chain: "default", skribbl: "default" });
+    await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_CHAIN_URL");
   });
 
   it("uses NEXT_PUBLIC_CHAIN_URL and NEXT_PUBLIC_SKRIBBL_URL when set", async () => {
@@ -33,10 +31,9 @@ describe("game URL environment variables", () => {
   });
 
   it("rejects a malformed env value instead of rendering a relative link", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "skribbl.yaply.eu.org");
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "https://chain.example.com");
+    vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "skribbl.example.com");
 
-    const { SKRIBBL_URL } = await loadGameUrls();
-
-    expect(SKRIBBL_URL).toBe("https://yaply-skribbl.vercel.app");
+    await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_SKRIBBL_URL");
   });
 });

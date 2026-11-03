@@ -9,11 +9,10 @@ import Showcase from "@/components/home/showcase";
 import Stages from "@/components/home/stages";
 import { faqs } from "@/data/faqs";
 import { games } from "@/data/games";
-
-const siteUrl = "https://yaply.eu.org";
+import { SITE_HOST, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  alternates: { canonical: `${siteUrl}/` },
+  alternates: { canonical: `${SITE_URL}/` },
 };
 
 const schema = {
@@ -21,42 +20,42 @@ const schema = {
   "@graph": [
     {
       "@type": "WebSite",
-      "@id": `${siteUrl}/#website`,
-      url: `${siteUrl}/`,
+      "@id": `${SITE_URL}/#website`,
+      url: `${SITE_URL}/`,
       name: "Yaply",
       alternateName: ["Yaply Games", "Yaply browser games"],
       description:
         "Free multiplayer browser games for game night, played with one link or room code.",
       inLanguage: "en",
-      publisher: { "@id": `${siteUrl}/#organization` },
+      publisher: { "@id": `${SITE_URL}/#organization` },
     },
     {
       "@type": "Organization",
-      "@id": `${siteUrl}/#organization`,
+      "@id": `${SITE_URL}/#organization`,
       name: "Yaply",
-      url: siteUrl,
+      url: SITE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${siteUrl}/icon.svg`,
-        width: 64,
-        height: 64,
+        url: `${SITE_URL}/icon-512.png`,
+        width: 512,
+        height: 512,
       },
     },
     {
       "@type": "ItemList",
-      "@id": `${siteUrl}/#games`,
+      "@id": `${SITE_URL}/#games`,
       name: "Yaply browser games",
       itemListElement: games.map((game, index) => ({
         "@type": "ListItem",
         position: index + 1,
         name: game.name,
-        url: game.url ?? `${siteUrl}/games/${game.slug}`,
+        url: game.url ?? `${SITE_URL}/games/${game.slug}`,
         description: game.description,
       })),
     },
     {
       "@type": "FAQPage",
-      "@id": `${siteUrl}/#faq`,
+      "@id": `${SITE_URL}/#faq`,
       mainEntity: faqs.map((faq) => ({
         "@type": "Question",
         name: faq.question,
@@ -84,7 +83,7 @@ export default function HomePage() {
         <Hero />
         <Features />
         <Showcase />
-        <Stages />
+        <Stages siteHost={SITE_HOST} />
         <Faq />
         <ClosingCta />
       </main>

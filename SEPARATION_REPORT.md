@@ -34,7 +34,7 @@ separation.
   storage, and numeric query-param clamping.
 - Added `apps/chain` as an independent app using the same shared realtime client.
 - Updated the main site to resolve game URLs from `NEXT_PUBLIC_CHAIN_URL` and
-  `NEXT_PUBLIC_SKRIBBL_URL`, with Vercel defaults in
+  `NEXT_PUBLIC_SKRIBBL_URL`, with no deployment domains hardcoded in
   `apps/web/lib/game-urls.ts`.
 - Kept `@yaply/shared` as the single source of protocol truth so the two game
   apps cannot drift apart.

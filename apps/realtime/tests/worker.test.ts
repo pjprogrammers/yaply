@@ -106,7 +106,7 @@ describe("Worker routing", () => {
   it("rejects an origin that is not allowlisted in production", async () => {
     const { env } = makeEnv({
       ENVIRONMENT: "production",
-      ALLOWED_ORIGINS: "https://yaply-web.vercel.app",
+      ALLOWED_ORIGINS: "https://main.example.com",
     });
     const response = await worker.fetch(
       request("/room/abc123?game=skribbl", {
@@ -192,7 +192,7 @@ describe("Worker routing", () => {
   it("rejects room creation from an unknown origin in production", async () => {
     const { env } = makeEnv({
       ENVIRONMENT: "production",
-      ALLOWED_ORIGINS: "https://yaply-web.vercel.app",
+      ALLOWED_ORIGINS: "https://main.example.com",
     });
     const response = await worker.fetch(
       request("/rooms", {
@@ -212,7 +212,7 @@ describe("Worker routing", () => {
   it("rejects a missing Origin in production (fail closed)", async () => {
     const { env } = makeEnv({
       ENVIRONMENT: "production",
-      ALLOWED_ORIGINS: "https://yaply-web.vercel.app",
+      ALLOWED_ORIGINS: "https://main.example.com",
     });
     const create = await worker.fetch(
       request("/rooms", {

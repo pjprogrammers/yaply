@@ -1,23 +1,28 @@
 import { normalizeHttpUrl } from "@yaply/shared/config";
 
-// Game deployments. These are read at build time from Vercel's project
-// environment. NEXT_PUBLIC_* values are inlined into the client bundle, so a
-// changed value only takes effect after a new deployment.
-const DEFAULT_CHAIN_URL = "https://yaply-chain.vercel.app";
-const DEFAULT_SKRIBBL_URL = "https://yaply-skribbl.vercel.app";
+function requireHttpUrl(value: string | undefined, name: string): string {
+  const url = normalizeHttpUrl(value, "");
+  if (!url) {
+    throw new Error(`${name} must be set to an absolute http(s) URL.`);
+  }
+  return url;
+}
 
-export const CHAIN_REACTION_URL = normalizeHttpUrl(
+// Game deployments. These are read at build time from the project environment.
+// NEXT_PUBLIC_* values are inlined into the client bundle, so a changed value
+// only takes effect after a new deployment.
+export const CHAIN_REACTION_URL = requireHttpUrl(
   process.env.NEXT_PUBLIC_CHAIN_URL,
-  DEFAULT_CHAIN_URL,
+  "NEXT_PUBLIC_CHAIN_URL",
 );
 
-export const SKRIBBL_URL = normalizeHttpUrl(
+export const SKRIBBL_URL = requireHttpUrl(
   process.env.NEXT_PUBLIC_SKRIBBL_URL,
-  DEFAULT_SKRIBBL_URL,
+  "NEXT_PUBLIC_SKRIBBL_URL",
 );
 
-/** True when the deployment supplied an explicit value for each game URL. */
+/** Where each game URL came from. */
 export const GAME_URL_SOURCES = {
-  chain: process.env.NEXT_PUBLIC_CHAIN_URL ? "env" : "default",
-  skribbl: process.env.NEXT_PUBLIC_SKRIBBL_URL ? "env" : "default",
+  chain: process.env.NEXT_PUBLIC_CHAIN_URL ? "env" : "missing",
+  skribbl: process.env.NEXT_PUBLIC_SKRIBBL_URL ? "env" : "missing",
 } as const;

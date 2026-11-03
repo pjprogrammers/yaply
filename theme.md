@@ -135,9 +135,9 @@ You are the lead product designer, senior frontend engineer, and UI architect fo
 
 Your task is to audit the existing repository and implement a cohesive, production-quality **Premium Dark + Playful Games** design across these three applications:
 
-1. **Yaply Home:** `yaply.eu.org`
-2. **Chain Reaction:** `chain.yaply.eu.org`
-3. **Skribbl:** `skribbl.yaply.eu.org`
+1. **Yaply Home:** `yaply.is-cool.dev`
+2. **Chain Reaction:** `chain.yaply.is-cool.dev`
+3. **Skribbl:** `skribbl.yaply.is-cool.dev`
 
 This is not a request to create three unrelated websites, a static Figma-style mockup, or a generic gaming dashboard.
 
@@ -458,7 +458,7 @@ Do not make the games look like copies of the homepage.
 
 Application: `apps/web`
 
-Domain: `yaply.eu.org`
+Domain: `yaply.is-cool.dev`
 
 The homepage is the central entry point for the platform.
 
@@ -721,7 +721,7 @@ Do not simply shrink the desktop layout until it fits a phone.
 
 Application: `apps/chain`
 
-Domain: `chain.yaply.eu.org`
+Domain: `chain.yaply.is-cool.dev`
 
 Chain Reaction should feel more focused, competitive, and geometric than the main homepage.
 
@@ -842,7 +842,7 @@ Do not implement fake multiplayer with hardcoded players.
 
 Application: `apps/skribbl`
 
-Domain: `skribbl.yaply.eu.org`
+Domain: `skribbl.yaply.is-cool.dev`
 
 Skribbl should be the most colorful and expressive part of the platform.
 
@@ -1284,7 +1284,7 @@ Test real application behavior, not only screenshots.
 
 Check the complete user journey:
 
-1. Open `yaply.eu.org`.
+1. Open `yaply.is-cool.dev`.
 2. Select Chain Reaction.
 3. Open the Chain Reaction application.
 4. Create or join a room.

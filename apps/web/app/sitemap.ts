@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site";
 
-const baseUrl = "https://yaply.eu.org";
+const baseUrl = SITE_URL;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const gamePages = ["chain-reaction", "smash-karts", "ludo", "whos-the-spy"];

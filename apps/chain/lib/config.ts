@@ -6,7 +6,7 @@ import {
 
 export const MAIN_URL = normalizeHttpUrl(
   process.env.NEXT_PUBLIC_MAIN_URL,
-  "https://yaply-web.vercel.app",
+  "http://localhost:3000",
 );
 
 export const REALTIME_URL = resolveRealtimeBaseUrl(

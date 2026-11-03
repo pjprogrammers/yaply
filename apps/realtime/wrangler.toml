@@ -27,7 +27,7 @@ ENVIRONMENT = "production"
 # Every deployed frontend origin must be listed here (main site, Skribbl, Chain
 # Reaction), including custom domains. Requests without an allowed Origin are
 # rejected in production, so a missing domain is a hard outage for that site.
-ALLOWED_ORIGINS = "https://yaply.eu.org,https://skribbl.yaply.eu.org,https://chain.yaply.eu.org,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+ALLOWED_ORIGINS = "https://yaply.is-cool.dev,https://skribbl.yaply.is-cool.dev,https://chain.yaply.is-cool.dev,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
 
 [env.production.durable_objects]
 bindings = [

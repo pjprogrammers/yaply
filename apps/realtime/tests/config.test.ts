@@ -82,7 +82,7 @@ describe("resolveRealtimeBaseUrl", () => {
     expect(resolveRealtimeBaseUrl("", { hostname: "127.0.0.1" })).toBe(
       "ws://127.0.0.1:8787/room",
     );
-    expect(resolveRealtimeBaseUrl("", { hostname: "yaply-skribbl.vercel.app" })).toBe("");
+    expect(resolveRealtimeBaseUrl("", { hostname: "game.example.com" })).toBe("");
     expect(resolveRealtimeBaseUrl(undefined)).toBe("");
   });
 });
@@ -239,9 +239,9 @@ describe("Worker production configuration", () => {
     // makes the Worker fail closed for that deployed site.
     expect(allowedOrigins).toEqual(
       expect.arrayContaining([
-        "https://yaply.eu.org",
-        "https://skribbl.yaply.eu.org",
-        "https://chain.yaply.eu.org",
+        "https://yaply.is-cool.dev",
+        "https://skribbl.yaply.is-cool.dev",
+        "https://chain.yaply.is-cool.dev",
       ]),
     );
   });

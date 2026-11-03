@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { GameEntry } from "@/data/games";
-
-const siteUrl = "https://yaply.eu.org";
+import { SITE_URL } from "@/lib/site";
 
 export function gameMetadata(game: GameEntry): Metadata {
   const title =
@@ -21,7 +20,7 @@ export function gameMetadata(game: GameEntry): Metadata {
     openGraph: {
       type: "website",
       locale: "en_US",
-      url: `${siteUrl}/games/${game.slug}`,
+      url: `${SITE_URL}/games/${game.slug}`,
       siteName: "Yaply",
       title: `${title} | Yaply`,
       description,

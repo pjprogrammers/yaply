@@ -11,9 +11,9 @@
 
 Final production domains, once DNS is approved:
 
-- Main site: https://yaply.eu.org
-- Skribbl: https://skribbl.yaply.eu.org
-- Chain Reaction: https://chain.yaply.eu.org
+- Main site: https://yaply.is-cool.dev
+- Skribbl: https://skribbl.yaply.is-cool.dev
+- Chain Reaction: https://chain.yaply.is-cool.dev
 
 Everything below fits the free tiers: Vercel Hobby, Cloudflare Workers Free, and
 SQLite-backed Durable Objects. No paid database, Redis, VPS, or broker is needed.
@@ -113,16 +113,20 @@ socket upgrades per client per minute) or leave a minute between runs.
 ### `apps/web` (Vercel project settings in production)
 
 ```env
+NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
 NEXT_PUBLIC_CHAIN_URL=https://yaply-chain.vercel.app
 NEXT_PUBLIC_SKRIBBL_URL=https://yaply-skribbl.vercel.app
 ```
 
-These are also the defaults in `apps/web/lib/game-urls.ts`, so the main site
-works without an env file. When the custom domains are live, set:
+`NEXT_PUBLIC_MAIN_URL` is the canonical origin used by the page metadata,
+sitemap and `robots.txt`. No production domain is hardcoded in the app; the
+variables above are required at build time. When the custom domains are live,
+set:
 
 ```env
-NEXT_PUBLIC_CHAIN_URL=https://chain.yaply.eu.org
-NEXT_PUBLIC_SKRIBBL_URL=https://skribbl.yaply.eu.org
+NEXT_PUBLIC_MAIN_URL=https://yaply.is-cool.dev
+NEXT_PUBLIC_CHAIN_URL=https://chain.yaply.is-cool.dev
+NEXT_PUBLIC_SKRIBBL_URL=https://skribbl.yaply.is-cool.dev
 ```
 
 ### `apps/skribbl` and `apps/chain` (Vercel project settings in production)
@@ -134,7 +138,7 @@ NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
 
 For local development the realtime URL can be omitted (it falls back to
 `ws://localhost:8787/room`). When the custom domain is live, use
-`NEXT_PUBLIC_MAIN_URL=https://yaply.eu.org`.
+`NEXT_PUBLIC_MAIN_URL=https://yaply.is-cool.dev`.
 
 The browser converts `https://` to `wss://` and appends `/room` if needed, so
 both `wss://host/room` and `https://host` are accepted. Prefer the explicit
@@ -151,7 +155,7 @@ Set each variable in the correct Vercel project:
 | `NEXT_PUBLIC_CHAIN_URL` | `yaply-web` only |
 | `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` only |
 | `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain` **and** `yaply-skribbl` |
-| `NEXT_PUBLIC_MAIN_URL` | `yaply-chain` **and** `yaply-skribbl` |
+| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain` **and** `yaply-skribbl` |
 
 Adding `NEXT_PUBLIC_REALTIME_URL` to the `yaply-web` project does nothing for
 the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` to the Skribbl project does nothing
@@ -167,21 +171,20 @@ curl https://yaply-chain.vercel.app/api/config
 curl https://yaply-skribbl.vercel.app/api/config
 ```
 
-`/api/config` returns the effective URLs, whether each came from an env var or
-the fallback default, and `vercelEnv`. If it shows `"source": "default"` when
-you expected an env value, the variable is missing in that Vercel project or was
-not present for the environment (Production/Preview) used by that deployment.
-If it shows the new value but the page still uses the old one, redeploy the
-project.
+`/api/config` returns the effective main-site and game URLs, the source of each
+value, and `vercelEnv`. If a value is missing or falls back when you expected
+an env value, the variable is missing in that Vercel project or was not present
+for the environment (Production/Preview) used by that deployment. If it shows
+the new value but the page still uses the old one, redeploy the project.
 
-### If the game link still goes to `skribbl.yaply.eu.org`
+### If the game link still goes to `skribbl.yaply.is-cool.dev`
 
 1. Check `https://<main-site>/api/config`. If `skribblUrl` is
-   `https://skribbl.yaply.eu.org`, that is the value of
+   `https://skribbl.yaply.is-cool.dev`, that is the value of
    `NEXT_PUBLIC_SKRIBBL_URL` in the `yaply-web` project. Change it there, then
    redeploy `yaply-web`.
 2. If `skribblUrl` already points somewhere else but the browser still lands on
-   `skribbl.yaply.eu.org`, the redirect is coming from Vercel's domain settings
+   `skribbl.yaply.is-cool.dev`, the redirect is coming from Vercel's domain settings
    on the Skribbl project (for example, `yaply-skribbl.vercel.app` redirecting to
    the custom domain). Either point `NEXT_PUBLIC_SKRIBBL_URL` at the final custom
    domain or change the primary/redirect domain in the Skribbl Vercel project.
@@ -203,7 +206,7 @@ Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaply.eu.org,https://skribbl.yaply.eu.org,https://chain.yaply.eu.org,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+ALLOWED_ORIGINS = "https://yaply.is-cool.dev,https://skribbl.yaply.is-cool.dev,https://chain.yaply.is-cool.dev,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
 ```
 
 Rules:
@@ -212,7 +215,7 @@ Rules:
 - In production the check is **fail-closed**: requests without an `Origin`
   header, or with an origin not on the list, are rejected. Add every deployed
   frontend origin, including custom domains, before deploying. The values above
-  cover both the canonical `yaply.eu.org` domains and the Vercel project
+  cover both the canonical `yaply.is-cool.dev` domains and the Vercel project
   domains; remove any that you do not actually deploy.
 - `APP_ORIGIN` is still read for backward compatibility, but new deployments
   should use `ALLOWED_ORIGINS` only.
@@ -246,7 +249,7 @@ curl https://yaply-realtime-production.yaplygames.workers.dev/version
 ```
 
 `/version` reports `protocolVersion: 1` and `environment: "production"`.
-Optionally attach a custom domain (for example `realtime.yaply.eu.org`) in the
+Optionally attach a custom domain (for example `realtime.yaply.is-cool.dev`) in the
 Cloudflare dashboard, then update `NEXT_PUBLIC_REALTIME_URL` in both game apps.
 
 ## Deploy the three Vercel projects
@@ -260,7 +263,7 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/web`
-- Environment: `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`
+- Environment: `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`
 
 **Project 2 — `yaply-skribbl`**
 
@@ -286,9 +289,9 @@ build command to `npm run build --workspace=@yaply/<app>`.
 
 ## DNS and HTTPS
 
-- Point `yaply.eu.org` at the main Vercel project.
-- Point `skribbl.yaply.eu.org` at the Skribbl project.
-- Point `chain.yaply.eu.org` at the Chain Reaction project.
+- Point `yaply.is-cool.dev` at the main Vercel project.
+- Point `skribbl.yaply.is-cool.dev` at the Skribbl project.
+- Point `chain.yaply.is-cool.dev` at the Chain Reaction project.
 - Point the realtime hostname at the Worker (workers.dev or a custom route).
 
 All production traffic must use HTTPS/WSS. Update `ALLOWED_ORIGINS` and the
