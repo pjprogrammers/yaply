@@ -134,6 +134,7 @@ function buildDemo() {
 }
 
 const DEMO = buildDemo();
+const MAX_POPS = DEMO.frames.length - 1;
 
 function totalsFor(cells: DemoCell[]): number[] {
   return PLAYERS.map((player) =>
@@ -195,77 +196,111 @@ export function ChainHeroBoard() {
 
   return (
     <div className="cr-demo-wrap">
-      <div className="cr-demo">
-        <div className="cr-demo-head">
-          <span className="cr-demo-room">
-            <i className="cr-demo-live" aria-hidden />
-            Demo table · FUSE42
-          </span>
-          <span className="cr-demo-meta">
-            {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : "6 × 9"} · turn 12
-          </span>
-        </div>
+      <div className="cr-demo-aura" aria-hidden />
 
-        <div className="cr-demo-board-shell">
-          <div className="cr-demo-board" key={boardKey} aria-hidden>
-            {cells.map((cell, cellIndex) => {
-              const row = Math.floor(cellIndex / COLS);
-              const col = cellIndex % COLS;
-              const cellKey = keyOf(row, col);
-              const isPopped = popped?.[0] === row && popped?.[1] === col;
-              const isChanged = Boolean(frame?.changed.includes(cellKey));
-              const isArmed = step < 0 && row === TRIGGER.row && col === TRIGGER.col;
-              return (
-                <span
-                  className={[
-                    "cr-demo-cell",
-                    isArmed ? "is-armed" : "",
-                    isPopped ? "is-popped" : "",
-                    isChanged && !isPopped ? "is-changed" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  key={cellKey}
-                >
-                  {cell.owner !== null && cell.count > 0 && (
-                    <span className="cr-demo-orbs">
-                      {Array.from({ length: Math.min(cell.count, 6) }).map((_, orb) => (
-                        <i
-                          key={orb}
-                          style={{ background: PLAYER_COLORS[cell.owner as number] }}
-                        />
-                      ))}
+      <div className="cr-demo-hud cr-demo-hud--timer" aria-hidden>
+        <span className="cr-demo-hud-label">Turn</span>
+        <strong className="cr-demo-hud-value">0:31</strong>
+        <span className="cr-demo-hud-track">
+          <i />
+        </span>
+      </div>
+
+      <div className="cr-demo-cube" aria-hidden>
+        <span className="cr-demo-cube-face cr-demo-cube-face--front">4</span>
+        <span className="cr-demo-cube-face cr-demo-cube-face--right" />
+        <span className="cr-demo-cube-face cr-demo-cube-face--top">Mass</span>
+      </div>
+
+      <div className="cr-demo-float">
+        <div className="cr-demo-rig">
+          <div className="cr-demo">
+            <div className="cr-demo-head">
+              <span className="cr-demo-room">
+                <i className="cr-demo-live" aria-hidden />
+                Demo table · FUSE42
+              </span>
+              <span className="cr-demo-meta">
+                {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : "6 × 9"} · turn 12
+              </span>
+            </div>
+
+            <div className="cr-demo-board-shell">
+              <div className="cr-demo-board" key={boardKey} aria-hidden>
+                {cells.map((cell, cellIndex) => {
+                  const row = Math.floor(cellIndex / COLS);
+                  const col = cellIndex % COLS;
+                  const cellKey = keyOf(row, col);
+                  const isPopped = popped?.[0] === row && popped?.[1] === col;
+                  const isChanged = Boolean(frame?.changed.includes(cellKey));
+                  const isArmed = step < 0 && row === TRIGGER.row && col === TRIGGER.col;
+                  return (
+                    <span
+                      className={[
+                        "cr-demo-cell",
+                        isArmed ? "is-armed" : "",
+                        isPopped ? "is-popped" : "",
+                        isChanged && !isPopped ? "is-changed" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      key={cellKey}
+                    >
+                      {cell.owner !== null && cell.count > 0 && (
+                        <span className="cr-demo-orbs">
+                          {Array.from({ length: Math.min(cell.count, 6) }).map((_, orb) => (
+                            <i
+                              key={orb}
+                              style={{ background: PLAYER_COLORS[cell.owner as number] }}
+                            />
+                          ))}
+                        </span>
+                      )}
                     </span>
-                  )}
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="cr-demo-meter" aria-hidden>
+              <span>Chain</span>
+              <div>
+                {Array.from({ length: MAX_POPS }).map((_, index) => (
+                  <i className={index < pops ? "is-on" : ""} key={index} />
+                ))}
+              </div>
+              <b>
+                {pops}/{MAX_POPS}
+              </b>
+            </div>
+
+            <div className="cr-demo-players">
+              {NAMES.map((name, player) => (
+                <span className="cr-demo-chip" key={name}>
+                  <i style={{ background: PLAYER_COLORS[player] }} aria-hidden />
+                  {name}
+                  <b className={pops > 0 ? "is-live" : ""} key={totals[player]}>
+                    {totals[player]}
+                  </b>
                 </span>
-              );
-            })}
+              ))}
+            </div>
+
+            <div className="cr-demo-foot">
+              <p className="cr-demo-caption" aria-live="polite">
+                {caption}
+              </p>
+              <button
+                className="cr-demo-run"
+                type="button"
+                onClick={run}
+                disabled={playing}
+              >
+                <PlayIcon size={12} />
+                {playing ? "Chaining…" : finished ? "Run it again" : "Run the chain"}
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="cr-demo-players">
-          {NAMES.map((name, player) => (
-            <span className="cr-demo-chip" key={name}>
-              <i style={{ background: PLAYER_COLORS[player] }} aria-hidden />
-              {name}
-              <b>{totals[player]}</b>
-            </span>
-          ))}
-        </div>
-
-        <div className="cr-demo-foot">
-          <p className="cr-demo-caption" aria-live="polite">
-            {caption}
-          </p>
-          <button
-            className="cr-demo-run"
-            type="button"
-            onClick={run}
-            disabled={playing}
-          >
-            <PlayIcon size={12} />
-            {playing ? "Chaining…" : finished ? "Run it again" : "Run the chain"}
-          </button>
         </div>
       </div>
     </div>

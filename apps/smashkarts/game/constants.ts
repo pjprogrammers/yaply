@@ -137,6 +137,6 @@ export const MAX_BOTS = 7;
 export const ARENA_RULES = [
   "Your pulse cannon never runs dry — hold fire and keep the pressure on.",
   "Grab glowing crates for heavier hardware. Ammo runs out, the pulse does not.",
-  "Hold drift through a turn to charge a mini-turbo, then let go.",
+  "Hard turns charge a mini-turbo automatically. Straighten out to spend it.",
   "Shields eat everything. Caltrops do not care about your shield's feelings.",
 ] as const;

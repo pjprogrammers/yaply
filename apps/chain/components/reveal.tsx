@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 type RevealTag = "div" | "section" | "li" | "article";
 
@@ -9,11 +15,17 @@ export function Reveal({
   className = "",
   delay = 0,
   as = "div",
+  stagger = false,
+  tilt = false,
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
   as?: RevealTag;
+  /** Stagger the direct children instead of moving the whole block. */
+  stagger?: boolean;
+  /** Let the pointer tip the block in 3D. */
+  tilt?: boolean;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false);
@@ -53,7 +65,14 @@ export function Reveal({
     <Tag
       ref={ref as never}
       className={`cr-reveal ${visible ? "is-visible" : ""} ${className}`.trim()}
-      style={{ animationDelay: `${delay}ms` }}
+      data-stagger={stagger ? "" : undefined}
+      data-tilt={tilt ? "" : undefined}
+      style={
+        {
+          animationDelay: `${delay}ms`,
+          "--reveal-delay": `${delay}ms`,
+        } as CSSProperties
+      }
     >
       {children}
     </Tag>

@@ -53,7 +53,8 @@ export default function Home() {
             <ul className="hero-specs">
               <li>Runs in the browser</li>
               <li>1–7 bots</li>
-              <li>Keyboard and mouse</li>
+              <li>WASD, arrows &amp; Space</li>
+              <li>Touch controls built in</li>
               <li>No signup</li>
             </ul>
           </div>
@@ -188,13 +189,14 @@ export default function Home() {
         <div className="margins">
           <Reveal className="section-head">
             <h2 id="controls-title" className="display section-title">
-              Four keys.
+              Five keys.
               <br />
               Zero excuses.
             </h2>
             <p className="section-lede">
               Arcade handling, no gearbox, no tyre temperatures. Point the kart,
-              hold the drift, and keep the pulse cannon hot.
+              hold a hard turn to charge the turbo, and keep the pulse cannon
+              hot. On a phone, the stick and fire button appear automatically.
             </p>
           </Reveal>
 
@@ -207,12 +209,12 @@ export default function Home() {
                 <div className="key">A</div>
                 <div className="key">S</div>
                 <div className="key">D</div>
-                <div className="key key-wide">Shift — drift</div>
+                <div className="key key-wide">Space — fire</div>
               </div>
               <p className="key-note">
-                Drive with WASD or the arrow keys. Hold Shift through a turn to
-                charge, then release for a mini-turbo. Left click or F fires.
-                Esc pauses.
+                Drive with WASD or the arrow keys. Hard turns charge a mini-turbo
+                automatically, then straighten out to spend it. Space fires. On
+                touch screens, use the joystick and the round fire button.
               </p>
             </Reveal>
 

@@ -7,6 +7,7 @@ import { MAPS } from "@/game/maps";
 import type { GameStore } from "@/game/store";
 import type { WeaponId } from "@/game/types";
 import { Minimap } from "./minimap";
+import { TouchControls } from "./touch-controls";
 import { WeaponGlyph } from "./weapon-glyph";
 
 interface HudProps {
@@ -109,8 +110,8 @@ export function Hud({
         />
       ) : null}
 
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2 sm:p-3">
-        <div className="hud-panel w-[248px] p-2.5 sm:w-[300px]">
+      <div className="hud-top absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2 sm:p-3">
+        <div className="hud-panel hud-player-panel w-[248px] p-2.5 sm:w-[300px]">
           <div className="flex items-center gap-2">
             <span
               className="h-3.5 w-3.5 shrink-0"
@@ -223,7 +224,7 @@ export function Hud({
             )}
           </div>
 
-          <div className="hud-panel hidden w-[190px] p-2 md:block">
+          <div className="hud-panel hud-standings hidden w-[190px] p-2 md:block">
             <div className="hud-label mb-1">
               Standings{standings.length > standingsShown.length ? ` · top ${standingsShown.length}` : ""}
             </div>
@@ -271,7 +272,7 @@ export function Hud({
         </div>
       </div>
 
-      <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
+      <div className="hud-drive absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
         <div className="hud-panel w-[178px] px-3 py-2 sm:w-[212px]">
           <div className="flex items-end gap-1">
             <span className="display text-4xl tabular-nums sm:text-5xl">{speed}</span>
@@ -295,25 +296,31 @@ export function Hud({
             {player.drifting
               ? "Charging mini-turbo"
               : player.driftCharge > 0
-                ? "Release for a boost"
-                : "Hold Shift through a turn"}
+                ? "Straighten out for a boost"
+                : "Hard turns charge a mini-turbo"}
           </div>
         </div>
       </div>
 
-      <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3">
+      <div className="hud-minimap absolute">
         <div className="hud-panel h-[116px] w-[116px] p-1 sm:h-[172px] sm:w-[172px]">
           <Minimap snapshot={snapshot} />
         </div>
         <div className="hud-label mt-1 text-right">{map.name}</div>
       </div>
 
-      <div className="absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
-        <KeyHint k="WASD" label="drive" />
-        <KeyHint k="Shift" label="drift" />
-        <KeyHint k="LMB" label="fire" />
-        {!online ? <KeyHint k="Esc" label="pause" /> : null}
+      <div className="hud-keyhints absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
+        <KeyHint k="WASD / Arrows" label="drive" />
+        <KeyHint k="Space" label="fire" />
       </div>
+
+      {snapshot.phase === "playing" ? (
+        <TouchControls
+          engineRef={engineRef}
+          weapon={player.weapon}
+          ammo={player.ammo}
+        />
+      ) : null}
 
       {!player.alive && snapshot.phase === "playing" ? (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -371,19 +378,19 @@ export function Hud({
             <dl className="mt-5 grid grid-cols-2 gap-2 text-sm text-ash">
               <div>
                 <dt className="hud-label">Drive</dt>
-                <dd>WASD or arrows</dd>
+                <dd>WASD, arrows, or the stick</dd>
               </div>
               <div>
                 <dt className="hud-label">Fire</dt>
-                <dd>Left click or F</dd>
+                <dd>Space or the fire button</dd>
               </div>
               <div>
-                <dt className="hud-label">Drift</dt>
-                <dd>Hold Shift</dd>
+                <dt className="hud-label">Mini-turbo</dt>
+                <dd>Automatic on hard turns</dd>
               </div>
               <div>
                 <dt className="hud-label">Pause</dt>
-                <dd>Esc</dd>
+                <dd>Pause button</dd>
               </div>
             </dl>
           </div>

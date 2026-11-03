@@ -6,7 +6,9 @@ import {
 } from "@yaply/shared/constants";
 import { ArrowRightIcon, ChainMark, PlayIcon } from "@/components/icons";
 import { ChainHeroBoard } from "@/components/hero-board";
+import { HeroJellyfish } from "@/components/hero-jellyfish";
 import { MiniBoard } from "@/components/mini-board";
+import { MotionDirector } from "@/components/motion-director";
 import { Reveal } from "@/components/reveal";
 import { MAIN_URL } from "@/lib/config";
 
@@ -196,7 +198,37 @@ export default function Home() {
         </header>
 
         <main id="main">
-          <section className="cr-hero" aria-labelledby="hero-title">
+          <section className="cr-hero" aria-labelledby="hero-title" data-hero-parallax>
+            <HeroJellyfish />
+
+            <div className="cr-hero-scene" aria-hidden>
+              <div className="cr-hero-floor cr-hero-floor--back" />
+              <div className="cr-hero-floor cr-hero-floor--front" />
+              <div className="cr-hero-orbit cr-hero-orbit--a">
+                <i />
+                <i />
+                <i />
+              </div>
+              <div className="cr-hero-orbit cr-hero-orbit--b">
+                <i />
+                <i />
+              </div>
+              <span className="cr-hero-orb cr-hero-orb--a" />
+              <span className="cr-hero-orb cr-hero-orb--b" />
+              <span className="cr-hero-orb cr-hero-orb--c" />
+              <span className="cr-hero-orb cr-hero-orb--d" />
+              <span className="cr-hero-slab cr-hero-slab--a">
+                <i />
+              </span>
+              <span className="cr-hero-slab cr-hero-slab--b">
+                <i />
+                <i />
+              </span>
+              <span className="cr-hero-slab cr-hero-slab--c">
+                <i />
+              </span>
+            </div>
+
             <div className="cr-margins cr-hero-grid">
               <div className="cr-hero-copy">
                 <p className="cr-eyebrow">
@@ -204,9 +236,12 @@ export default function Home() {
                   Turn-based board game · 2–8 players
                 </p>
                 <h1 id="hero-title" className="cr-title">
-                  One orb.
-                  <br />
-                  Whole board.
+                  <span className="cr-title-line">
+                    <span>One orb.</span>
+                  </span>
+                  <span className="cr-title-line">
+                    <span>Whole board.</span>
+                  </span>
                 </h1>
                 <p className="cr-lede">
                   Chain Reaction is a game about pressure. Claim cells, stack orbs past their limit
@@ -251,7 +286,7 @@ export default function Home() {
 
           <section id="how-it-works" className="cr-section cr-section--paper">
             <div className="cr-margins cr-split">
-              <Reveal className="cr-section-copy">
+              <Reveal className="cr-section-copy" stagger>
                 <p className="cr-kicker">How it works</p>
                 <h2 className="cr-h2">
                   Four moves.
@@ -284,7 +319,7 @@ export default function Home() {
 
           <section id="rules" className="cr-section cr-section--ice">
             <div className="cr-margins cr-mass">
-              <Reveal className="cr-section-copy">
+              <Reveal className="cr-section-copy" stagger>
                 <p className="cr-kicker">Critical mass</p>
                 <h2 className="cr-h2">
                   Corners 2.
@@ -304,7 +339,7 @@ export default function Home() {
                 </ul>
               </Reveal>
 
-              <Reveal className="cr-mass-card" delay={80}>
+              <Reveal className="cr-mass-card" delay={80} tilt>
                 <div className="cr-mass-head">
                   <span>Breaking point</span>
                   <span className="cr-mass-pill">one more pops it</span>
@@ -338,7 +373,7 @@ export default function Home() {
 
           <section id="boards" className="cr-section cr-section--ink">
             <div className="cr-margins">
-              <Reveal className="cr-section-head">
+              <Reveal className="cr-section-head" stagger>
                 <div>
                   <p className="cr-kicker">The table</p>
                   <h2 className="cr-h2">
@@ -360,6 +395,7 @@ export default function Home() {
                     className={`cr-board-card ${board.featured ? "is-featured" : ""}`}
                     key={board.label}
                     delay={boardIndex * 60}
+                    tilt
                   >
                     <div className="cr-board-top">
                       <span className="cr-board-label">{board.name}</span>
@@ -390,7 +426,7 @@ export default function Home() {
 
           <section id="modes" className="cr-section cr-section--blue">
             <div className="cr-margins">
-              <Reveal className="cr-section-head">
+              <Reveal className="cr-section-head" stagger>
                 <div>
                   <p className="cr-kicker">Pick a table</p>
                   <h2 className="cr-h2">
@@ -407,7 +443,7 @@ export default function Home() {
 
               <div className="cr-modes">
                 {MODES.map((mode, modeIndex) => (
-                  <Reveal className="cr-mode" key={mode.title} delay={modeIndex * 70}>
+                  <Reveal className="cr-mode" key={mode.title} delay={modeIndex * 70} tilt>
                     <span className="cr-mode-no">{mode.number}</span>
                     <h3>{mode.title}</h3>
                     <p>{mode.body}</p>
@@ -433,7 +469,7 @@ export default function Home() {
 
           <section className="cr-section cr-section--paper">
             <div className="cr-margins">
-              <Reveal className="cr-section-head">
+              <Reveal className="cr-section-head" stagger>
                 <div>
                   <p className="cr-kicker">Host controls</p>
                   <h2 className="cr-h2">
@@ -449,7 +485,7 @@ export default function Home() {
               </Reveal>
 
               <div className="cr-host-grid">
-                <Reveal className="cr-room-card">
+                <Reveal className="cr-room-card" tilt>
                   <div className="cr-room-top">
                     <span>Room code</span>
                     <span className="cr-room-live">
@@ -514,7 +550,7 @@ export default function Home() {
 
           <section className="cr-section cr-section--coal">
             <div className="cr-margins cr-faq-grid">
-              <Reveal className="cr-section-copy">
+              <Reveal className="cr-section-copy" stagger>
                 <p className="cr-kicker">Before you ask</p>
                 <h2 className="cr-h2">
                   Before
@@ -526,7 +562,7 @@ export default function Home() {
                 </p>
               </Reveal>
 
-              <Reveal className="cr-faq" delay={70}>
+              <Reveal className="cr-faq" delay={70} stagger>
                 {FAQS.map((faq) => (
                   <details key={faq.question}>
                     <summary>{faq.question}</summary>
@@ -538,8 +574,20 @@ export default function Home() {
           </section>
 
           <section className="cr-cta" aria-labelledby="cta-title">
+            <div className="cr-cta-scene" aria-hidden>
+              <span className="cr-cta-tile cr-cta-tile--a">
+                <i />
+              </span>
+              <span className="cr-cta-tile cr-cta-tile--b">
+                <i />
+                <i />
+              </span>
+              <span className="cr-cta-tile cr-cta-tile--c">
+                <i />
+              </span>
+            </div>
             <div className="cr-margins">
-              <Reveal>
+              <Reveal stagger>
                 <p className="cr-kicker">Your move</p>
                 <h2 id="cta-title" className="cr-cta-title">
                   Start a room.
@@ -547,7 +595,7 @@ export default function Home() {
                   Bring the pressure.
                 </h2>
               </Reveal>
-              <Reveal className="cr-cta-row" delay={70}>
+              <Reveal className="cr-cta-row" delay={70} stagger>
                 <p>
                   Two to eight players. Four boards. One rule: the board always answers back.
                 </p>
@@ -565,6 +613,8 @@ export default function Home() {
             </div>
           </section>
         </main>
+
+        <MotionDirector />
 
         <footer className="cr-footer">
           <div className="cr-margins">

@@ -27,7 +27,7 @@ ENVIRONMENT = "production"
 # Every deployed frontend origin allowed to call the Worker. Update this list
 # when a domain changes. Requests without an allowed Origin are rejected in
 # production, so a missing domain is a hard outage for that site.
-ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
 
 [env.production.durable_objects]
 bindings = [

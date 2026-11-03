@@ -195,8 +195,10 @@ export class GameEngine {
   private readonly resizeObserver: ResizeObserver;
 
   private readonly keys = new Set<string>();
-  private pointerFire = false;
   private keyFire = false;
+  private touchSteer = 0;
+  private touchThrottle = 0;
+  private touchFire = false;
 
   private readonly role: EngineMode;
   private readonly localPlayerId: string;
@@ -299,9 +301,7 @@ export class GameEngine {
       return;
     }
     this.mode = "paused";
-    this.keys.clear();
-    this.pointerFire = false;
-    this.keyFire = false;
+    this.clearInput();
     this.audio.setEngine(0, false, false, false);
     this.store.set({ phase: "paused" });
     this.publish();
@@ -345,6 +345,38 @@ export class GameEngine {
     this.setMuted(!this.muted);
   }
 
+  /**
+   * Screen-space movement from the on-screen joystick. `steer` is +1 for right
+   * and `throttle` is +1 for forward, both in the -1..1 range.
+   */
+  setTouchMovement(steer: number, throttle: number) {
+    this.touchSteer = clamp(steer, -1, 1);
+    this.touchThrottle = clamp(throttle, -1, 1);
+    this.audio.unlock();
+  }
+
+  /** Held state of the on-screen fire button. */
+  setTouchFire(firing: boolean) {
+    this.touchFire = firing;
+    if (firing) {
+      this.audio.unlock();
+    }
+  }
+
+  /** Releases the on-screen controls, e.g. when the HUD unmounts. */
+  clearTouchInput() {
+    this.touchSteer = 0;
+    this.touchThrottle = 0;
+    this.touchFire = false;
+  }
+
+  /** Drops every held control. Used on pause, blur, tab hide and match end. */
+  private clearInput() {
+    this.keys.clear();
+    this.keyFire = false;
+    this.clearTouchInput();
+  }
+
   dispose() {
     if (this.disposed) {
       return;
@@ -375,9 +407,7 @@ export class GameEngine {
     }
     // Online play must keep running, but a hidden tab should never hold the
     // throttle open after the player stops looking at the game.
-    this.keys.clear();
-    this.pointerFire = false;
-    this.keyFire = false;
+    this.clearInput();
   };
 
   private resize() {
@@ -393,53 +423,59 @@ export class GameEngine {
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("blur", this.onBlur);
-    const canvas = this.renderer.domElement;
-    canvas.addEventListener("pointerdown", this.onPointerDown);
-    window.addEventListener("pointerup", this.onPointerUp);
-    canvas.addEventListener("contextmenu", this.preventContext);
+    // Touch and mouse fire live on the HUD controls, not the canvas, so taps
+    // used to look around or interact with the page never fire a weapon.
+    this.renderer.domElement.addEventListener("contextmenu", this.preventContext);
   }
 
   private removeInput() {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     window.removeEventListener("blur", this.onBlur);
-    const canvas = this.renderer.domElement;
-    canvas.removeEventListener("pointerdown", this.onPointerDown);
-    window.removeEventListener("pointerup", this.onPointerUp);
-    canvas.removeEventListener("contextmenu", this.preventContext);
+    this.renderer.domElement.removeEventListener("contextmenu", this.preventContext);
   }
 
   private preventContext = (event: Event) => {
     event.preventDefault();
   };
 
-  private onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0) {
-      return;
-    }
-    this.pointerFire = true;
-    this.audio.unlock();
-  };
-
-  private onPointerUp = () => {
-    this.pointerFire = false;
-  };
-
   private onBlur = () => {
-    this.keys.clear();
-    this.pointerFire = false;
-    this.keyFire = false;
+    this.clearInput();
   };
 
   private onKeyDown = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    // Never eat keystrokes meant for a text field layered over the canvas.
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
+    const code = event.code;
+    // Arrows and Space scroll the page by default. Prevent that before the
+    // repeat guard so holding a key down does not start scrolling.
+    if (
+      code === "ArrowUp" ||
+      code === "ArrowDown" ||
+      code === "ArrowLeft" ||
+      code === "ArrowRight" ||
+      code === "Space"
+    ) {
+      event.preventDefault();
+    }
     if (event.repeat) {
       return;
     }
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
-      event.preventDefault();
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
     }
-    this.keys.add(event.code);
-    if (event.code === "KeyF") {
+
+    this.keys.add(code);
+    if (code === "Space") {
       this.keyFire = true;
     }
     this.audio.unlock();
@@ -447,7 +483,7 @@ export class GameEngine {
 
   private onKeyUp = (event: KeyboardEvent) => {
     this.keys.delete(event.code);
-    if (event.code === "KeyF") {
+    if (event.code === "Space") {
       this.keyFire = false;
     }
   };
@@ -746,10 +782,23 @@ export class GameEngine {
     const down = this.keys.has("KeyS") || this.keys.has("ArrowDown");
     const left = this.keys.has("KeyA") || this.keys.has("ArrowLeft");
     const right = this.keys.has("KeyD") || this.keys.has("ArrowRight");
-    this.player.input.throttle = (up ? 1 : 0) - (down ? 1 : 0);
-    this.player.input.steer = (right ? 1 : 0) - (left ? 1 : 0);
-    this.player.input.drift = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
-    this.player.input.fire = this.pointerFire || this.keyFire;
+    const keyboardThrottle = (up ? 1 : 0) - (down ? 1 : 0);
+    const keyboardSteer = (right ? 1 : 0) - (left ? 1 : 0);
+
+    this.player.input.throttle = clamp(
+      keyboardThrottle + this.touchThrottle,
+      -1,
+      1,
+    );
+    // Joystick and keyboard are both screen-space: +1 means right. The kart
+    // simulation uses the opposite sign (positive steer turns left in world
+    // space), so invert exactly once here. Bots keep their world-space input.
+    this.player.input.steer = -clamp(keyboardSteer + this.touchSteer, -1, 1);
+    // Drift is automatic: a hard turn at speed charges the mini-turbo, so the
+    // whole game needs only movement and fire.
+    this.player.input.drift =
+      Math.abs(this.player.input.steer) > 0.55 && Math.abs(this.player.speed) > 7;
+    this.player.input.fire = this.keyFire || this.touchFire;
   }
 
   private sendGuestInput(now: number) {
@@ -929,9 +978,7 @@ export class GameEngine {
 
     if (snapshot.phase === "over" && this.mode !== "over") {
       this.mode = "over";
-      this.keys.clear();
-      this.pointerFire = false;
-      this.keyFire = false;
+      this.clearInput();
       this.audio.setEngine(0, false, false, false);
       this.winner = snapshot.winner ?? this.bestKartWinner();
       this.store.set({ phase: "over", winner: this.winner, timeLeft: 0 });
@@ -2045,9 +2092,7 @@ export class GameEngine {
     }
     this.mode = "over";
     this.audio.setEngine(0, false, false, false);
-    this.keys.clear();
-    this.pointerFire = false;
-    this.keyFire = false;
+    this.clearInput();
 
     let champion = winner;
     if (!champion) {
@@ -2348,7 +2393,9 @@ export class GameEngine {
         wheel.rotation.y = damp(wheel.rotation.y, kart.input.steer * 0.42, 12, dt);
       }
 
-      const targetRoll = -kart.input.steer * 0.085 * clamp(speedRatio, 0, 1);
+      // Positive steer is a left turn, so lean the body toward the outside of
+      // the corner (local -X) instead of into it.
+      const targetRoll = kart.input.steer * 0.085 * clamp(speedRatio, 0, 1);
       kart.bodyRoll = damp(kart.bodyRoll, targetRoll, 8, dt);
       visual.body.rotation.z = kart.bodyRoll;
       visual.body.rotation.x = damp(visual.body.rotation.x, -0.015 * speedRatio, 6, dt);
@@ -2457,7 +2504,8 @@ export class GameEngine {
     }
 
     this.camera.lookAt(this.cameraLook);
-    const targetFov = this.player.boostTime > 0 && this.player.alive ? 77 : 68;
+    const targetFov =
+      this.fovForAspect() + (this.player.boostTime > 0 && this.player.alive ? 9 : 0);
     if (Math.abs(this.camera.fov - targetFov) > 0.05) {
       this.camera.fov = damp(this.camera.fov, targetFov, 5, dt);
       this.camera.updateProjectionMatrix();
@@ -2467,6 +2515,14 @@ export class GameEngine {
       );
       this.smoke.setViewport(this.renderer.domElement.height, this.camera.fov);
     }
+  }
+
+  /** Portrait screens need a wider lens so the arena still reads clearly. */
+  private fovForAspect(): number {
+    const aspect = this.camera.aspect;
+    if (aspect < 0.75) return 82;
+    if (aspect < 1.15) return 74;
+    return 68;
   }
 
   private computeCameraTarget(): { position: THREE.Vector3; look: THREE.Vector3 } {

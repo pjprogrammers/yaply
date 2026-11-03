@@ -96,8 +96,14 @@ export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps
           className="lobby-grid"
           onSubmit={(event) => {
             event.preventDefault();
-            if (mode === "bots") submit();
-            else joinRoom();
+            if (mode === "bots") {
+              submit();
+            } else if (joinCode.trim()) {
+              // Enter only joins when a code has been typed. Otherwise it
+              // should not fire an empty-code error while the player is still
+              // editing their name or paint.
+              joinRoom();
+            }
           }}
         >
           <div className="lobby-panel">
@@ -315,7 +321,7 @@ export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps
                 {mode === "bots"
                   ? `${botCount} bots · first to ${killTarget} · ${duration / 60} minute${
                       duration === 60 ? "" : "s"
-                    } · keyboard and mouse. Press Esc to pause.`
+                    } · WASD / arrows drive · Space fires · touch controls included.`
                   : `Online room · first to ${killTarget} · ${duration / 60} minute${
                       duration === 60 ? "" : "s"
                     } · 40 seats · friends can join mid-match.`}
