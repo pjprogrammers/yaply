@@ -145,6 +145,24 @@ export function XIcon(props: IconProps) {
   );
 }
 
+export function ExpandIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 3H3v6M15 3h6v6M21 15v6h-6M3 15v6h6" />
+      <path d="M3 3l6 6M21 3l-6 6M21 21l-6-6M3 21l6-6" />
+    </svg>
+  );
+}
+
+export function CollapseIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 9H3V3M15 9h6V3M15 15h6v6M9 15H3v6" />
+      <path d="M9 9L3 3M15 9l6-6M15 15l6 6M9 15l-6 6" />
+    </svg>
+  );
+}
+
 export function ChainMark(props: IconProps) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" aria-hidden {...props}>

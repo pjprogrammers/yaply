@@ -49,14 +49,22 @@ export function alpha(color: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, opacity))})`;
 }
 
-/** A CSS sphere that reads as a lit orb in both 2D and 3D layouts. */
+/**
+ * Gummy, slightly translucent-looking ball. The reference uses a saturated
+ * core with a dark elastic rim, not a hard white specular dot.
+ */
 export function orbBackground(color: string): string {
   return [
-    `radial-gradient(circle at 32% 26%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.28) 14%, rgba(255,255,255,0) 36%)`,
-    `radial-gradient(circle at 34% 30%, ${lighten(color, 0.42)} 0%, ${color} 48%, ${darken(color, 0.55)} 100%)`,
+    `radial-gradient(circle at 37% 31%, ${alpha(lighten(color, 0.3), 0.34)} 0%, rgba(255,255,255,0) 42%)`,
+    `radial-gradient(circle at 36% 30%, ${lighten(color, 0.08)} 0%, ${color} 40%, ${color} 68%, ${darken(color, 0.26)} 88%, ${darken(color, 0.52)} 100%)`,
   ].join(", ");
 }
 
 export function orbShadow(color: string): string {
-  return `0 2px 4px rgba(0,0,0,0.45), inset 0 -1px 2px ${alpha(darken(color, 0.6), 0.55)}`;
+  return [
+    `0 clamp(1px, 0.35vw, 4px) clamp(3px, 0.8vw, 9px) rgba(0,0,0,0.42)`,
+    `0 0 0 1px ${alpha(darken(color, 0.5), 0.5)}`,
+    `inset -2px -3px 7px ${alpha(darken(color, 0.46), 0.42)}`,
+    `inset 2px 2px 6px ${alpha(lighten(color, 0.28), 0.16)}`,
+  ].join(", ");
 }

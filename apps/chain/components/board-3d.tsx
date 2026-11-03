@@ -2,32 +2,43 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ChainState, ChainTheme, Player } from "@yaply/shared/types";
-import { boardTheme, type BoardTheme } from "@/lib/board-theme";
+import { boardTheme } from "@/lib/board-theme";
 import { alpha, darken, lighten } from "@/lib/colors";
 import type { ChainCellSelection } from "./board";
 import { isPlayableCell } from "./board";
 
-type Vec3 = { x: number; y: number; z: number };
-
-type Camera = {
-  eye: Vec3;
-  forward: Vec3;
-  right: Vec3;
-  up: Vec3;
-  f: number;
-  aspect: number;
-  width: number;
-  height: number;
-  scale: number;
-  offsetX: number;
-  offsetY: number;
+type Board3DProps = {
+  chain: ChainState;
+  players: Player[];
+  meId: string | null;
+  canPlay: boolean;
+  /** Pointer/tap placement, funneled through the board's triple-tap guard. */
+  onPlace: (row: number, col: number) => void;
+  /** Keyboard placement — should resolve immediately. */
+  onPlaceNow: (row: number, col: number) => void;
+  flash: Set<string>;
+  selected: ChainCellSelection | null;
+  onCancel: () => void;
+  theme: ChainTheme;
 };
 
-type Projected = { x: number; y: number; depth: number };
+type Layout = {
+  width: number;
+  height: number;
+  originX: number;
+  originY: number;
+  cell: number;
+  gridW: number;
+  gridH: number;
+};
+
+type Ball = { dx: number; dy: number; r: number };
 
 type Particle = {
-  position: Vec3;
-  velocity: Vec3;
+  row: number;
+  col: number;
+  vx: number;
+  vy: number;
   color: string;
   start: number;
   life: number;
@@ -42,225 +53,167 @@ type Ring = {
   life: number;
 };
 
-type Board3DProps = {
-  chain: ChainState;
-  players: Player[];
-  meId: string | null;
-  canPlay: boolean;
-  onPlace: (row: number, col: number) => void;
-  flash: Set<string>;
-  selected: ChainCellSelection | null;
-  onCancel: () => void;
-  theme: ChainTheme;
-};
-
-const BOARD_THICKNESS = 0.62;
-const ANIMATION_MS = 900;
-const FOV = (40 * Math.PI) / 180;
-
-function sub(a: Vec3, b: Vec3): Vec3 {
-  return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
-}
-
-function add(a: Vec3, b: Vec3): Vec3 {
-  return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
-}
-
-function mul(a: Vec3, scalar: number): Vec3 {
-  return { x: a.x * scalar, y: a.y * scalar, z: a.z * scalar };
-}
-
-function dot(a: Vec3, b: Vec3): number {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return {
-    x: a.y * b.z - a.z * b.y,
-    y: a.z * b.x - a.x * b.z,
-    z: a.x * b.y - a.y * b.x,
-  };
-}
-
-function normalize(a: Vec3): Vec3 {
-  const length = Math.hypot(a.x, a.y, a.z) || 1;
-  return { x: a.x / length, y: a.y / length, z: a.z / length };
-}
-
-function makeCamera(rows: number, cols: number, width: number, height: number): Camera {
-  const eye: Vec3 = {
-    x: 0,
-    y: Math.max(7.4, rows * 0.98 + 3.4),
-    z: Math.max(9.5, rows * 1.12 + cols * 0.34 + 2.4),
-  };
-  const forward = normalize(sub({ x: 0, y: -0.1, z: 0 }, eye));
-  const right = normalize(cross(forward, { x: 0, y: 1, z: 0 }));
-  const up = normalize(cross(right, forward));
-  const f = 1 / Math.tan(FOV / 2);
-  const aspect = width / Math.max(1, height);
-
-  const camera: Camera = {
-    eye,
-    forward,
-    right,
-    up,
-    f,
-    aspect,
-    width,
-    height,
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0,
-  };
-
-  const halfW = cols / 2;
-  const halfD = rows / 2;
-  const corners: Vec3[] = [];
-  for (const x of [-halfW, halfW]) {
-    for (const z of [-halfD, halfD]) {
-      corners.push({ x, y: 0, z });
-      corners.push({ x, y: -BOARD_THICKNESS, z });
-    }
-  }
-  const projected = corners.map((corner) => projectRaw(camera, corner));
-  const xs = projected.map((point) => point.x);
-  const ys = projected.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const pad = Math.max(18, Math.min(width, height) * 0.075);
-  const scale = Math.max(
-    0.08,
-    Math.min(
-      (width - pad * 2) / Math.max(1, maxX - minX),
-      (height - pad * 2) / Math.max(1, maxY - minY),
-    ),
-  );
-  camera.scale = Math.min(scale, 4);
-  camera.offsetX = width / 2 - ((minX + maxX) / 2) * camera.scale;
-  camera.offsetY = height / 2 - ((minY + maxY) / 2) * camera.scale;
-  return camera;
-}
-
-function projectRaw(camera: Camera, point: Vec3): Projected {
-  const delta = sub(point, camera.eye);
-  const viewX = dot(delta, camera.right);
-  const viewY = dot(delta, camera.up);
-  const viewZ = Math.max(0.05, dot(delta, camera.forward));
-  const ndcX = ((camera.f / camera.aspect) * viewX) / viewZ;
-  const ndcY = (camera.f * viewY) / viewZ;
-  return {
-    x: (ndcX * 0.5 + 0.5) * camera.width,
-    y: (0.5 - ndcY * 0.5) * camera.height,
-    depth: viewZ,
-  };
-}
-
-function project(camera: Camera, point: Vec3): Projected {
-  const raw = projectRaw(camera, point);
-  return {
-    x: raw.x * camera.scale + camera.offsetX,
-    y: raw.y * camera.scale + camera.offsetY,
-    depth: raw.depth,
-  };
-}
-
-function worldRadius(camera: Camera, radius: number, depth: number): number {
-  return ((camera.f * radius) / Math.max(0.05, depth)) * (camera.height / 2) * camera.scale;
-}
-
-function cellWorld(chain: ChainState, row: number, col: number): Vec3 {
-  return {
-    x: col - (chain.cols - 1) / 2,
-    z: row - (chain.rows - 1) / 2,
-    y: 0,
-  };
-}
-
-function orbOffsets(count: number): { x: number; z: number }[] {
-  if (count <= 1) return [{ x: 0, z: 0 }];
-  if (count === 2) {
-    return [
-      { x: -0.18, z: 0 },
-      { x: 0.18, z: 0 },
-    ];
-  }
-  if (count === 3) {
-    return [
-      { x: 0, z: -0.17 },
-      { x: -0.16, z: 0.12 },
-      { x: 0.16, z: 0.12 },
-    ];
-  }
-  if (count === 4) {
-    return [
-      { x: -0.17, z: -0.17 },
-      { x: 0.17, z: -0.17 },
-      { x: -0.17, z: 0.17 },
-      { x: 0.17, z: 0.17 },
-    ];
-  }
-  const radius = count > 6 ? 0.28 : 0.23;
-  return Array.from({ length: count }, (_, index) => {
-    const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
-    return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius };
-  });
-}
-
-function orbRadiusFor(count: number): number {
-  if (count <= 1) return 0.2;
-  if (count === 2) return 0.155;
-  if (count === 3) return 0.14;
-  if (count === 4) return 0.12;
-  return count > 6 ? 0.08 : 0.095;
-}
+/** Long enough for a short cascade of delayed explosion rings. */
+const ANIMATION_MS = 1400;
+const MAX_ANIMATED_EXPLOSIONS = 24;
 
 function easeOut(value: number): number {
   const clamped = Math.max(0, Math.min(1, value));
   return 1 - Math.pow(1 - clamped, 3);
 }
 
-function quadPath(
-  ctx: CanvasRenderingContext2D,
-  points: Projected[],
-): void {
-  if (points.length === 0) return;
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let index = 1; index < points.length; index++) {
-    ctx.lineTo(points[index].x, points[index].y);
-  }
-  ctx.closePath();
-}
-
-function rayToCell(
-  camera: Camera,
-  chain: ChainState,
-  screenX: number,
-  screenY: number,
-): { row: number; col: number } | null {
-  const rawX = (screenX - camera.offsetX) / camera.scale;
-  const rawY = (screenY - camera.offsetY) / camera.scale;
-  const ndcX = (rawX / camera.width) * 2 - 1;
-  const ndcY = 1 - (rawY / camera.height) * 2;
-  const direction = normalize(
-    add(
-      camera.forward,
-      add(
-        mul(camera.right, (ndcX * camera.aspect) / camera.f),
-        mul(camera.up, ndcY / camera.f),
-      ),
+function makeLayout(rows: number, cols: number, width: number, height: number): Layout {
+  // Keep a small breathing margin, like the reference image; then make every
+  // cell a square, even when the container is not exactly board-shaped.
+  const pad = Math.max(7, Math.min(width, height) * 0.032);
+  const cell = Math.max(
+    6,
+    Math.min(
+      (width - pad * 2) / Math.max(1, cols),
+      (height - pad * 2) / Math.max(1, rows),
     ),
   );
-  if (Math.abs(direction.y) < 0.0001) return null;
-  const t = -camera.eye.y / direction.y;
-  if (t <= 0) return null;
-  const point = add(camera.eye, mul(direction, t));
-  const col = Math.floor(point.x + chain.cols / 2);
-  const row = Math.floor(point.z + chain.rows / 2);
-  if (row < 0 || row >= chain.rows || col < 0 || col >= chain.cols) return null;
-  return { row, col };
+  const gridW = cell * cols;
+  const gridH = cell * rows;
+  return {
+    width,
+    height,
+    originX: (width - gridW) / 2,
+    originY: (height - gridH) / 2,
+    cell,
+    gridW,
+    gridH,
+  };
+}
+
+/**
+ * The reference is a wall of shallow cubbies. The bevel is almost invisible at
+ * the centre of the wall and deepens toward every edge, which gives the grid a
+ * soft lens-like bulge without using a perspective camera.
+ */
+function bevelFor(row: number, col: number, rows: number, cols: number, cell: number) {
+  const nx = Math.abs(((col + 0.5) / cols) * 2 - 1);
+  const ny = Math.abs(((row + 0.5) / rows) * 2 - 1);
+  const edge = Math.max(nx, ny);
+  const weight = Math.pow(edge, 1.2);
+  return {
+    x: cell * (0.055 + 0.145 * weight),
+    y: cell * (0.07 + 0.37 * weight),
+  };
+}
+
+function baseBallLayout(count: number): Ball[] {
+  if (count <= 1) return [{ dx: 0, dy: 0, r: 0.3 }];
+  if (count === 2) {
+    return [
+      { dx: -0.12, dy: -0.015, r: 0.255 },
+      { dx: 0.12, dy: 0.015, r: 0.255 },
+    ];
+  }
+  if (count === 3) {
+    return [
+      { dx: 0.005, dy: -0.13, r: 0.25 },
+      { dx: -0.15, dy: 0.12, r: 0.225 },
+      { dx: 0.16, dy: 0.11, r: 0.23 },
+    ];
+  }
+  if (count === 4) {
+    return [
+      { dx: -0.145, dy: -0.135, r: 0.215 },
+      { dx: 0.145, dy: -0.135, r: 0.215 },
+      { dx: -0.145, dy: 0.135, r: 0.215 },
+      { dx: 0.145, dy: 0.135, r: 0.215 },
+    ];
+  }
+  const ringCount = Math.min(count, 8);
+  const ringRadius = count > 6 ? 0.285 : 0.26;
+  const ballRadius = count > 6 ? 0.125 : 0.145;
+  return Array.from({ length: ringCount }, (_, index) => {
+    const angle = (index / ringCount) * Math.PI * 2 - Math.PI / 2;
+    return {
+      dx: Math.cos(angle) * ringRadius,
+      dy: Math.sin(angle) * ringRadius,
+      r: ballRadius,
+    };
+  });
+}
+
+/** A little deterministic wobble keeps the clusters from looking machine-made. */
+function clusterBalls(count: number, row: number, col: number): Ball[] {
+  return baseBallLayout(count)
+    .map((ball, index) => {
+      const wobble = Math.sin(row * 12.9898 + col * 78.233 + index * 37.719);
+      const wobble2 = Math.sin(row * 4.13 + col * 93.27 + index * 11.7);
+      return {
+        dx: ball.dx + wobble * 0.012,
+        dy: ball.dy + wobble2 * 0.01,
+        r: ball.r * (0.97 + (wobble + 1) * 0.03),
+      };
+    })
+    .sort((a, b) => a.dy - b.dy);
+}
+
+function drawBall(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  neon: boolean,
+): void {
+  if (radius < 0.5) return;
+
+  const gradient = ctx.createRadialGradient(
+    x - radius * 0.34,
+    y - radius * 0.38,
+    radius * 0.02,
+    x,
+    y,
+    radius * 1.04,
+  );
+  gradient.addColorStop(0, lighten(color, 0.18));
+  gradient.addColorStop(0.32, color);
+  gradient.addColorStop(0.66, color);
+  gradient.addColorStop(0.86, darken(color, 0.24));
+  gradient.addColorStop(1, darken(color, 0.5));
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  if (neon) {
+    ctx.shadowColor = alpha(color, 0.58);
+    ctx.shadowBlur = radius * 1.1;
+  }
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Broad, soft sheen rather than a hard specular dot.
+  const sheen = ctx.createRadialGradient(
+    x - radius * 0.3,
+    y - radius * 0.34,
+    0,
+    x - radius * 0.3,
+    y - radius * 0.34,
+    radius * 0.62,
+  );
+  sheen.addColorStop(0, alpha(lighten(color, 0.34), 0.28));
+  sheen.addColorStop(1, alpha(lighten(color, 0.34), 0));
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = sheen;
+  ctx.fill();
+
+  // Elastic dark rim.
+  ctx.strokeStyle = alpha(darken(color, 0.58), 0.58);
+  ctx.lineWidth = Math.max(0.6, radius * 0.07);
+  ctx.stroke();
+
+  // A soft reflected edge along the bottom keeps the gummy volume readable.
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.84, Math.PI * 0.2, Math.PI * 0.82);
+  ctx.strokeStyle = alpha(darken(color, 0.46), 0.22);
+  ctx.lineWidth = Math.max(0.5, radius * 0.07);
+  ctx.stroke();
 }
 
 export function Board3D({
@@ -269,6 +222,7 @@ export function Board3D({
   meId,
   canPlay,
   onPlace,
+  onPlaceNow,
   flash,
   selected,
   onCancel,
@@ -276,22 +230,6 @@ export function Board3D({
 }: Board3DProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const cameraRef = useRef<Camera | null>(null);
-  const propsRef = useRef<Board3DProps>({
-    chain,
-    players,
-    meId,
-    canPlay,
-    onPlace,
-    flash,
-    selected,
-    onCancel,
-    theme,
-  });
-  useEffect(() => {
-    propsRef.current = { chain, players, meId, canPlay, onPlace, flash, selected, onCancel, theme };
-  }, [chain, players, meId, canPlay, onPlace, flash, selected, onCancel, theme]);
-
   const hoverRef = useRef<{ row: number; col: number } | null>(null);
   const cursorRef = useRef<{ row: number; col: number }>({ row: 0, col: 0 });
   const animationStartRef = useRef(0);
@@ -299,6 +237,33 @@ export function Board3D({
   const particlesRef = useRef<Particle[]>([]);
   const ringsRef = useRef<Ring[]>([]);
   const drawRef = useRef<(now: number) => void>(() => {});
+  const propsRef = useRef<Board3DProps>({
+    chain,
+    players,
+    meId,
+    canPlay,
+    onPlace,
+    onPlaceNow,
+    flash,
+    selected,
+    onCancel,
+    theme,
+  });
+
+  useEffect(() => {
+    propsRef.current = {
+      chain,
+      players,
+      meId,
+      canPlay,
+      onPlace,
+      onPlaceNow,
+      flash,
+      selected,
+      onCancel,
+      theme,
+    };
+  }, [chain, players, meId, canPlay, onPlace, onPlaceNow, flash, selected, onCancel, theme]);
 
   const palette = useMemo(() => {
     const map = new Map<string, string>();
@@ -339,332 +304,222 @@ export function Board3D({
 
       const props = propsRef.current;
       const board = props.chain;
-      const camera = makeCamera(board.rows, board.cols, width, height);
-      cameraRef.current = camera;
+      const layout = makeLayout(board.rows, board.cols, width, height);
+      const { originX, originY, cell, gridW, gridH } = layout;
       const selectedCell = props.selected;
       const hovered = hoverRef.current;
-      const halfW = board.cols / 2;
-      const halfD = board.rows / 2;
+      const lastMove = board.lastMove;
+      const elapsed = now - animationStartRef.current;
+      const placementScale =
+        lastMove && elapsed < 340 ? 0.55 + easeOut(elapsed / 340) * 0.45 : 1;
+      const cursor = cursorRef.current;
 
-      // Table glow behind the board.
+      // The reference's quiet vertical wash.
+      const background = ctx.createLinearGradient(0, 0, 0, height);
+      background.addColorStop(0, colors.gradientTop);
+      background.addColorStop(0.32, colors.gradientMid);
+      background.addColorStop(0.68, colors.gradientMid);
+      background.addColorStop(1, colors.gradientBottom);
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, width, height);
+
       const glow = ctx.createRadialGradient(
         width / 2,
-        height * 0.5,
-        10,
+        height * 0.16,
+        0,
         width / 2,
-        height * 0.5,
-        Math.max(width, height) * 0.62,
+        height * 0.16,
+        Math.max(width, height) * 0.74,
       );
       glow.addColorStop(0, colors.haze);
       glow.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = colors.background;
-      ctx.fillRect(0, 0, width, height);
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, width, height);
 
-      const topCorners = [
-        { x: -halfW, y: 0, z: -halfD },
-        { x: halfW, y: 0, z: -halfD },
-        { x: halfW, y: 0, z: halfD },
-        { x: -halfW, y: 0, z: halfD },
-      ];
-      const bottomCorners = topCorners.map((corner) => ({ ...corner, y: -BOARD_THICKNESS }));
-      const top = topCorners.map((corner) => project(camera, corner));
-      const bottom = bottomCorners.map((corner) => project(camera, corner));
+      // A barely perceptible tint separates the lattice from the outer wash.
+      ctx.fillStyle = colors.cellTint;
+      ctx.fillRect(originX, originY, gridW, gridH);
 
-      // Visible slab faces: front, left and right.
-      const faces: Projected[][] = [
-        [top[3], top[2], bottom[2], bottom[3]],
-        [top[0], top[3], bottom[3], bottom[0]],
-        [top[1], top[2], bottom[2], bottom[1]],
-      ];
-      for (const face of faces) {
-        quadPath(ctx, face);
-        const minY = Math.min(...face.map((point) => point.y));
-        const maxY = Math.max(...face.map((point) => point.y));
-        const gradient = ctx.createLinearGradient(0, minY, 0, maxY);
-        gradient.addColorStop(0, colors.tableSide);
-        gradient.addColorStop(1, colors.tableEdge);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.strokeStyle = alpha(colors.text, 0.06);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Top surface.
-      quadPath(ctx, top);
-      const topGradient = ctx.createLinearGradient(0, Math.min(...top.map((p) => p.y)), 0, Math.max(...top.map((p) => p.y)));
-      topGradient.addColorStop(0, colors.tableTop);
-      topGradient.addColorStop(1, colors.tableTopAlt);
-      ctx.fillStyle = topGradient;
-      ctx.fill();
-
-      const cellQuads = (row: number, col: number): Projected[] => {
-        const x0 = col - halfW;
-        const x1 = x0 + 1;
-        const z0 = row - halfD;
-        const z1 = z0 + 1;
-        return [
-          project(camera, { x: x0, y: 0, z: z0 }),
-          project(camera, { x: x1, y: 0, z: z0 }),
-          project(camera, { x: x1, y: 0, z: z1 }),
-          project(camera, { x: x0, y: 0, z: z1 }),
-        ];
-      };
-
-      ctx.save();
-      quadPath(ctx, top);
-      ctx.clip();
-
+      // Cell fills sit beneath every line.
       for (let row = 0; row < board.rows; row++) {
         for (let col = 0; col < board.cols; col++) {
-          const cell = board.cells[row * board.cols + col];
-          const owner = cell.ownerId ? palette.get(cell.ownerId) : undefined;
-          const points = cellQuads(row, col);
-          quadPath(ctx, points);
-          ctx.fillStyle = (row + col) % 2 === 0 ? colors.tableTop : colors.tableTopAlt;
-          ctx.fill();
-          if (owner && cell.orbs > 0) {
-            ctx.fillStyle = alpha(owner, theme === "light" ? 0.16 : 0.13);
-            ctx.fill();
-          }
           const isSelected = selectedCell?.row === row && selectedCell?.col === col;
           const isHovered = hovered?.row === row && hovered?.col === col;
           const playable = isPlayableCell(props.chain, props.meId, props.canPlay, row, col);
-          if (isSelected) {
-            ctx.fillStyle = alpha(colors.accent, 0.24);
-            ctx.fill();
-          } else if (isHovered && playable) {
-            ctx.fillStyle = alpha(colors.accent, 0.09);
-            ctx.fill();
-          }
+          if (!isSelected && !(isHovered && playable)) continue;
+          ctx.fillStyle = isSelected ? colors.selectedFill : colors.hoverFill;
+          ctx.fillRect(
+            originX + col * cell,
+            originY + row * cell,
+            cell,
+            cell,
+          );
         }
       }
 
-      // Grid lines clipped to the table top.
+      // Cubbies: one shallow top/left wall, drawn only with hairlines.
       ctx.strokeStyle = colors.gridLine;
       ctx.lineWidth = 1;
+      for (let row = 0; row < board.rows; row++) {
+        for (let col = 0; col < board.cols; col++) {
+          const x0 = originX + col * cell;
+          const y0 = originY + row * cell;
+          const x1 = x0 + cell;
+          const y1 = y0 + cell;
+          const bevel = bevelFor(row, col, board.rows, board.cols, cell);
+          const cornerX = x0 + bevel.x;
+          const cornerY = y0 + bevel.y;
+
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(cornerX, cornerY);
+          ctx.lineTo(cornerX, y1);
+          ctx.moveTo(cornerX, cornerY);
+          ctx.lineTo(x1, cornerY);
+          ctx.stroke();
+        }
+      }
+
+      // The main lattice.
+      ctx.strokeStyle = colors.gridLine;
       for (let col = 0; col <= board.cols; col++) {
-        const x = col - halfW;
-        const a = project(camera, { x, y: 0, z: -halfD });
-        const b = project(camera, { x, y: 0, z: halfD });
+        const x = Math.round(originX + col * cell) + 0.5;
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(x, originY);
+        ctx.lineTo(x, originY + gridH);
         ctx.stroke();
       }
       for (let row = 0; row <= board.rows; row++) {
-        const z = row - halfD;
-        const a = project(camera, { x: -halfW, y: 0, z });
-        const b = project(camera, { x: halfW, y: 0, z });
+        const y = Math.round(originY + row * cell) + 0.5;
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(originX, y);
+        ctx.lineTo(originX + gridW, y);
         ctx.stroke();
       }
-      ctx.restore();
 
-      // Outer edge.
-      quadPath(ctx, top);
+      // Outer rim, a touch brighter than the interior.
       ctx.strokeStyle = colors.gridLineStrong;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(
+        Math.round(originX) + 0.5,
+        Math.round(originY) + 0.5,
+        Math.round(gridW) - 1,
+        Math.round(gridH) - 1,
+      );
 
-      // Selected / last-move cell rings.
-      const ringFor = (row: number, col: number, color: string, width = 2) => {
-        const points = cellQuads(row, col);
-        quadPath(ctx, points);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        ctx.stroke();
-      };
+      // Last move is a quiet owner-coloured edge, not a heavy ring.
+      if (lastMove) {
+        const color = palette.get(lastMove.playerId) ?? colors.accent;
+        ctx.strokeStyle = alpha(color, 0.72);
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(
+          originX + lastMove.col * cell + 1,
+          originY + lastMove.row * cell + 1,
+          cell - 2,
+          cell - 2,
+        );
+      }
+
       if (selectedCell) {
-        ringFor(selectedCell.row, selectedCell.col, colors.accent, 2.6);
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          originX + selectedCell.col * cell + 1,
+          originY + selectedCell.row * cell + 1,
+          cell - 2,
+          cell - 2,
+        );
       } else if (
         hovered &&
         isPlayableCell(board, props.meId, props.canPlay, hovered.row, hovered.col)
       ) {
-        ringFor(hovered.row, hovered.col, alpha(colors.accent, 0.6), 1.6);
+        ctx.strokeStyle = alpha(colors.accent, 0.58);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(
+          originX + hovered.col * cell + 1,
+          originY + hovered.row * cell + 1,
+          cell - 2,
+          cell - 2,
+        );
       }
-      const lastMove = board.lastMove;
-      if (lastMove) {
-        const ownerColor = palette.get(lastMove.playerId) ?? colors.accent;
-        ringFor(lastMove.row, lastMove.col, alpha(ownerColor, 0.85), 1.8);
-      }
-
-      const elapsed = now - animationStartRef.current;
-      const placementScale =
-        lastMove && elapsed < 320
-          ? 0.55 + easeOut(elapsed / 320) * 0.45
-          : 1;
 
       // Rings left by explosions.
       ringsRef.current = ringsRef.current.filter((ring) => now - ring.start < ring.life);
       for (const ring of ringsRef.current) {
+        if (now < ring.start) continue;
         const age = (now - ring.start) / ring.life;
-        const center = cellWorld(board, ring.row, ring.col);
-        const centerProjected = project(camera, { ...center, y: 0.02 });
-        const radius = worldRadius(camera, 0.15 + age * 0.9, centerProjected.depth);
+        const cx = originX + (ring.col + 0.5) * cell;
+        const cy = originY + (ring.row + 0.5) * cell;
+        const radius = cell * (0.12 + age * 0.48);
         ctx.beginPath();
-        ctx.ellipse(
-          centerProjected.x,
-          centerProjected.y,
-          radius,
-          radius * 0.46,
-          0,
-          0,
-          Math.PI * 2,
-        );
-        ctx.strokeStyle = alpha(ring.color, (1 - age) * 0.7);
-        ctx.lineWidth = Math.max(1, 3 * (1 - age));
+        ctx.ellipse(cx, cy, radius, radius * 0.88, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = alpha(ring.color, (1 - age) * 0.6);
+        ctx.lineWidth = Math.max(1, 2.4 * (1 - age));
         ctx.stroke();
       }
 
-      // Orbs: project, sort far to near, then paint shaded spheres.
-      const orbs: {
-        x: number;
-        y: number;
-        radius: number;
-        color: string;
-        depth: number;
-        scale: number;
-      }[] = [];
+      // Balls, painted as overlapping gummy clusters.
       for (let row = 0; row < board.rows; row++) {
         for (let col = 0; col < board.cols; col++) {
-          const cell = board.cells[row * board.cols + col];
-          if (cell.orbs <= 0) continue;
-          const color = (cell.ownerId ? palette.get(cell.ownerId) : undefined) ?? colors.text;
-          const center = cellWorld(board, row, col);
-          const count = Math.min(cell.orbs, 12);
-          const offsets = orbOffsets(count);
-          const radius = orbRadiusFor(count);
+          const cellState = board.cells[row * board.cols + col];
+          if (cellState.orbs <= 0) continue;
+          const color = (cellState.ownerId ? palette.get(cellState.ownerId) : undefined) ?? colors.text;
+          const count = Math.min(cellState.orbs, 8);
+          const balls = clusterBalls(count, row, col);
           const isLastCell = lastMove?.row === row && lastMove?.col === col;
-          for (let index = 0; index < count; index++) {
-            const offset = offsets[index] ?? { x: 0, z: 0 };
-            const jitter =
-              Math.sin(row * 12.9898 + col * 78.233 + index * 37.719) * 0.008;
-            const point = {
-              x: center.x + offset.x + jitter,
-              y: radius,
-              z: center.z + offset.z + jitter,
-            };
-            const projected = project(camera, point);
-            const scale = isLastCell ? placementScale : 1;
-            orbs.push({
-              x: projected.x,
-              y: projected.y,
-              radius: worldRadius(camera, radius * scale, projected.depth),
+          const scale = isLastCell ? placementScale : 1;
+          const centerX = originX + (col + 0.5) * cell;
+          const centerY = originY + (row + 0.5) * cell;
+          const bevel = bevelFor(row, col, board.rows, board.cols, cell);
+
+          // Nudge the cluster toward the back face just enough to sit in the cubby.
+          const clusterX = centerX + bevel.x * 0.12;
+          const clusterY = centerY + bevel.y * 0.1;
+
+          for (const ball of balls) {
+            drawBall(
+              ctx,
+              clusterX + ball.dx * cell,
+              clusterY + ball.dy * cell,
+              ball.r * cell * scale,
               color,
-              depth: projected.depth,
-              scale,
-            });
+              theme === "neon",
+            );
           }
         }
       }
-      orbs.sort((a, b) => b.depth - a.depth);
-      for (const orb of orbs) {
-        if (orb.radius < 0.4) continue;
-        // Contact shadow on the table.
-        const shadowCenter = {
-          x: orb.x,
-          y: orb.y + orb.radius * 0.72,
-        };
-        ctx.beginPath();
-        ctx.ellipse(
-          shadowCenter.x,
-          shadowCenter.y,
-          orb.radius * 0.95,
-          orb.radius * 0.34,
-          0,
-          0,
-          Math.PI * 2,
-        );
-        ctx.fillStyle = colors.shadow;
-        ctx.globalAlpha = 0.55;
-        ctx.fill();
-        ctx.globalAlpha = 1;
 
-        const gradient = ctx.createRadialGradient(
-          orb.x - orb.radius * 0.34,
-          orb.y - orb.radius * 0.4,
-          orb.radius * 0.04,
-          orb.x,
-          orb.y,
-          orb.radius * 1.04,
-        );
-        gradient.addColorStop(0, lighten(orb.color, 0.78));
-        gradient.addColorStop(0.28, lighten(orb.color, 0.24));
-        gradient.addColorStop(0.68, orb.color);
-        gradient.addColorStop(1, darken(orb.color, 0.58));
-        ctx.beginPath();
-        ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
-        if (theme === "neon") {
-          ctx.shadowColor = alpha(orb.color, 0.6);
-          ctx.shadowBlur = orb.radius * 0.9;
-        }
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = alpha(darken(orb.color, 0.7), 0.55);
-        ctx.lineWidth = Math.max(0.5, orb.radius * 0.07);
-        ctx.stroke();
-
-        // Specular highlight.
-        ctx.beginPath();
-        ctx.arc(
-          orb.x - orb.radius * 0.34,
-          orb.y - orb.radius * 0.42,
-          Math.max(0.5, orb.radius * 0.17),
-          0,
-          Math.PI * 2,
-        );
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.fill();
-      }
-
-      // Particles from explosions.
-      particlesRef.current = particlesRef.current.filter((particle) => now - particle.start < particle.life);
+      // Explosion droplets.
+      particlesRef.current = particlesRef.current.filter(
+        (particle) => now - particle.start < particle.life,
+      );
       for (const particle of particlesRef.current) {
+        if (now < particle.start) continue;
         const age = (now - particle.start) / particle.life;
         const seconds = (now - particle.start) / 1000;
-        const point = {
-          x: particle.position.x + particle.velocity.x * seconds,
-          y: Math.max(
-            0.02,
-            particle.position.y + particle.velocity.y * seconds - 4.2 * seconds * seconds,
-          ),
-          z: particle.position.z + particle.velocity.z * seconds,
-        };
-        const projected = project(camera, point);
-        const radius = worldRadius(camera, particle.size * (1 - age * 0.6), projected.depth);
+        const x = originX + (particle.col + 0.5 + particle.vx * seconds) * cell;
+        const y =
+          originY + (particle.row + 0.5 + particle.vy * seconds + 1.9 * seconds * seconds) * cell;
         ctx.beginPath();
-        ctx.arc(projected.x, projected.y, Math.max(0.4, radius), 0, Math.PI * 2);
+        ctx.arc(x, y, Math.max(0.5, particle.size * cell * (1 - age * 0.55)), 0, Math.PI * 2);
         ctx.fillStyle = alpha(particle.color, (1 - age) * 0.9);
         ctx.fill();
       }
 
       // Keyboard cursor.
-      const cursor = cursorRef.current;
-      const cursorCell = board.cells[cursor.row * board.cols + cursor.col];
       if (
         document.activeElement === canvas &&
         !selectedCell &&
         !(hovered?.row === cursor.row && hovered?.col === cursor.col)
       ) {
-        const points = cellQuads(cursor.row, cursor.col);
-        quadPath(ctx, points);
-        ctx.strokeStyle = alpha(colors.text, 0.4);
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-        if (cursorCell.orbs === 0) {
-          const center = project(camera, { ...cellWorld(board, cursor.row, cursor.col), y: 0.12 });
-          const radius = worldRadius(camera, 0.07, center.depth);
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, Math.max(1, radius), 0, Math.PI * 2);
-          ctx.fillStyle = alpha(colors.accent, 0.55);
-          ctx.fill();
-        }
+        ctx.strokeStyle = alpha(colors.text, 0.38);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(
+          originX + cursor.col * cell + 2,
+          originY + cursor.row * cell + 2,
+          cell - 4,
+          cell - 4,
+        );
       }
     },
     [colors, palette, theme],
@@ -703,29 +558,23 @@ export function Board3D({
     const particles: Particle[] = [];
     // A long cascade can log hundreds of explosions. Animate the first few so
     // low-end phones stay smooth; the board state is already fully resolved.
-    for (const explosion of lastMove.explosions.slice(0, 28)) {
-      const center = cellWorld(chain, explosion.row, explosion.col);
+    for (const [index, explosion] of lastMove.explosions.slice(0, MAX_ANIMATED_EXPLOSIONS).entries()) {
       const color = colorsByPlayer.get(explosion.ownerId) ?? "#ffffff";
-      rings.push({ row: explosion.row, col: explosion.col, color, start: now, life: 560 });
+      const start = now + index * 28;
+      rings.push({ row: explosion.row, col: explosion.col, color, start, life: 560 });
       const count = 7;
-      for (let index = 0; index < count; index++) {
-        const angle = (index / count) * Math.PI * 2 + Math.random() * 0.5;
-        const speed = 1.1 + Math.random() * 2.2;
+      for (let particleIndex = 0; particleIndex < count; particleIndex++) {
+        const angle = (particleIndex / count) * Math.PI * 2 + Math.random() * 0.5;
+        const speed = 0.55 + Math.random() * 1.25;
         particles.push({
-          position: {
-            x: center.x + (Math.random() - 0.5) * 0.2,
-            y: 0.18,
-            z: center.z + (Math.random() - 0.5) * 0.2,
-          },
-          velocity: {
-            x: Math.cos(angle) * speed,
-            y: 1.2 + Math.random() * 2.4,
-            z: Math.sin(angle) * speed,
-          },
+          row: explosion.row,
+          col: explosion.col,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
           color,
-          start: now,
+          start,
           life: 520 + Math.random() * 260,
-          size: 0.035 + Math.random() * 0.05,
+          size: 0.035 + Math.random() * 0.045,
         });
       }
     }
@@ -734,21 +583,26 @@ export function Board3D({
     scheduleDraw();
   }, [chain.lastMove, chain, players, scheduleDraw]);
 
-  const cellFromEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    const camera = cameraRef.current;
-    if (!canvas || !camera) return null;
-    const rect = canvas.getBoundingClientRect();
-    return rayToCell(
-      camera,
-      propsRef.current.chain,
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-    );
-  };
+  const cellFromPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const board = propsRef.current.chain;
+      const layout = makeLayout(board.rows, board.cols, rect.width, rect.height);
+      const x = clientX - rect.left - layout.originX;
+      const y = clientY - rect.top - layout.originY;
+      if (x < 0 || y < 0 || x >= layout.gridW || y >= layout.gridH) return null;
+      const col = Math.floor(x / layout.cell);
+      const row = Math.floor(y / layout.cell);
+      if (row < 0 || row >= board.rows || col < 0 || col >= board.cols) return null;
+      return { row, col };
+    },
+    [],
+  );
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const cell = cellFromEvent(event);
+    const cell = cellFromPoint(event.clientX, event.clientY);
     const previous = hoverRef.current;
     if (previous?.row === cell?.row && previous?.col === cell?.col) return;
     hoverRef.current = cell;
@@ -762,8 +616,8 @@ export function Board3D({
     scheduleDraw();
   };
 
-  const handleClick = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const cell = cellFromEvent(event);
+  const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const cell = cellFromPoint(event.clientX, event.clientY);
     const props = propsRef.current;
     if (!cell) {
       props.onCancel();
@@ -781,7 +635,7 @@ export function Board3D({
     const props = propsRef.current;
     const board = props.chain;
     const cursor = cursorRef.current;
-    let next = { ...cursor };
+    const next = { ...cursor };
     if (event.key === "ArrowLeft") next.col = Math.max(0, cursor.col - 1);
     else if (event.key === "ArrowRight") next.col = Math.min(board.cols - 1, cursor.col + 1);
     else if (event.key === "ArrowUp") next.row = Math.max(0, cursor.row - 1);
@@ -789,7 +643,7 @@ export function Board3D({
     else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (isPlayableCell(board, props.meId, props.canPlay, cursor.row, cursor.col)) {
-        props.onPlace(cursor.row, cursor.col);
+        props.onPlaceNow(cursor.row, cursor.col);
       }
       return;
     } else if (event.key === "Escape") {
@@ -811,40 +665,28 @@ export function Board3D({
       : "Chain Reaction 3D board. Use arrow keys to move; clicking places only on your turn.";
 
   return (
-    <div className="board-block board-block--3d" ref={wrapperRef}>
-      <div className="board-3d-shell">
-        <canvas
-          ref={canvasRef}
-          className="board-3d"
-          data-chain-cell="true"
-          role="grid"
-          tabIndex={0}
-          aria-label={label}
-          aria-rowcount={chain.rows}
-          aria-colcount={chain.cols}
-          onPointerDown={(event) => event.currentTarget.focus()}
-          onPointerMove={handlePointerMove}
-          onPointerLeave={handlePointerLeave}
-          onClick={handleClick}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      <div className="board-foot">
-        <span className="legend-row">
-          <span className="legend-dot" style={{ background: "var(--accent)" }} />
-          {selected
-            ? "Selected — tap the same cell again to confirm"
-            : canPlay
-              ? "Your turn — tap an orb cell, or use the arrow keys and Enter"
-              : "The 3D table updates after every move"}
-        </span>
-        <span className="board-legend num">
-          Corner 2 · Edge 3 · Middle 4 · {chain.rows} × {chain.cols}
-        </span>
-      </div>
-      <p className="sr-only" aria-live="polite">
-        {selected ? `Row ${selected.row + 1}, column ${selected.col + 1} selected.` : ""}
-      </p>
+    <div className="board-3d-shell" ref={wrapperRef} data-chain-surface="true">
+      <canvas
+        ref={canvasRef}
+        className="board-3d"
+        data-chain-cell="true"
+        role="grid"
+        tabIndex={0}
+        aria-label={label}
+        aria-rowcount={chain.rows}
+        aria-colcount={chain.cols}
+        onPointerDown={(event) => {
+          event.currentTarget.dataset.pointerFocus = "true";
+          event.currentTarget.focus({ preventScroll: true });
+        }}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+        onClick={handleClick}
+        onKeyDown={(event) => {
+          delete event.currentTarget.dataset.pointerFocus;
+          handleKeyDown(event);
+        }}
+      />
     </div>
   );
 }
