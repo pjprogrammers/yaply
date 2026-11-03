@@ -67,7 +67,7 @@ export default function Hero() {
                 Browse the games
               </a>
               <span className="hero__note">
-                No installs. One link. Two games live now.
+                No installs. One link. Three games live now.
               </span>
             </div>
           </div>

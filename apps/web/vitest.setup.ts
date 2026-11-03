@@ -4,3 +4,4 @@
 process.env.NEXT_PUBLIC_MAIN_URL ||= "https://main.example.com";
 process.env.NEXT_PUBLIC_CHAIN_URL ||= "https://chain.example.com";
 process.env.NEXT_PUBLIC_SKRIBBL_URL ||= "https://draw.example.com";
+process.env.NEXT_PUBLIC_SMASHKARTS_URL ||= "https://karts.example.com";

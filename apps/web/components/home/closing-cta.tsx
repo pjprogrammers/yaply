@@ -8,7 +8,10 @@ import { availableGames, games } from "@/data/games";
 export default function ClosingCta() {
   const [gameId, setGameId] = useState(games[0].id);
   const selected = games.find((game) => game.id === gameId) ?? games[0];
-  const liveNames = availableGames.map((game) => game.name).join(" and ");
+  const liveNames = availableGames
+    .map((game) => game.name)
+    .join(", ")
+    .replace(/, ([^,]*)$/, " and $1");
 
   return (
     <section

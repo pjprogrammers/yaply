@@ -21,8 +21,16 @@ export const SKRIBBL_URL = requireHttpUrl(
   "NEXT_PUBLIC_SKRIBBL_URL",
 );
 
+// The app directory and package keep the `smashkarts` name; the public game is
+// Kart Riot, so the env var and export stay recognisable.
+export const SMASHKARTS_URL = requireHttpUrl(
+  process.env.NEXT_PUBLIC_SMASHKARTS_URL,
+  "NEXT_PUBLIC_SMASHKARTS_URL",
+);
+
 /** Where each game URL came from. */
 export const GAME_URL_SOURCES = {
   chain: process.env.NEXT_PUBLIC_CHAIN_URL ? "env" : "missing",
   skribbl: process.env.NEXT_PUBLIC_SKRIBBL_URL ? "env" : "missing",
+  smashkarts: process.env.NEXT_PUBLIC_SMASHKARTS_URL ? "env" : "missing",
 } as const;

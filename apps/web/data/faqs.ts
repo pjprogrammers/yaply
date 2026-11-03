@@ -17,7 +17,7 @@ export const faqs: Faq[] = [
   {
     question: "Which games can I play right now?",
     answer:
-      "Chain Reaction and Skribbl are live. Ludo, Who's the Spy and Smash Karts are in development and will open on the same platform.",
+      "Chain Reaction, Skribbl and Kart Riot are live. Ludo and Who's the Spy are in development and will open on the same platform.",
   },
   {
     question: "Do I need an account?",

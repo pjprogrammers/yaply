@@ -51,8 +51,8 @@ export function GamePage({ game }: { game: GameEntry }) {
               <p>{game.description}</p>
               <p>
                 {live
-                  ? `${game.name} is live now. Open the game, start a room and share the link. The first move is yours.`
-                  : "This one is still being built. It will join the shelf when it is ready to play. Chain Reaction and Skribbl are live in the meantime."}
+                  ? `${game.name} is live now. Open the game and jump in — no installs, no account and no setup.`
+                  : "This one is still being built. It will join the shelf when it is ready to play. Chain Reaction, Skribbl and Kart Riot are live in the meantime."}
               </p>
             </div>
           </div>

@@ -7,6 +7,7 @@
 | Main site | Vercel Hobby | `apps/web` | https://yaply-web.vercel.app |
 | Skribbl | Vercel Hobby | `apps/skribbl` | https://yaply-skribbl.vercel.app |
 | Chain Reaction | Vercel Hobby | `apps/chain` | https://yaply-chain.vercel.app |
+| Kart Riot | Vercel Hobby | `apps/smashkarts` | https://yaply-smashkarts.vercel.app |
 | Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `https://yaply-realtime-production.yaplygames.workers.dev` |
 
 Final production domains, once DNS is approved:
@@ -14,6 +15,7 @@ Final production domains, once DNS is approved:
 - Main site: https://yaply.is-cool.dev
 - Skribbl: https://skribbl.yaply.is-cool.dev
 - Chain Reaction: https://chain.yaply.is-cool.dev
+- Kart Riot: https://kart-riot.yaply.is-cool.dev
 
 Everything below fits the free tiers: Vercel Hobby, Cloudflare Workers Free, and
 SQLite-backed Durable Objects. No paid database, Redis, VPS, or broker is needed.
@@ -22,7 +24,7 @@ SQLite-backed Durable Objects. No paid database, Redis, VPS, or broker is needed
 
 - Node.js 22+ and npm 10+
 - A Cloudflare account with Workers enabled
-- Three Vercel projects (Hobby plan is sufficient)
+- Four Vercel projects (Hobby plan is sufficient)
 - `npx wrangler login` completed locally before deploying the Worker
 
 ## Install and verify
@@ -36,7 +38,7 @@ npm test
 npm run build
 ```
 
-`npm run build` builds the three Next.js apps. The Worker has no bundling step;
+`npm run build` builds every Next.js app in the workspace. The Worker has no bundling step;
 use the dry-run check instead:
 
 ```bash
@@ -55,14 +57,15 @@ npm run dev --workspace=@yaply/realtime
 Terminal 2 — one or more frontends:
 
 ```bash
-npm run dev --workspace=@yaply/skribbl   # http://localhost:3001
-npm run dev --workspace=@yaply/chain     # http://localhost:3002
-npm run dev --workspace=@yaply/web       # http://localhost:3000
+npm run dev --workspace=@yaply/skribbl     # http://localhost:3001
+npm run dev --workspace=@yaply/chain       # http://localhost:3002
+npm run dev --workspace=@yaply/smashkarts  # http://localhost:3003
+npm run dev --workspace=@yaply/web         # http://localhost:3000
 ```
 
 Local defaults in `apps/realtime/wrangler.toml` allow origins on ports 3000,
-3001, and 3002. Both game apps fall back to `ws://localhost:8787/room` when
-`NEXT_PUBLIC_REALTIME_URL` is unset.
+3001, 3002 and 3003. The game apps fall back to `ws://localhost:8787/room`
+when `NEXT_PUBLIC_REALTIME_URL` is unset.
 
 If a game's `.env.local` points at the production Worker, override it for a
 local run (process environment wins over `.env.local`):
@@ -84,7 +87,7 @@ curl -X POST http://localhost:8787/rooms \
 
 ### Browser end-to-end tests
 
-With the Worker on 8787 and both game dev servers running against it:
+With the Worker on 8787 and the Skribbl and Chain Reaction dev servers running against it:
 
 ```bash
 npm run test:e2e
@@ -116,6 +119,7 @@ socket upgrades per client per minute) or leave a minute between runs.
 NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
 NEXT_PUBLIC_CHAIN_URL=https://yaply-chain.vercel.app
 NEXT_PUBLIC_SKRIBBL_URL=https://yaply-skribbl.vercel.app
+NEXT_PUBLIC_SMASHKARTS_URL=https://yaply-smashkarts.vercel.app
 ```
 
 `NEXT_PUBLIC_MAIN_URL` is the canonical origin used by the page metadata,
@@ -127,9 +131,10 @@ set:
 NEXT_PUBLIC_MAIN_URL=https://yaply.is-cool.dev
 NEXT_PUBLIC_CHAIN_URL=https://chain.yaply.is-cool.dev
 NEXT_PUBLIC_SKRIBBL_URL=https://skribbl.yaply.is-cool.dev
+NEXT_PUBLIC_SMASHKARTS_URL=https://kart-riot.yaply.is-cool.dev
 ```
 
-### `apps/skribbl` and `apps/chain` (Vercel project settings in production)
+### `apps/skribbl`, `apps/chain` and `apps/smashkarts` (Vercel project settings in production)
 
 ```env
 NEXT_PUBLIC_REALTIME_URL=wss://yaply-realtime-production.yaplygames.workers.dev/room
@@ -139,6 +144,18 @@ NEXT_PUBLIC_MAIN_URL=https://yaply-web.vercel.app
 For local development the realtime URL can be omitted (it falls back to
 `ws://localhost:8787/room`). When the custom domain is live, use
 `NEXT_PUBLIC_MAIN_URL=https://yaply.is-cool.dev`.
+
+Kart Riot also needs the canonical origin of its own deployment so relative
+Open Graph image paths resolve correctly:
+
+```env
+NEXT_PUBLIC_SITE_URL=https://yaply-smashkarts.vercel.app
+```
+
+Kart Riot currently runs its arena locally against bots. Its realtime URL is
+wired through the same config and diagnostic endpoint as the other games, but
+the Worker protocol only accepts `skribbl` and `chain` rooms until online Kart
+Riot multiplayer is implemented.
 
 The browser converts `https://` to `wss://` and appends `/room` if needed, so
 both `wss://host/room` and `https://host` are accepted. Prefer the explicit
@@ -154,12 +171,14 @@ Set each variable in the correct Vercel project:
 | --- | --- |
 | `NEXT_PUBLIC_CHAIN_URL` | `yaply-web` only |
 | `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` only |
-| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain` **and** `yaply-skribbl` |
-| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain` **and** `yaply-skribbl` |
+| `NEXT_PUBLIC_SMASHKARTS_URL` | `yaply-web` only |
+| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
+| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
+| `NEXT_PUBLIC_SITE_URL` | `yaply-smashkarts` only |
 
 Adding `NEXT_PUBLIC_REALTIME_URL` to the `yaply-web` project does nothing for
-the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` to the Skribbl project does nothing
-for the main site.
+the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` or `NEXT_PUBLIC_SMASHKARTS_URL` to
+a game project does nothing for the main site.
 
 ### Verify which values a deployment actually built
 
@@ -169,6 +188,7 @@ Each app exposes a public, non-secret diagnostic endpoint:
 curl https://yaply-web.vercel.app/api/config
 curl https://yaply-chain.vercel.app/api/config
 curl https://yaply-skribbl.vercel.app/api/config
+curl https://yaply-smashkarts.vercel.app/api/config
 ```
 
 `/api/config` returns the effective main-site and game URLs, the source of each
@@ -199,14 +219,14 @@ Development (top-level `[vars]`):
 
 ```toml
 ENVIRONMENT = "development"
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
 ```
 
 Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaply.is-cool.dev,https://skribbl.yaply.is-cool.dev,https://chain.yaply.is-cool.dev,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app"
+ALLOWED_ORIGINS = "https://yaply.is-cool.dev,https://skribbl.yaply.is-cool.dev,https://chain.yaply.is-cool.dev,https://kart-riot.yaply.is-cool.dev,https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
 ```
 
 Rules:
@@ -252,9 +272,9 @@ curl https://yaply-realtime-production.yaplygames.workers.dev/version
 Optionally attach a custom domain (for example `realtime.yaply.is-cool.dev`) in the
 Cloudflare dashboard, then update `NEXT_PUBLIC_REALTIME_URL` in both game apps.
 
-## Deploy the three Vercel projects
+## Deploy the four Vercel projects
 
-Create three separate Vercel projects from the same repository so each app can
+Create four separate Vercel projects from the same repository so each app can
 ship independently.
 
 **Project 1 — `yaply-web`**
@@ -263,7 +283,7 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/web`
-- Environment: `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`
+- Environment: `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`, `NEXT_PUBLIC_SMASHKARTS_URL`
 
 **Project 2 — `yaply-skribbl`**
 
@@ -281,6 +301,19 @@ ship independently.
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/chain`
 - Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`
 
+**Project 4 — `yaply-smashkarts`**
+
+- Root Directory: `apps/smashkarts`
+- Framework Preset: Next.js
+- Install Command: `cd ../.. && npm install`
+- Build Command: `cd ../.. && npm run build --workspace=@yaply/smashkarts`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_SITE_URL`
+
+`NEXT_PUBLIC_SITE_URL` must be the public origin of this project
+(`https://yaply-smashkarts.vercel.app`, then
+`https://kart-riot.yaply.is-cool.dev`). The app uses it as `metadataBase` for
+the Open Graph images.
+
 Installing from the repository root is required so npm workspaces can resolve
 `@yaply/shared`. If Vercel cannot read files outside the selected Root
 Directory, enable the monorepo "include source files outside the Root
@@ -292,6 +325,7 @@ build command to `npm run build --workspace=@yaply/<app>`.
 - Point `yaply.is-cool.dev` at the main Vercel project.
 - Point `skribbl.yaply.is-cool.dev` at the Skribbl project.
 - Point `chain.yaply.is-cool.dev` at the Chain Reaction project.
+- Point `kart-riot.yaply.is-cool.dev` at the Kart Riot project.
 - Point the realtime hostname at the Worker (workers.dev or a custom route).
 
 All production traffic must use HTTPS/WSS. Update `ALLOWED_ORIGINS` and the
@@ -301,18 +335,22 @@ affected frontend.
 ## Pre-launch checklist
 
 1. `npm run check` passes (typecheck + all workspace tests).
-2. `npm run build` passes for `apps/web`, `apps/skribbl`, and `apps/chain`.
+2. `npm run build` passes for `apps/web`, `apps/skribbl`, `apps/chain`, and
+   `apps/smashkarts`.
 3. `npm run check:worker --workspace=@yaply/realtime` passes.
 4. `npx wrangler deploy --dry-run --env production` passes from `apps/realtime`.
 5. Production `ALLOWED_ORIGINS` contains every deployed frontend origin.
 6. `/health` and `/version` respond on the deployed Worker.
-7. Two browsers can create/join the same room in both games.
+7. Two browsers can create/join the same room in both online games (Skribbl
+   and Chain Reaction).
 8. A refresh reconnects to the same seat and score.
 9. A non-host cannot start the game or change settings.
 10. Skribbl guesses, drawing, round transitions, and scores match on both clients.
 11. Chain placements, cascades, eliminations, and the winner match on both clients.
 12. A third client cannot join a full room; an invalid room code shows a clean error.
-13. Links from the main site reach both game deployments.
+13. Links from the main site reach all three game deployments, including
+    `/games/kart-riot` → `https://yaply-smashkarts.vercel.app`, and the old
+    `/games/smash-karts` URL redirects to it.
 14. Repeat steps 7–13 after switching to the custom domains.
 15. `npm run test:e2e` passes against a locally running Worker and both
     frontends (six Playwright tests, including full matches, refresh/reconnect,
@@ -328,8 +366,9 @@ affected frontend.
 
 - `POST /rooms` is the only production room-allocation path. The Worker
   generates the code, reserves it in the `${game}:${code}` Durable Object
-  before responding, and retries collisions internally. Both game frontends
-  call it before navigating to `/room/[code]`.
+  before responding, and retries collisions internally. The Skribbl and Chain
+  Reaction frontends call it before navigating to `/room/[code]`. Kart Riot
+  currently runs its arena locally and does not create rooms.
 - A collision during `room.create` (for example, a copied `?host=1` URL opened
   in a second tab) automatically falls back to `room.join`. When a Player
   opens their own invite link in a new tab, they join as a new player instead

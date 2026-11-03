@@ -33,7 +33,7 @@ const features = [
     id: "rail",
     title: "More games on the same rail.",
     result:
-      "Chain Reaction and Skribbl are live now. Ludo, Who's the Spy and Smash Karts are being added to the same shelf.",
+      "Chain Reaction, Skribbl and Kart Riot are live now. Ludo and Who's the Spy are being added to the same shelf.",
     band: "var(--blue)",
     ink: "var(--white)",
   },

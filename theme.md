@@ -100,7 +100,7 @@ Each game maintains Yaply's brand identity while having unique theming:
 | **Skribbl** | Bright canvas, playful | Warm colors, colorful palette, animated elements |
 | **Who's the Spy?** | Mysterious dark | Deep purples, blacks, dramatic reveals, amber accents |
 | **Chain Reaction** | Clean board, vivid | Bright cyans/oranges, satisfying animations |
-| **Smash Karts** | Action-oriented, energetic | Bold corals/blues, dynamic lighting, racing aesthetic |
+| **Kart Riot** | Action-oriented, energetic | Bold corals/blues, dynamic lighting, racing aesthetic |
 
 All games should feel part of Yaply but have distinct personalities.
 
@@ -613,7 +613,7 @@ Initially display:
 - Chain Reaction.
 - Skribbl.
 
-Prepare the registry to support future games such as Who's the Spy, Ludo, and Smash Karts, but do not present unavailable games as playable.
+Prepare the registry to support future games such as Who's the Spy and Ludo, but do not present unavailable games as playable.
 
 Use a reusable game registry, for example:
 

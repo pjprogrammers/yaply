@@ -4,7 +4,13 @@ import { SITE_URL } from "@/lib/site";
 const baseUrl = SITE_URL;
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const gamePages = ["chain-reaction", "smash-karts", "ludo", "whos-the-spy"];
+  const gamePages = [
+    "chain-reaction",
+    "skribbl",
+    "kart-riot",
+    "ludo",
+    "whos-the-spy",
+  ];
 
   return [
     {

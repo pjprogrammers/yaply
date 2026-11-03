@@ -1,4 +1,8 @@
-import { CHAIN_REACTION_URL, SKRIBBL_URL } from "@/lib/game-urls";
+import {
+  CHAIN_REACTION_URL,
+  SKRIBBL_URL,
+  SMASHKARTS_URL,
+} from "@/lib/game-urls";
 
 export type GameStatus = "available" | "coming-soon";
 
@@ -50,6 +54,21 @@ export const games: GameEntry[] = [
     alt: "Skribbl cover with a pink drawing on a yellow field",
   },
   {
+    id: "kart-riot",
+    slug: "kart-riot",
+    name: "Kart Riot",
+    description: "Race, battle, and fight for first place.",
+    statement: "Short races, big collisions and first place or nothing.",
+    url: SMASHKARTS_URL,
+    status: "available",
+    tag: "Arena",
+    color: "#1fc27a",
+    disc: "#1423b8",
+    ink: "dark",
+    poster: "/games/kart-riot.png",
+    alt: "Kart Riot cover with a black kart and speed lines on green",
+  },
+  {
     id: "ludo",
     slug: "ludo",
     name: "Ludo",
@@ -78,21 +97,6 @@ export const games: GameEntry[] = [
     ink: "light",
     poster: "/games/whos-the-spy.png",
     alt: "Who's the Spy cover with a large yellow magnifying glass on black",
-  },
-  {
-    id: "smash-karts",
-    slug: "smash-karts",
-    name: "Smash Karts",
-    description: "Race, battle, and fight for first place.",
-    statement: "Short races, big collisions and first place or nothing.",
-    url: null,
-    status: "coming-soon",
-    tag: "Racing",
-    color: "#1fc27a",
-    disc: "#1423b8",
-    ink: "dark",
-    poster: "/games/smash-karts.png",
-    alt: "Smash Karts cover with a black kart and speed lines on green",
   },
 ];
 

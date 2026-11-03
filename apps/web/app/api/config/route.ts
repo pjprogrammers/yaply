@@ -3,6 +3,7 @@ import {
   CHAIN_REACTION_URL,
   GAME_URL_SOURCES,
   SKRIBBL_URL,
+  SMASHKARTS_URL,
 } from "@/lib/game-urls";
 import { SITE_URL } from "@/lib/site";
 
@@ -19,6 +20,7 @@ export function GET() {
       mainUrl: SITE_URL,
       chainUrl: CHAIN_REACTION_URL,
       skribblUrl: SKRIBBL_URL,
+      smashkartsUrl: SMASHKARTS_URL,
       sources: {
         ...GAME_URL_SOURCES,
         main: process.env.NEXT_PUBLIC_MAIN_URL ? "env" : "vercel",

@@ -14,25 +14,33 @@ describe("game URL environment variables", () => {
   it("requires the game URL env values", async () => {
     vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "");
 
     await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_CHAIN_URL");
   });
 
-  it("uses NEXT_PUBLIC_CHAIN_URL and NEXT_PUBLIC_SKRIBBL_URL when set", async () => {
+  it("uses the game URL env values when set", async () => {
     vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "https://chain.example.com");
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "https://draw.example.com/");
+    vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "https://karts.example.com/");
 
-    const { CHAIN_REACTION_URL, SKRIBBL_URL, GAME_URL_SOURCES } =
+    const { CHAIN_REACTION_URL, SKRIBBL_URL, SMASHKARTS_URL, GAME_URL_SOURCES } =
       await loadGameUrls();
 
     expect(CHAIN_REACTION_URL).toBe("https://chain.example.com");
     expect(SKRIBBL_URL).toBe("https://draw.example.com");
-    expect(GAME_URL_SOURCES).toEqual({ chain: "env", skribbl: "env" });
+    expect(SMASHKARTS_URL).toBe("https://karts.example.com");
+    expect(GAME_URL_SOURCES).toEqual({
+      chain: "env",
+      skribbl: "env",
+      smashkarts: "env",
+    });
   });
 
   it("rejects a malformed env value instead of rendering a relative link", async () => {
     vi.stubEnv("NEXT_PUBLIC_CHAIN_URL", "https://chain.example.com");
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "skribbl.example.com");
+    vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "https://karts.example.com");
 
     await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_SKRIBBL_URL");
   });

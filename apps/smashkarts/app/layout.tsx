@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Inter } from "next/font/google";
+import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const display = Archivo_Black({
@@ -16,7 +17,7 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3003"),
+  metadataBase: new URL(SITE_URL),
   title: "Kart Riot — a browser kart arena",
   description:
     "Kart Riot is a free-for-all kart arena in your browser. Three scrap-built maps, six weapons, and up to seven bots. Drift, fire, repeat.",

@@ -21,9 +21,9 @@ packages/
   ui/         Shared UI primitives
 ```
 
-`apps/web/app/games` contains only the coming-soon game pages (Chain Reaction,
-Ludo, Smash Karts, Who's the Spy). The old Skribbl route was removed during the
-separation.
+`apps/web/app/games` contains the game pages (Chain Reaction, Skribbl, Kart
+Riot, Ludo and Who's the Spy). The old in-app Skribbl route was removed during
+the separation.
 
 ## Separation changes
 

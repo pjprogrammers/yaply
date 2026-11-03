@@ -1,4 +1,4 @@
-import { CHAIN_REACTION_URL, SKRIBBL_URL } from "@/lib/game-urls";
+import { CHAIN_REACTION_URL, SKRIBBL_URL, SMASHKARTS_URL } from "@/lib/game-urls";
 
 export type GameStatus = "available" | "coming-soon";
 
@@ -29,6 +29,14 @@ export const games: GameEntry[] = [
     tag: "Party",
   },
   {
+    id: "kart-riot",
+    name: "Kart Riot",
+    description: "Race, battle, and fight for first place.",
+    url: SMASHKARTS_URL,
+    status: "available",
+    tag: "Arena",
+  },
+  {
     id: "ludo",
     name: "Ludo",
     description: "A classic board game with friends.",
@@ -43,13 +51,5 @@ export const games: GameEntry[] = [
     url: null,
     status: "coming-soon",
     tag: "Mystery",
-  },
-  {
-    id: "smash-karts",
-    name: "Smash Karts",
-    description: "Race, battle, and fight for first place.",
-    url: null,
-    status: "coming-soon",
-    tag: "Racing",
   },
 ];

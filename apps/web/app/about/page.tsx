@@ -55,8 +55,8 @@ export default function AboutPage() {
                   and no five-minute setup before the first round.
                 </p>
                 <p>
-                  Chain Reaction and Skribbl are live now. Ludo, Who&apos;s the
-                  Spy and Smash Karts are next. Each game has its own room link,
+                  Chain Reaction, Skribbl and Kart Riot are live now. Ludo and
+                  Who&apos;s the Spy are next. Each game has its own room link,
                   its own rules and the same low-friction way in.
                 </p>
                 <p>
