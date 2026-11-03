@@ -4,7 +4,7 @@ import {
 } from "@yaply/shared/config";
 
 /**
- * Canonical origin of this Kart Riot deployment. `NEXT_PUBLIC_SMASHKARTS_URL`
+ * Canonical origin of this Smash Karts deployment. `NEXT_PUBLIC_SMASHKARTS_URL`
  * wins; Vercel's system variables provide a host when the project has not set
  * it, so Open Graph images do not fall back to localhost on a deployment.
  */
@@ -25,7 +25,7 @@ export const MAIN_URL = normalizeHttpUrl(
 );
 
 /**
- * Shared realtime WebSocket base. Kart Riot currently runs its arena locally;
+ * Shared realtime WebSocket base. Smash Karts currently runs its arena locally;
  * this value keeps the app pointed at the same backend as Skribbl and Chain
  * Reaction so an online mode can use it without another config change.
  */

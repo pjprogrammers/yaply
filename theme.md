@@ -100,7 +100,7 @@ Each game maintains Yaply's brand identity while having unique theming:
 | **Skribbl** | Bright canvas, playful | Warm colors, colorful palette, animated elements |
 | **Who's the Spy?** | Mysterious dark | Deep purples, blacks, dramatic reveals, amber accents |
 | **Chain Reaction** | Clean board, vivid | Bright cyans/oranges, satisfying animations |
-| **Kart Riot** | Action-oriented, energetic | Bold corals/blues, dynamic lighting, racing aesthetic |
+| **Smash Karts** | Action-oriented, energetic | Bold corals/blues, dynamic lighting, racing aesthetic |
 
 All games should feel part of Yaply but have distinct personalities.
 

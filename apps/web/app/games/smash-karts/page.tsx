@@ -3,7 +3,7 @@ import { GamePage } from "@/components/game-page";
 import { games } from "@/data/games";
 import { gameMetadata } from "@/lib/game-metadata";
 
-const game = games.find((entry) => entry.slug === "kart-riot")!;
+const game = games.find((entry) => entry.slug === "smash-karts")!;
 
 export const metadata: Metadata = gameMetadata(game);
 

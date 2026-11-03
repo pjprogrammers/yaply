@@ -18,30 +18,21 @@ const body = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Kart Riot — a browser kart arena",
+  title: "Smash Karts — a browser kart arena",
   description:
-    "Kart Riot is a free-for-all kart arena in your browser. Three scrap-built maps, six weapons, and up to seven bots. Drift, fire, repeat.",
-  applicationName: "Kart Riot",
+    "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, six weapons, and up to seven bots. Drift, fire, repeat.",
+  applicationName: "Smash Karts",
   openGraph: {
-    title: "Kart Riot",
+    title: "Smash Karts",
     description:
       "Free-for-all kart combat in your browser. Three arenas, six weapons, one rule: keep moving.",
     type: "website",
-    images: [
-      {
-        url: "/media/firefight.jpg",
-        width: 1280,
-        height: 720,
-        alt: "Two karts trading fire on a neon rooftop arena.",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kart Riot",
+    title: "Smash Karts",
     description:
       "Free-for-all kart combat in your browser. Three arenas, six weapons, one rule: keep moving.",
-    images: ["/media/firefight.jpg"],
   },
 };
 

@@ -10,8 +10,8 @@ describe("game directory", () => {
     const live = games.filter((game) => game.status === "available");
     expect(live.map((game) => game.slug).sort()).toEqual([
       "chain-reaction",
-      "kart-riot",
       "skribbl",
+      "smash-karts",
     ]);
     for (const game of live) {
       expect(game.url).toMatch(/^https:\/\//);

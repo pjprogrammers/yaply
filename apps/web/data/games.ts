@@ -54,9 +54,9 @@ export const games: GameEntry[] = [
     alt: "Skribbl cover with a pink drawing on a yellow field",
   },
   {
-    id: "kart-riot",
-    slug: "kart-riot",
-    name: "Kart Riot",
+    id: "smash-karts",
+    slug: "smash-karts",
+    name: "Smash Karts",
     description: "Race, battle, and fight for first place.",
     statement: "Short races, big collisions and first place or nothing.",
     url: SMASHKARTS_URL,
@@ -65,8 +65,8 @@ export const games: GameEntry[] = [
     color: "#1fc27a",
     disc: "#1423b8",
     ink: "dark",
-    poster: "/games/kart-riot.png",
-    alt: "Kart Riot cover with a black kart and speed lines on green",
+    poster: "/games/smash-karts.png",
+    alt: "Smash Karts cover with a black kart and speed lines on green",
   },
   {
     id: "ludo",

@@ -194,7 +194,7 @@ export class GameEngine {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.24;
     this.renderer.domElement.className = "game-canvas";
-    this.renderer.domElement.setAttribute("aria-label", "Kart Riot arena");
+    this.renderer.domElement.setAttribute("aria-label", "Smash Karts arena");
     this.renderer.domElement.tabIndex = 0;
     container.appendChild(this.renderer.domElement);
 
@@ -281,7 +281,7 @@ export class GameEngine {
     this.muted = value;
     this.audio.setMuted(value);
     try {
-      window.localStorage.setItem("kartriot:muted", value ? "1" : "0");
+      window.localStorage.setItem("smashkarts:muted", value ? "1" : "0");
     } catch {
       // storage can be unavailable in private mode
     }

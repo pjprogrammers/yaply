@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export function GET() {
   return NextResponse.json(
     {
-      game: "kart-riot",
+      game: "smashkarts",
       siteUrl: SITE_URL,
       mainUrl: MAIN_URL,
       realtimeUrl: REALTIME_URL,

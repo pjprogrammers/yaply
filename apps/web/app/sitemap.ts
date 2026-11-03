@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const gamePages = [
     "chain-reaction",
     "skribbl",
-    "kart-riot",
+    "smash-karts",
     "ludo",
     "whos-the-spy",
   ];

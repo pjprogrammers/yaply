@@ -29,8 +29,8 @@ export const games: GameEntry[] = [
     tag: "Party",
   },
   {
-    id: "kart-riot",
-    name: "Kart Riot",
+    id: "smash-karts",
+    name: "Smash Karts",
     description: "Race, battle, and fight for first place.",
     url: SMASHKARTS_URL,
     status: "available",

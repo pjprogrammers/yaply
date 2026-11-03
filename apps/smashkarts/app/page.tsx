@@ -15,7 +15,7 @@ export default function Home() {
     <main id="main">
       <nav className="nav margins" aria-label="Primary">
         <Link href="/" className="nav-word">
-          Kart Riot
+          Smash Karts
         </Link>
         <div className="nav-links">
           <a href="#arenas">Arenas</a>
@@ -33,9 +33,9 @@ export default function Home() {
         <div className="hero-grid">
           <div className="hero-copy margins">
             <h1 id="hero-title" className="display hero-title">
-              Kart
+              Smash
               <br />
-              Riot
+              Karts
             </h1>
             <p className="hero-sub">
               A free-for-all kart arena in your browser. Three scrap-built maps,
@@ -305,7 +305,7 @@ export default function Home() {
         <div className="margins">
           <Reveal>
             <h2 id="cta-title" className="display cta-title">
-              Kart Riot
+              Smash Karts
             </h2>
             <div className="cta-row">
               <p>
@@ -323,7 +323,7 @@ export default function Home() {
 
       <footer className="footer margins">
         <p className="footer-word" aria-hidden="true">
-          Kart Riot
+          Smash Karts
         </p>
         <div className="footer-row">
           <span>An original browser arena game from Yaply. © 2026 Yaply.</span>

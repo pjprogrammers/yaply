@@ -7,7 +7,7 @@
 | Main site | Vercel Hobby | `apps/web` | `NEXT_PUBLIC_MAIN_URL` in `yaply-web` |
 | Skribbl | Vercel Hobby | `apps/skribbl` | `NEXT_PUBLIC_SKRIBBL_URL` |
 | Chain Reaction | Vercel Hobby | `apps/chain` | `NEXT_PUBLIC_CHAIN_URL` |
-| Kart Riot | Vercel Hobby | `apps/smashkarts` | `NEXT_PUBLIC_SMASHKARTS_URL` |
+| Smash Karts | Vercel Hobby | `apps/smashkarts` | `NEXT_PUBLIC_SMASHKARTS_URL` |
 | Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `NEXT_PUBLIC_REALTIME_URL` in each game |
 
 Frontend deployment URLs come from the environment. The only committed
@@ -118,7 +118,7 @@ socket upgrades per client per minute) or leave a minute between runs.
 NEXT_PUBLIC_MAIN_URL=https://<main-project>.vercel.app
 NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
-NEXT_PUBLIC_SMASHKARTS_URL=https://<kart-riot-project>.vercel.app
+NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
 ```
 
 `NEXT_PUBLIC_MAIN_URL` is the canonical origin used by the page metadata,
@@ -147,14 +147,14 @@ NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
 # yaply-chain + yaply-web
 NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 # yaply-smashkarts + yaply-web
-NEXT_PUBLIC_SMASHKARTS_URL=https://<kart-riot-project>.vercel.app
+NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
 ```
 
 For local development the URL can be omitted; the apps fall back to their Vercel
 system hostname, then to `http://localhost:3001` (Skribbl), `3002` (Chain
-Reaction) or `3003` (Kart Riot).
+Reaction) or `3003` (Smash Karts).
 
-Kart Riot currently runs its arena locally against bots. Its realtime URL is
+Smash Karts currently runs its arena locally against bots. Its realtime URL is
 wired through the same config and diagnostic endpoint as the other games, but
 the Worker protocol only accepts `skribbl` and `chain` rooms until online Kart
 Riot multiplayer is implemented.
@@ -189,7 +189,7 @@ Each app exposes a public, non-secret diagnostic endpoint:
 curl https://<main-project>.vercel.app/api/config
 curl https://<chain-project>.vercel.app/api/config
 curl https://<skribbl-project>.vercel.app/api/config
-curl https://<kart-riot-project>.vercel.app/api/config
+curl https://<smash-karts-project>.vercel.app/api/config
 ```
 
 `/api/config` returns the effective main-site and game URLs, the source of each
@@ -315,7 +315,7 @@ ship independently.
 `NEXT_PUBLIC_SMASHKARTS_URL` must be the public origin of this project
 (its `*.vercel.app` domain, or a custom domain once attached). The app uses it
 as `metadataBase` for the Open Graph images. The same variable is set on
-`yaply-web`, where it is the Kart Riot link.
+`yaply-web`, where it is the Smash Karts link.
 
 Installing from the repository root is required so npm workspaces can resolve
 `@yaply/shared`. If Vercel cannot read files outside the selected Root
@@ -351,8 +351,8 @@ then redeploy both the Worker and the affected frontend.
 11. Chain placements, cascades, eliminations, and the winner match on both clients.
 12. A third client cannot join a full room; an invalid room code shows a clean error.
 13. Links from the main site reach all three game deployments, including
-    `/games/kart-riot` → the value of `NEXT_PUBLIC_SMASHKARTS_URL`, and the old
-    `/games/smash-karts` URL redirects to it.
+    `/games/smash-karts` → the value of `NEXT_PUBLIC_SMASHKARTS_URL`, and the old
+    `/games/kart-riot` URL redirects to it.
 14. `npm run test:e2e` passes against a locally running Worker and both
     frontends (six Playwright tests, including full matches, refresh/reconnect,
     drawer disconnects, and Chain eliminations/surrenders).
@@ -368,7 +368,7 @@ then redeploy both the Worker and the affected frontend.
 - `POST /rooms` is the only production room-allocation path. The Worker
   generates the code, reserves it in the `${game}:${code}` Durable Object
   before responding, and retries collisions internally. The Skribbl and Chain
-  Reaction frontends call it before navigating to `/room/[code]`. Kart Riot
+  Reaction frontends call it before navigating to `/room/[code]`. Smash Karts
   currently runs its arena locally and does not create rooms.
 - A collision during `room.create` (for example, a copied `?host=1` URL opened
   in a second tab) automatically falls back to `room.join`. When a Player

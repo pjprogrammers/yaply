@@ -22,7 +22,7 @@ export const SKRIBBL_URL = requireHttpUrl(
 );
 
 // The app directory and package keep the `smashkarts` name; the public game is
-// Kart Riot, so the env var and export stay recognisable.
+// Smash Karts, so the env var and export stay recognisable.
 export const SMASHKARTS_URL = requireHttpUrl(
   process.env.NEXT_PUBLIC_SMASHKARTS_URL,
   "NEXT_PUBLIC_SMASHKARTS_URL",

@@ -10,7 +10,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("kart riot config", () => {
+describe("smash karts config", () => {
   it("falls back to local development defaults when env is unset", async () => {
     vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "");
     vi.stubEnv("NEXT_PUBLIC_MAIN_URL", "");

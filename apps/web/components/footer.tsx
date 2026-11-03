@@ -55,7 +55,7 @@ export function Footer() {
         <div className="site-footer__bottom">
           <p className="site-footer__about">
             Yaply is a browser games platform for game night. Play Chain
-            Reaction, Skribbl and Kart Riot with friends using one link or room
+            Reaction, Skribbl and Smash Karts with friends using one link or room
             code. Ludo and Who&apos;s the Spy are on the way.
           </p>
           <p>

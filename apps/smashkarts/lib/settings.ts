@@ -30,8 +30,8 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   duration: 300,
 };
 
-const STORAGE_KEY = "kartriot:settings";
-const MUTE_KEY = "kartriot:muted";
+const STORAGE_KEY = "smashkarts:settings";
+const MUTE_KEY = "smashkarts:muted";
 
 function isMapId(value: unknown): value is MapId {
   return typeof value === "string" && value in MAPS;

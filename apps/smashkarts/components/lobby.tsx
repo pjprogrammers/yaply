@@ -39,7 +39,7 @@ export function Lobby({ initial, onStart }: LobbyProps) {
       <div className="margins">
         <header className="lobby-head">
           <Link href="/" className="nav-word">
-            Kart Riot
+            Smash Karts
           </Link>
           <div className="flex items-center gap-5 text-sm">
             <span className="hidden text-ash sm:inline">Garage</span>

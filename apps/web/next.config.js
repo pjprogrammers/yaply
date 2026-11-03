@@ -3,11 +3,11 @@ const nextConfig = {
   transpilePackages: ["@yaply/shared"],
   async redirects() {
     return [
-      // The game shipped as "Smash Karts" in early previews. Keep old links
-      // working while the public name is Kart Riot.
+      // The game shipped as "Kart Riot" in early previews. Keep old links
+      // working while the public name is Smash Karts.
       {
-        source: "/games/smash-karts",
-        destination: "/games/kart-riot",
+        source: "/games/kart-riot",
+        destination: "/games/smash-karts",
         permanent: true,
       },
     ];
