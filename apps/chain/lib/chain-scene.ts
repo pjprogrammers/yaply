@@ -14,6 +14,11 @@ export type ChainSceneState = {
   theme: ChainTheme;
 };
 
+export type ChainSceneOptions = {
+  /** Tumble multi-orb clusters while idle. Disable to keep orbs fixed in place. */
+  idleMotion?: boolean;
+};
+
 type OrbOffset = { x: number; y: number };
 
 type Flight = {
@@ -158,10 +163,16 @@ export class ChainScene {
   private transposed = false;
   private frame: number | null = null;
   private reducedMotion = false;
+  private idleMotion: boolean;
 
-  constructor(canvas: HTMLCanvasElement, initial: ChainSceneState) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    initial: ChainSceneState,
+    options: ChainSceneOptions = {},
+  ) {
     this.canvas = canvas;
     this.state = initial;
+    this.idleMotion = options.idleMotion ?? true;
     this.transposed = this.orientationFor(
       canvas.clientWidth,
       canvas.clientHeight,
@@ -797,7 +808,7 @@ export class ChainScene {
       const count = group.userData.n as number;
       if (!group.children.length) continue;
 
-      if (!this.reducedMotion && count > 1) {
+      if (this.idleMotion && !this.reducedMotion && count > 1) {
         const speed = count === 2 ? 1.8 : 2.3;
         const phase = group.userData.phase as number;
         group.rotation.x = seconds * speed * 0.8 + phase;

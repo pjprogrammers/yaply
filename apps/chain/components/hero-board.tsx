@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PLAYER_COLORS } from "@yaply/shared/constants";
+import type { ChainMove, ChainState, Player } from "@yaply/shared/types";
+import { ChainScene, type ChainSceneState } from "@/lib/chain-scene";
 import { PlayIcon } from "./icons";
 
 const ROWS = 6;
-const COLS = 9;
+const COLS = 11;
 const TRIGGER = { row: 0, col: 0, player: 0 };
 const NAMES = ["Mara", "Jules", "Niko", "Ari"];
 const PLAYERS = [0, 1, 2, 3];
@@ -20,14 +22,18 @@ const SEEDS: Array<[row: number, col: number, owner: number, count: number]> = [
   [1, 2, 2, 3],
   [2, 2, 2, 2],
   [2, 4, 3, 1],
+  [2, 7, 1, 1],
+  [2, 9, 0, 1],
   [3, 4, 1, 1],
   [3, 6, 2, 1],
-  [3, 7, 3, 1],
-  [4, 7, 2, 2],
-  [4, 8, 2, 1],
+  [3, 8, 3, 1],
+  [3, 10, 2, 2],
+  [4, 5, 3, 2],
+  [4, 8, 2, 2],
+  [4, 10, 2, 1],
+  [5, 3, 1, 2],
   [5, 6, 3, 2],
-  [5, 8, 3, 1],
-  [2, 6, 1, 1],
+  [5, 9, 1, 1],
 ];
 
 type DemoCell = { owner: number | null; count: number };
@@ -136,6 +142,68 @@ function buildDemo() {
 const DEMO = buildDemo();
 const MAX_POPS = DEMO.frames.length - 1;
 
+const demoPlayerId = (player: number) => `hero-${player}`;
+
+const DEMO_PLAYERS: Player[] = PLAYERS.map((player) => ({
+  id: demoPlayerId(player),
+  nickname: NAMES[player],
+  avatar: "",
+  color: PLAYER_COLORS[player],
+  score: 0,
+  connected: true,
+  guessedCorrectly: false,
+  joinedAt: 0,
+}));
+
+function demoChain(
+  cells: DemoCell[],
+  moveCount: number,
+  lastMove: ChainMove | null,
+): ChainState {
+  return {
+    rows: ROWS,
+    cols: COLS,
+    cells: cells.map((cell) => ({
+      ownerId: cell.owner === null ? null : demoPlayerId(cell.owner),
+      orbs: cell.count,
+    })),
+    turnPlayerId: demoPlayerId(TRIGGER.player),
+    eliminatedPlayerIds: [],
+    winnerId: null,
+    lastMove,
+    turnEndsAt: null,
+    moveCount,
+  };
+}
+
+function demoLastMove(step: number): ChainMove | null {
+  if (step === 0) {
+    return {
+      playerId: demoPlayerId(TRIGGER.player),
+      row: TRIGGER.row,
+      col: TRIGGER.col,
+      explosions: [],
+      captured: 0,
+      orbsPlaced: 1,
+    };
+  }
+
+  const popped = step > 0 ? DEMO.frames[step]?.popped : null;
+  if (!popped) return null;
+
+  const [row, col] = popped;
+  const owner =
+    DEMO.frames[step - 1]?.cells[index(row, col)].owner ?? TRIGGER.player;
+  return {
+    playerId: demoPlayerId(owner),
+    row,
+    col,
+    explosions: [{ row, col, ownerId: demoPlayerId(owner) }],
+    captured: 0,
+    orbsPlaced: 0,
+  };
+}
+
 function totalsFor(cells: DemoCell[]): number[] {
   return PLAYERS.map((player) =>
     cells
@@ -147,11 +215,13 @@ function totalsFor(cells: DemoCell[]): number[] {
 export function ChainHeroBoard() {
   const [step, setStep] = useState(-1);
   const [phase, setPhase] = useState<"idle" | "playing" | "done">("idle");
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const sceneRef = useRef<ChainScene | null>(null);
 
   const frame = step < 0 ? null : DEMO.frames[step];
   const cells = frame?.cells ?? DEMO.initial;
   const totals = totalsFor(cells);
-  const popped = frame?.popped ?? null;
   const pops = step < 0 ? 0 : DEMO.frames.slice(0, step + 1).filter((item) => item.popped).length;
   const finished = phase === "done";
   const playing = phase === "playing";
@@ -169,6 +239,57 @@ export function ChainHeroBoard() {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [phase, step]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const stage = stageRef.current;
+    if (!canvas || !stage) return;
+
+    const state: ChainSceneState = {
+      chain: demoChain(DEMO.initial, 0, null),
+      players: DEMO_PLAYERS,
+      meId: null,
+      canPlay: false,
+      selected: { row: TRIGGER.row, col: TRIGGER.col },
+      flash: new Set(),
+      theme: "dark",
+    };
+
+    const scene = new ChainScene(canvas, state, { idleMotion: false });
+    sceneRef.current = scene;
+
+    const onResize = () => scene.resize();
+    const observer = new ResizeObserver(onResize);
+    observer.observe(stage);
+    window.addEventListener("resize", onResize);
+    scene.resize();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onResize);
+      scene.dispose();
+      sceneRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const nextFrame = step < 0 ? null : DEMO.frames[step];
+    const cells = nextFrame?.cells ?? DEMO.initial;
+    const flash = new Set(nextFrame?.changed ?? []);
+
+    scene.update({
+      chain: demoChain(cells, step + 1, demoLastMove(step)),
+      players: DEMO_PLAYERS,
+      meId: null,
+      canPlay: false,
+      selected: step < 0 ? { row: TRIGGER.row, col: TRIGGER.col } : null,
+      flash,
+      theme: "dark",
+    });
+    scene.pulseCells(flash);
+  }, [step]);
 
   const run = () => {
     if (playing) return;
@@ -191,8 +312,6 @@ export function ChainHeroBoard() {
     : finished
       ? `The chain settles. Blue owns ${totals[0]} orbs.`
       : "Mara's corner is one orb from popping. Run it.";
-
-  const boardKey = step < 0 ? "initial" : `frame-${step}`;
 
   return (
     <div className="cr-demo-wrap">
@@ -221,44 +340,13 @@ export function ChainHeroBoard() {
                 Demo table · FUSE42
               </span>
               <span className="cr-demo-meta">
-                {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : "11 × 6"} · turn 12
+                {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : `${COLS} × ${ROWS}`} · turn 12
               </span>
             </div>
 
             <div className="cr-demo-board-shell">
-              <div className="cr-demo-board" key={boardKey} aria-hidden>
-                {cells.map((cell, cellIndex) => {
-                  const row = Math.floor(cellIndex / COLS);
-                  const col = cellIndex % COLS;
-                  const cellKey = keyOf(row, col);
-                  const isPopped = popped?.[0] === row && popped?.[1] === col;
-                  const isChanged = Boolean(frame?.changed.includes(cellKey));
-                  const isArmed = step < 0 && row === TRIGGER.row && col === TRIGGER.col;
-                  return (
-                    <span
-                      className={[
-                        "cr-demo-cell",
-                        isArmed ? "is-armed" : "",
-                        isPopped ? "is-popped" : "",
-                        isChanged && !isPopped ? "is-changed" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      key={cellKey}
-                    >
-                      {cell.owner !== null && cell.count > 0 && (
-                        <span className="cr-demo-orbs">
-                          {Array.from({ length: Math.min(cell.count, 6) }).map((_, orb) => (
-                            <i
-                              key={orb}
-                              style={{ background: PLAYER_COLORS[cell.owner as number] }}
-                            />
-                          ))}
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
+              <div className="cr-demo-canvas-stage" ref={stageRef} aria-hidden>
+                <canvas ref={canvasRef} className="cr-demo-canvas" />
               </div>
             </div>
 
