@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { buildArena, type ArenaWorld } from "./world";
+import { buildArena, groundHeightAt, type ArenaWorld } from "./world";
 import { buildKart, disposeObject, type KartVisual } from "./kart-mesh";
 import { buildPickup, type PickupVisual } from "./pickup-mesh";
 import { GameAudio } from "./audio";
@@ -40,10 +40,13 @@ interface KartActor {
   /** Guest replication target, smoothed by the renderer between snapshots. */
   netX: number;
   netZ: number;
+  netY: number;
   netYaw: number;
   vx: number;
   vz: number;
   vy: number;
+  grounded: boolean;
+  boostPadCooldown: number;
   speed: number;
   hp: number;
   weapon: WeaponId;
@@ -93,6 +96,7 @@ interface MineActor {
   id: number;
   ownerId: string;
   x: number;
+  y: number;
   z: number;
   arm: number;
   life: number;
@@ -103,8 +107,8 @@ interface MineActor {
 interface PickupActor {
   id: number;
   x: number;
+  y: number;
   z: number;
-  weapon: WeaponId;
   active: boolean;
   timer: number;
   phase: number;
@@ -173,6 +177,7 @@ export class GameEngine {
   private readonly pickups: PickupActor[] = [];
   private readonly shockwaves: Shockwave[] = [];
   private readonly feed: GameSnapshot["feed"] = [];
+  private weaponBag: WeaponId[] = [];
 
   private mode: GameSnapshot["phase"] = "booting";
   private started = false;
@@ -573,10 +578,13 @@ export class GameEngine {
       yaw: 0,
       netX: 0,
       netZ: 0,
+      netY: 0,
       netYaw: 0,
       vx: 0,
       vz: 0,
       vy: 0,
+      grounded: true,
+      boostPadCooldown: 0,
       speed: 0,
       hp: KART.hp,
       weapon: "pulse",
@@ -608,21 +616,29 @@ export class GameEngine {
 
   private buildPickups() {
     this.arenaMap.pickups.forEach(([x, z], index) => {
-      const weapon = PICKUP_POOL[index % PICKUP_POOL.length];
-      const visual = buildPickup(weapon, this.pickupGlowTexture);
-      visual.group.position.set(x, 0, z);
+      const y = groundHeightAt(this.arenaMap, x, z, 0);
+      const visual = buildPickup(this.pickupGlowTexture);
+      visual.group.position.set(x, y, z);
       this.scene.add(visual.group);
       this.pickups.push({
         id: index + 1,
         x,
+        y,
         z,
-        weapon,
         active: true,
         timer: 0,
         phase: Math.random() * Math.PI * 2,
         visual,
       });
     });
+  }
+
+  /** Draws from a shuffled weighted bag so box contents stay unpredictable. */
+  private drawWeapon(): WeaponId {
+    if (this.weaponBag.length === 0) {
+      this.weaponBag = shuffle(PICKUP_POOL);
+    }
+    return this.weaponBag.pop() ?? "missile";
   }
 
   private placeAtSpawns() {
@@ -655,14 +671,17 @@ export class GameEngine {
   private spawnAt(kart: KartActor, x: number, z: number) {
     kart.x = x;
     kart.z = z;
-    kart.y = 0;
+    kart.y = groundHeightAt(this.arenaMap, x, z, 0);
     kart.yaw = Math.atan2(-x, -z);
     kart.netX = kart.x;
     kart.netZ = kart.z;
+    kart.netY = kart.y;
     kart.netYaw = kart.yaw;
     kart.vx = 0;
     kart.vz = 0;
     kart.vy = 0;
+    kart.grounded = true;
+    kart.boostPadCooldown = 0;
     kart.speed = 0;
     kart.hp = KART.hp;
     kart.weapon = "pulse";
@@ -678,7 +697,7 @@ export class GameEngine {
     kart.lastHitBy = null;
     kart.lockId = null;
     kart.visual.group.visible = true;
-    kart.visual.group.position.set(x, 0, z);
+    kart.visual.group.position.set(x, kart.y, z);
     kart.visual.group.rotation.y = kart.yaw;
     kart.visual.shield.visible = false;
     kart.visual.shieldWire.visible = false;
@@ -1017,10 +1036,12 @@ export class GameEngine {
 
     kart.netX = snapshot.x;
     kart.netZ = snapshot.z;
+    kart.netY = snapshot.y;
     kart.netYaw = snapshot.yaw;
     if (immediate) {
       kart.x = snapshot.x;
       kart.z = snapshot.z;
+      kart.y = snapshot.y;
       kart.yaw = snapshot.yaw;
     }
     kart.hp = snapshot.hp;
@@ -1121,12 +1142,13 @@ export class GameEngine {
     for (const state of snapshot.mines) {
       seen.add(state.id);
       if (this.mines.some((mine) => mine.id === state.id)) continue;
-      const { group, lamp } = this.buildMineVisual(state.x, state.z);
+      const { group, lamp } = this.buildMineVisual(state.x, state.z, state.y);
       this.scene.add(group);
       this.mines.push({
         id: state.id,
         ownerId: "",
         x: state.x,
+        y: state.y,
         z: state.z,
         arm: 0,
         life: 1,
@@ -1182,6 +1204,7 @@ export class GameEngine {
       name: kart.name,
       color: kart.color,
       x: kart.x,
+      y: kart.y,
       z: kart.z,
       yaw: kart.yaw,
       hp: Math.max(0, kart.hp),
@@ -1220,7 +1243,7 @@ export class GameEngine {
         vy: projectile.velocity.y,
         vz: projectile.velocity.z,
       })),
-      mines: this.mines.map((mine) => ({ id: mine.id, x: mine.x, z: mine.z })),
+      mines: this.mines.map((mine) => ({ id: mine.id, x: mine.x, y: mine.y, z: mine.z })),
       feed: this.feed.map((entry) => ({ ...entry })),
       winner: this.winner,
     };
@@ -1254,6 +1277,7 @@ export class GameEngine {
     kart.cooldown = Math.max(0, kart.cooldown - dt);
     kart.shieldTime = Math.max(0, kart.shieldTime - dt);
     kart.boostTime = Math.max(0, kart.boostTime - dt);
+    kart.boostPadCooldown = Math.max(0, kart.boostPadCooldown - dt);
     kart.slowTime = Math.max(0, kart.slowTime - dt);
     kart.invuln = Math.max(0, kart.invuln - dt);
     if (!kart.alive) {
@@ -1320,18 +1344,39 @@ export class GameEngine {
     kart.vz = forwardZ * forwardSpeed + rightZ * lateralSpeed;
     kart.speed = forwardSpeed;
 
+    const previousX = kart.x;
+    const previousZ = kart.z;
     kart.x += kart.vx * dt;
     kart.z += kart.vz * dt;
 
-    if (kart.y > 0 || kart.vy > 0) {
-      kart.y += kart.vy * dt;
+    // Ramps and platform decks are continuous surfaces. A rise larger than a
+    // step is a side wall: refuse the move instead of teleporting the kart up.
+    const ground = groundHeightAt(this.arenaMap, kart.x, kart.z, kart.y + 0.5);
+    const rise = ground - kart.y;
+    if (rise > 0.6) {
+      kart.x = previousX;
+      kart.z = previousZ;
+      kart.vx *= 0.15;
+      kart.vz *= 0.15;
+    } else if (kart.grounded && kart.vy <= 0 && rise > -0.7) {
+      kart.y = ground;
+      kart.vy = 0;
+    } else {
       kart.vy -= 32 * dt;
-      if (kart.y <= 0) {
-        kart.y = 0;
+      kart.y += kart.vy * dt;
+      if (kart.y <= ground) {
+        if (!kart.grounded && kart.vy < -5) {
+          this.smoke.burst(kart.x, ground + 0.2, kart.z, 0x6b6357, 5, 2.2, 0.9, 0.4, 1);
+        }
+        kart.y = ground;
         kart.vy = 0;
-        this.smoke.burst(kart.x, 0.2, kart.z, 0x6b6357, 5, 2.2, 0.9, 0.4, 1);
+        kart.grounded = true;
+      } else {
+        kart.grounded = false;
       }
     }
+
+    this.checkBoostPads(kart);
 
     if (kart.drifting && Math.random() > 0.55) {
       const rearX = kart.x - forwardX * 1.2;
@@ -1349,6 +1394,27 @@ export class GameEngine {
         gravity: 12,
         drag: 1.4,
       });
+    }
+  }
+
+  /** Launch pads give a short burst with a per-kart cooldown. */
+  private checkBoostPads(kart: KartActor) {
+    if (kart.boostPadCooldown > 0 || kart.y > 0.8) {
+      return;
+    }
+    for (const pad of this.arenaMap.boostPads) {
+      const dx = kart.x - pad.x;
+      const dz = kart.z - pad.z;
+      if (dx * dx + dz * dz > 3.1 * 3.1) {
+        continue;
+      }
+      kart.boostTime = Math.max(kart.boostTime, KART.boostDuration);
+      kart.boostPadCooldown = 2.4;
+      this.sparks.burst(kart.x, kart.y + 0.45, kart.z, 0xffa02b, 16, 8, 0.55, 0.45, 6);
+      if (kart.isPlayer) {
+        this.audio.boost();
+      }
+      return;
     }
   }
 
@@ -2585,6 +2651,7 @@ export class GameEngine {
       color: kart.color,
       isPlayer: kart.isPlayer,
       x: kart.x,
+      y: kart.y,
       z: kart.z,
       yaw: kart.yaw,
       hp: Math.max(0, Math.round(kart.hp)),
@@ -2607,7 +2674,6 @@ export class GameEngine {
       id: pickup.id,
       x: pickup.x,
       z: pickup.z,
-      weapon: pickup.weapon,
       active: pickup.active,
     }));
 

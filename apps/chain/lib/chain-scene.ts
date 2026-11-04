@@ -36,6 +36,12 @@ const CELL_HALF = 0.5;
 const CELL_DEPTH = 0.5;
 const GRID_FILL = 0.995;
 const MAX_CELL_ASPECT = 1.2;
+/**
+ * Desktop boards sit much closer to the camera than portrait phones, so a full
+ * box depth makes the front/back wireframes spread apart at the edges. Keep the
+ * extrusion subtle in landscape while leaving the portrait board untouched.
+ */
+const LANDSCAPE_DEPTH_SCALE = 0.45;
 const FLIGHT_MS = 270;
 const FLIGHT_LIFT = 0.46;
 const PLACEMENT_MS = 340;
@@ -334,7 +340,8 @@ export class ChainScene {
     this.cellHeight = cellHeight;
     this.orbScale = Math.min(1, minCell);
 
-    const depthScale = this.orbScale;
+    const depthScale =
+      this.orbScale * (width > height ? LANDSCAPE_DEPTH_SCALE : 1);
     this.gridRoot.scale.set(cellWidth, cellHeight, depthScale);
     this.layoutCells();
 
@@ -350,19 +357,6 @@ export class ChainScene {
     this.camera.lookAt(0, 0, 0);
     this.camera.updateProjectionMatrix();
 
-    (window as unknown as { __chainDebug?: unknown }).__chainDebug = {
-      width,
-      height,
-      aspect,
-      displayRows,
-      displayCols,
-      cellWidth,
-      cellHeight,
-      orbScale: this.orbScale,
-      distance,
-      fov: this.camera.fov,
-      transposed: this.transposed,
-    };
     this.hoverFill.scale.set(cellWidth, cellHeight, 1);
     this.selectionFill.scale.set(cellWidth, cellHeight, 1);
     this.selectionEdges.scale.set(cellWidth, cellHeight, 1);
