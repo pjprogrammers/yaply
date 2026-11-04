@@ -216,10 +216,10 @@ export type ChainBoardPreset = {
  * `xxl` is the widest board the 3D renderer and mobile layout are tuned for.
  */
 export const CHAIN_BOARD_PRESETS: Record<ChainBoardSize, ChainBoardPreset> = {
-  small: { rows: 5, cols: 7, label: "Small" },
-  medium: { rows: 6, cols: 9, label: "Medium" },
-  large: { rows: 8, cols: 12, label: "Large" },
-  xxl: { rows: 10, cols: 14, label: "XXL (14)" },
+  small: { rows: 9, cols: 5, label: "Small" },
+  medium: { rows: 11, cols: 6, label: "Medium" },
+  large: { rows: 15, cols: 8, label: "Large" },
+  xxl: { rows: 18, cols: 10, label: "XXL (10)" },
 };
 
 export const CHAIN_BOARD_SIZE_IDS = Object.keys(CHAIN_BOARD_PRESETS) as ChainBoardSize[];

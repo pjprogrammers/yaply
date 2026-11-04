@@ -11,6 +11,8 @@ export type BoardTheme = {
   gridLine: string;
   /** Outer board outline and the brightest lattice edges. */
   gridLineStrong: string;
+  /** Colour the active player's grid tint is mixed toward. */
+  gridLineTarget: string;
   /** Barely-there tint inside the lattice. */
   cellTint: string;
   hoverFill: string;
@@ -28,6 +30,7 @@ const THEMES: Record<ChainTheme, BoardTheme> = {
     gradientBottom: "#090a0f",
     gridLine: "rgba(221,220,235,0.62)",
     gridLineStrong: "rgba(238,237,248,0.84)",
+    gridLineTarget: "#f2e4ea",
     cellTint: "rgba(0,0,0,0.045)",
     hoverFill: "rgba(76,179,240,0.10)",
     selectedFill: "rgba(76,179,240,0.18)",
@@ -42,6 +45,7 @@ const THEMES: Record<ChainTheme, BoardTheme> = {
     gradientBottom: "#d9cfbf",
     gridLine: "rgba(41,34,24,0.34)",
     gridLineStrong: "rgba(41,34,24,0.56)",
+    gridLineTarget: "#3a2d1e",
     cellTint: "rgba(255,255,255,0.02)",
     hoverFill: "rgba(31,122,224,0.09)",
     selectedFill: "rgba(31,122,224,0.16)",
@@ -56,6 +60,7 @@ const THEMES: Record<ChainTheme, BoardTheme> = {
     gradientBottom: "#02050a",
     gridLine: "rgba(125,228,255,0.42)",
     gridLineStrong: "rgba(167,242,255,0.78)",
+    gridLineTarget: "#d9fbff",
     cellTint: "rgba(0,0,0,0.08)",
     hoverFill: "rgba(57,255,136,0.09)",
     selectedFill: "rgba(57,255,136,0.17)",

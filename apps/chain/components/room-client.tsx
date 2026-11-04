@@ -21,11 +21,13 @@ import {
 import { settingsFromSearchParams } from "@/lib/chain-settings";
 import { Board } from "./board";
 import { Chat, type ChatMessage } from "./chat";
-import { CheckIcon, ClockIcon, CopyIcon, PlayIcon } from "./icons";
+import { GameMenuFacts, GameMenuSection, GameStage } from "./game-stage";
+import { CheckIcon, ClockIcon, CopyIcon, ExpandIcon, PlayIcon } from "./icons";
 import { PlayerList } from "./player-list";
 import { ChainSettingsFields } from "./settings-controls";
 import { Topbar } from "./topbar";
 import { MAIN_URL } from "@/lib/config";
+import { useGameFullscreen } from "@/hooks/use-game-fullscreen";
 
 const FATAL_CODES = new Set([
   "ROOM_NOT_FOUND",
@@ -227,6 +229,12 @@ function ConnectedRoom({
     chain?.turnPlayerId === playerId;
   const eliminated = chain?.eliminatedPlayerIds.includes(playerId ?? "") ?? false;
   const fatal = error && FATAL_CODES.has(error.code) ? error : null;
+  const {
+    fullscreen,
+    enter: enterFullscreen,
+    exit: exitFullscreen,
+    toggle: toggleFullscreen,
+  } = useGameFullscreen(phase !== "lobby");
 
   const boardPreset = CHAIN_BOARD_PRESETS[roomSettings.boardSize ?? "medium"];
   const paletteName =
@@ -300,6 +308,9 @@ function ConnectedRoom({
       setToast({ message: "At least two players are needed to start.", error: true });
       return;
     }
+    // The click is a user gesture, so the host can get native fullscreen even
+    // before the server flips the room into the playing phase.
+    void enterFullscreen();
     send({ type: "room.start" });
   };
 
@@ -360,6 +371,252 @@ function ConnectedRoom({
     ? Math.max(0, Math.min(8, roomSettings.maxPlayers) - snapshot.players.length)
     : 0;
 
+  const connectionWarning =
+    status === "reconnecting" || status === "disconnected" || status === "failed";
+  const hostPlayer =
+    snapshot.players.find((player) => player.id === snapshot.hostId) ?? null;
+  const turnLabel =
+    phase === "game-over"
+      ? "Game over"
+      : canPlay
+        ? "Your move"
+        : currentPlayer
+          ? `${currentPlayer.nickname}'s move`
+          : "Waiting for the next turn";
+  const turnDetail = `Round ${Math.max(1, snapshot.roundNumber)} · ${
+    chain?.moveCount ?? 0
+  } moves · ${code.toUpperCase()}`;
+  const turnColor = currentPlayer?.color ?? me?.color ?? "var(--accent)";
+  const stageHint =
+    phase === "game-over"
+      ? "Final board"
+      : canPlay
+        ? roomSettings.confirmMoves
+          ? "Tap a cell twice to place · Arrow keys + Enter works too"
+          : "Tap an open cell · Arrow keys + Enter works too"
+        : currentPlayer
+          ? `${currentPlayer.nickname} is choosing a cell`
+          : "Waiting for the next turn";
+
+  const stageTimer =
+    snapshot.endsAt && phase !== "game-over" ? (
+      <span className="stage-clock" aria-label={`${remaining} seconds left`}>
+        <ClockIcon size={14} />
+        <span className="stage-clock-value num">{remaining}</span>
+        <span className="stage-clock-track">
+          <span className="stage-clock-fill" style={{ width: `${progress * 100}%` }} />
+        </span>
+      </span>
+    ) : (
+      <span className="stage-pill">
+        {phase === "game-over" ? "Finished" : "Waiting"}
+      </span>
+    );
+
+  const toastNode = toast ? (
+    <div className={`toast ${toast.error ? "toast--error" : ""}`} role="status">
+      {toast.message}
+    </div>
+  ) : null;
+
+  const gameOverOverlay =
+    phase === "game-over" ? (
+      <div className="canvas-overlay">
+        <div className="overlay-card">
+          <p className="eyebrow">Game over</p>
+          <p className="overlay-title">
+            {winner ? `${winner.nickname} wins the board` : "Final board"}
+          </p>
+          <p className="overlay-sub">
+            {rankings.length} players · {chain?.moveCount ?? 0} moves played
+          </p>
+          <div className="result-rankings">
+            {rankings.map((entry, index) => (
+              <div
+                className={`result-rank-row ${entry.playerId === winnerId ? "result-rank-row--winner" : ""}`}
+                key={entry.playerId}
+              >
+                <span className="rank">{index + 1}</span>
+                <span className="result-rank-name">
+                  {entry.nickname}
+                  {entry.playerId === playerId ? " (you)" : ""}
+                </span>
+                <span className="result-rank-score">
+                  {entry.score} <span className="small faint">orbs</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="overlay-actions">
+            {isHost ? (
+              <button
+                className="btn btn--primary"
+                type="button"
+                onClick={() => send({ type: "game.rematch" })}
+              >
+                <PlayIcon size={14} />
+                Rematch
+              </button>
+            ) : (
+              <span className="muted small">Waiting for the host to start a rematch.</span>
+            )}
+            <button className="btn btn--ghost" type="button" onClick={handleLeave}>
+              Leave room
+            </button>
+            <a className="btn btn--ghost" href={MAIN_URL}>
+              Main Yaply page
+            </a>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  const boardArea = (
+    <div className="board-shell">
+      {chain ? (
+        <Board
+          chain={chain}
+          players={snapshot.players}
+          meId={playerId}
+          canPlay={canPlay}
+          onPlace={(row, col) => send({ type: "chain.place", row, col })}
+          flash={flash}
+          confirmMoves={roomSettings.confirmMoves}
+          theme={roomSettings.theme}
+          fullscreen={fullscreen}
+          onToggleFullscreen={() => void toggleFullscreen()}
+        />
+      ) : (
+        <div className="empty">Setting up the board…</div>
+      )}
+      {gameOverOverlay}
+    </div>
+  );
+
+  const roomMenu = (
+    <>
+      <GameMenuSection
+        title="Room"
+        aside={
+          <span className="status" title={`Connection: ${STATUS_LABEL[status] ?? status}`}>
+            <span className="status-dot" data-status={status} />
+            {STATUS_LABEL[status] ?? status}
+          </span>
+        }
+      >
+        <div className="stage-room-code">
+          <div>
+            <span className="eyebrow">Room code</span>
+            <span className="room-code">{code.toUpperCase()}</span>
+          </div>
+          <button className="btn btn--sm" type="button" onClick={copyInvite}>
+            {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+            {copied ? "Copied" : "Copy invite"}
+          </button>
+        </div>
+        <GameMenuFacts
+          items={[
+            { label: "Board", value: `${boardPreset.rows} × ${boardPreset.cols}` },
+            { label: "Players", value: `${snapshot.players.length} / ${roomSettings.maxPlayers}` },
+            { label: "Palette", value: paletteName },
+            { label: "Theme", value: themeName },
+            { label: "Turn clock", value: `${turnTime}s` },
+            { label: "Confirm moves", value: roomSettings.confirmMoves ? "On" : "Off" },
+            { label: "Host", value: hostPlayer?.nickname ?? "—" },
+            { label: "Status", value: turnLabel },
+          ]}
+        />
+      </GameMenuSection>
+
+      <GameMenuSection
+        title="Leaderboard"
+        aside={<span className="pill">{snapshot.players.length} in room</span>}
+      >
+        <PlayerList
+          players={snapshot.players}
+          meId={playerId}
+          hostId={snapshot.hostId}
+          turnPlayerId={chain?.turnPlayerId ?? null}
+          eliminatedIds={chain?.eliminatedPlayerIds ?? []}
+        />
+      </GameMenuSection>
+
+      <GameMenuSection
+        title="Room chat"
+        aside={
+          <span className="pill">
+            {messages.length > 0 ? `${messages.length} lines` : "quiet"}
+          </span>
+        }
+      >
+        <Chat
+          messages={messages}
+          onSend={(text) => send({ type: "chat.guess", text })}
+          disabled={status !== "connected"}
+          placeholder="Type a message…"
+          hint="Trash talk is part of the game."
+          hideHeader
+        />
+      </GameMenuSection>
+
+      <GameMenuSection title="Actions">
+        <div className="stage-action-grid">
+          {phase === "playing" && !eliminated && (
+            <button className="btn btn--danger btn--block" type="button" onClick={surrender}>
+              Surrender
+            </button>
+          )}
+          {phase === "game-over" && isHost && (
+            <button
+              className="btn btn--primary btn--block"
+              type="button"
+              onClick={() => send({ type: "game.rematch" })}
+            >
+              <PlayIcon size={14} />
+              Rematch
+            </button>
+          )}
+          <button className="btn btn--ghost btn--block" type="button" onClick={handleLeave}>
+            Leave room
+          </button>
+          <a className="btn btn--ghost btn--block" href={MAIN_URL}>
+            Main Yaply page
+          </a>
+        </div>
+      </GameMenuSection>
+    </>
+  );
+
+  if (!isLobby && fullscreen) {
+    return (
+      <>
+        <GameStage
+          turnLabel={turnLabel}
+          turnColor={turnColor}
+          detail={turnDetail}
+          timer={stageTimer}
+          hint={stageHint}
+          banner={
+            connectionWarning ? (
+              <>
+                <span>Connection lost. Rejoining the room…</span>
+                <button type="button" onClick={() => window.location.reload()}>
+                  Reload now
+                </button>
+              </>
+            ) : undefined
+          }
+          menu={roomMenu}
+          menuLabel={`Room ${code.toUpperCase()}`}
+          onExitFullscreen={() => void exitFullscreen()}
+        >
+          {boardArea}
+        </GameStage>
+        {toastNode}
+      </>
+    );
+  }
+
   return (
     <div className="app-shell">
       <Topbar>
@@ -373,6 +630,16 @@ function ConnectedRoom({
             {STATUS_LABEL[status] ?? status}
           </span>
           <div className="room-bar-actions">
+            {!isLobby && (
+              <button
+                className="btn btn--sm"
+                type="button"
+                onClick={() => void enterFullscreen()}
+              >
+                <ExpandIcon size={13} />
+                Fullscreen
+              </button>
+            )}
             <button className="btn btn--sm" type="button" onClick={copyInvite}>
               {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
               {copied ? "Copied" : "Copy invite"}
@@ -482,12 +749,6 @@ function ConnectedRoom({
                       <span className="setting-value">{themeName}</span>
                     </div>
                     <div className="setting-row">
-                      <span className="setting-label">Grid</span>
-                      <span className="setting-value">
-                        {(roomSettings.gridStyle ?? "3d") === "2d" ? "2D" : "3D"}
-                      </span>
-                    </div>
-                    <div className="setting-row">
                       <span className="setting-label">Confirm moves</span>
                       <span className="setting-value">
                         {roomSettings.confirmMoves ? "On" : "Off"}
@@ -557,70 +818,7 @@ function ConnectedRoom({
                 </div>
               </div>
 
-              <div className="board-shell">
-                {chain ? (
-                  <Board
-                    chain={chain}
-                    players={snapshot.players}
-                    meId={playerId}
-                    canPlay={canPlay}
-                    onPlace={(row, col) => send({ type: "chain.place", row, col })}
-                    flash={flash}
-                    gridStyle={roomSettings.gridStyle}
-                    confirmMoves={roomSettings.confirmMoves}
-                    theme={roomSettings.theme}
-                  />
-                ) : (
-                  <div className="empty">Setting up the board…</div>
-                )}
-
-                {phase === "game-over" && (
-                  <div className="canvas-overlay">
-                    <div className="overlay-card">
-                      <p className="eyebrow">Game over</p>
-                      <p className="overlay-title">
-                        {winner ? `${winner.nickname} wins the board` : "Final board"}
-                      </p>
-                      <p className="overlay-sub">
-                        {rankings.length} players · {chain?.moveCount ?? 0} moves played
-                      </p>
-                      <div className="result-rankings">
-                        {rankings.map((entry, index) => (
-                          <div
-                            className={`result-rank-row ${entry.playerId === winnerId ? "result-rank-row--winner" : ""}`}
-                            key={entry.playerId}
-                          >
-                            <span className="rank">{index + 1}</span>
-                            <span className="result-rank-name">
-                              {entry.nickname}
-                              {entry.playerId === playerId ? " (you)" : ""}
-                            </span>
-                            <span className="result-rank-score">
-                              {entry.score} <span className="small faint">orbs</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="overlay-actions">
-                        {isHost ? (
-                          <button className="btn btn--primary" type="button" onClick={() => send({ type: "game.rematch" })}>
-                            <PlayIcon size={14} />
-                            Rematch
-                          </button>
-                        ) : (
-                          <span className="muted small">Waiting for the host to start a rematch.</span>
-                        )}
-                        <button className="btn btn--ghost" type="button" onClick={handleLeave}>
-                          Leave room
-                        </button>
-                        <a className="btn btn--ghost" href={MAIN_URL}>
-                          Main Yaply page
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {boardArea}
 
               <div className="chain-actions">
                 <span className={`turn-pill ${canPlay ? "turn-pill--mine" : ""}`}>
@@ -701,11 +899,7 @@ function ConnectedRoom({
         )}
       </main>
 
-      {toast && (
-        <div className={`toast ${toast.error ? "toast--error" : ""}`} role="status">
-          {toast.message}
-        </div>
-      )}
+      {toastNode}
     </div>
   );
 }

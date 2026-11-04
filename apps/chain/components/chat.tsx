@@ -19,9 +19,17 @@ type ChatProps = {
   disabled?: boolean;
   placeholder?: string;
   hint?: string;
+  hideHeader?: boolean;
 };
 
-export function Chat({ messages, onSend, disabled = false, placeholder, hint }: ChatProps) {
+export function Chat({
+  messages,
+  onSend,
+  disabled = false,
+  placeholder,
+  hint,
+  hideHeader = false,
+}: ChatProps) {
   const [value, setValue] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,10 +49,14 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
 
   return (
     <div className="chat-card">
-      <div className="rail-head">
-        <span className="rail-title">Room chat</span>
-        <span className="rail-count">{messages.length > 0 ? `${messages.length} lines` : "quiet"}</span>
-      </div>
+      {!hideHeader && (
+        <div className="rail-head">
+          <span className="rail-title">Room chat</span>
+          <span className="rail-count">
+            {messages.length > 0 ? `${messages.length} lines` : "quiet"}
+          </span>
+        </div>
+      )}
       <div className="chat-list" ref={listRef} role="log" aria-live="polite">
         {messages.length === 0 ? (
           <div className="chat-empty">

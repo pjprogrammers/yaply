@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   description:
     "A turn-based board game for 2–8 players. Claim cells, stack orbs past their critical mass and watch the chain flip the table. Play online, pass-and-play or against CPUs.",
   applicationName: "Chain Reaction",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Chain Reaction",
+  },
   openGraph: {
     title: "Chain Reaction — one orb, whole board",
     description:

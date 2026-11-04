@@ -237,7 +237,7 @@ describe("Worker production configuration", () => {
   it("allows every deployed frontend origin", () => {
     // Keep this list in sync with the current Vercel project domains.
     expect(allowedOrigins).toEqual([
-      "https://yaply-web.vercel.app",
+      "https://yaplygames.vercel.app",
       "https://yaply-skribbl.vercel.app",
       "https://yaply-chain.vercel.app",
       "https://yaply-smashkarts.vercel.app",

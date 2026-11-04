@@ -189,7 +189,7 @@ export function CreateRoom() {
                   Board preview
                 </span>
                 <span className="pill pill--accent">
-                  {board.rows} × {board.cols} · {settings.gridStyle === "2d" ? "2D" : "3D"}
+                  {board.rows} × {board.cols} · 3D table
                 </span>
               </div>
               <MiniBoard rows={board.rows} cols={board.cols} colors={palette} />

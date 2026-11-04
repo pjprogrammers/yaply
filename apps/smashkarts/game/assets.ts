@@ -197,6 +197,146 @@ export function createNameTexture(name: string, color: string): THREE.CanvasText
   return texture;
 }
 
+export interface HealthBarTexture {
+  texture: THREE.CanvasTexture;
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  percent: number;
+}
+
+const HEALTH_COLORS = [
+  {
+    light: "#d9ff8a",
+    base: "#9ef01a",
+    dark: "#5fae00",
+    glow: "rgba(158, 240, 26, 0.62)",
+  },
+  {
+    light: "#ffe58a",
+    base: "#ffc233",
+    dark: "#e08a00",
+    glow: "rgba(255, 194, 51, 0.62)",
+  },
+  {
+    light: "#ffc0a0",
+    base: "#ff5a1f",
+    dark: "#c92d00",
+    glow: "rgba(255, 90, 31, 0.68)",
+  },
+];
+
+function roundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+/**
+ * Draws a high-contrast health bar into a canvas texture. The white frame and
+ * dark track keep it readable over every arena, and the bright fill makes the
+ * remaining hull obvious at a glance.
+ */
+export function paintHealthBar(bar: HealthBarTexture, ratio: number): void {
+  const percent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+  if (percent === bar.percent) {
+    return;
+  }
+  bar.percent = percent;
+
+  const { ctx, canvas } = bar;
+  const width = canvas.width;
+  const height = canvas.height;
+  const clamped = percent / 100;
+  const colors =
+    clamped > 0.55
+      ? HEALTH_COLORS[0]
+      : clamped > 0.25
+        ? HEALTH_COLORS[1]
+        : HEALTH_COLORS[2];
+
+  ctx.clearRect(0, 0, width, height);
+
+  // Light outer frame with a soft coloured glow so the bar separates from the
+  // karts, walls and sky behind it.
+  ctx.save();
+  ctx.shadowColor = colors.glow;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = "#fffdf6";
+  roundedRect(ctx, 2, 2, width - 4, height - 4, 16);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(8, 8, 7, 0.95)";
+  roundedRect(ctx, 8, 8, width - 16, height - 16, 10);
+  ctx.fill();
+
+  const x = 12;
+  const y = 12;
+  const trackWidth = width - 24;
+  const trackHeight = height - 24;
+  const fillWidth =
+    clamped <= 0 ? 0 : Math.min(trackWidth, Math.max(8, trackWidth * clamped));
+
+  if (fillWidth > 0) {
+    const gradient = ctx.createLinearGradient(0, y, 0, y + trackHeight);
+    gradient.addColorStop(0, colors.light);
+    gradient.addColorStop(0.55, colors.base);
+    gradient.addColorStop(1, colors.dark);
+    ctx.fillStyle = gradient;
+    roundedRect(ctx, x, y, fillWidth, trackHeight, 7);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+    roundedRect(ctx, x + 2, y + 2, Math.max(0, fillWidth - 4), trackHeight * 0.32, 4);
+    ctx.fill();
+
+    if (fillWidth > 12) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+      ctx.fillRect(x + fillWidth - 5, y + 2, 3, trackHeight - 4);
+    }
+  }
+
+  // Segment ticks read as a gauge without adding another HUD panel.
+  ctx.strokeStyle = "rgba(8, 8, 7, 0.4)";
+  ctx.lineWidth = 2;
+  for (let index = 1; index < 4; index += 1) {
+    const tickX = x + (trackWidth * index) / 4;
+    ctx.beginPath();
+    ctx.moveTo(tickX, y + 2);
+    ctx.lineTo(tickX, y + trackHeight - 2);
+    ctx.stroke();
+  }
+
+  bar.texture.needsUpdate = true;
+}
+
+export function createHealthBarTexture(): HealthBarTexture {
+  const width = 320;
+  const height = 64;
+  const { canvas, ctx } = canvas2d(width, height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  const bar: HealthBarTexture = { texture, canvas, ctx, percent: -1 };
+  paintHealthBar(bar, 1);
+  return bar;
+}
+
 export function createSparkTexture(): THREE.CanvasTexture {
   const size = 64;
   const { canvas, ctx } = canvas2d(size, size);

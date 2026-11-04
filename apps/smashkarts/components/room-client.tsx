@@ -28,6 +28,7 @@ import {
   readStoredNickname,
   storeNickname,
 } from "@/lib/config";
+import { useAutoFullscreen } from "@/lib/fullscreen";
 import { OnlineArena } from "./online-arena";
 
 const FATAL_CODES = new Set([
@@ -91,6 +92,7 @@ function readHostSettings(params: URLSearchParams): GameSettings {
 }
 
 export function RoomClient({ code }: { code: string }) {
+  useAutoFullscreen();
   const searchParams = useSearchParams();
   const nameParam = (searchParams.get("name") ?? "").trim().slice(0, MAX_NICKNAME_LENGTH);
   const [joined, setJoined] = useState(nameParam.length > 0);

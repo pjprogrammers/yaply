@@ -36,6 +36,34 @@ export interface ObstacleDef {
   h: number;
   kind: ObstacleKind;
   color?: number;
+  /** Vertical offset for props stacked on a platform. */
+  base?: number;
+}
+
+export type PlatformKind = "steel" | "wreck" | "roof";
+
+export interface PlatformDef {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+  height: number;
+  kind: PlatformKind;
+  color?: number;
+}
+
+export interface RampDef {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+  height: number;
+  /** Axis the ramp climbs along. */
+  axis: "x" | "z";
+  /** +1 rises toward the positive axis, -1 toward the negative axis. */
+  dir: 1 | -1;
+  kind: PlatformKind;
+  color?: number;
 }
 
 export interface SceneryDef {
@@ -90,6 +118,8 @@ export interface MapDef {
   size: number;
   theme: MapTheme;
   obstacles: ObstacleDef[];
+  platforms: PlatformDef[];
+  ramps: RampDef[];
   scenery: SceneryDef[];
   lights: LightDef[];
   boostPads: BoostPadDef[];
@@ -141,6 +171,7 @@ export interface KartSnapshot {
   color: string;
   isPlayer: boolean;
   x: number;
+  y: number;
   z: number;
   yaw: number;
   hp: number;
@@ -163,7 +194,6 @@ export interface PickupSnapshot {
   id: number;
   x: number;
   z: number;
-  weapon: WeaponId;
   active: boolean;
 }
 

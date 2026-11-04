@@ -20,7 +20,8 @@ import {
 import type { ChainState, GameSettings, Player } from "@yaply/shared/types";
 import { useCountdown, useNow } from "@yaply/shared/react";
 import { Board } from "./board";
-import { ClockIcon, PlayIcon } from "./icons";
+import { GameMenuFacts, GameMenuSection, GameStage } from "./game-stage";
+import { ClockIcon, ExpandIcon, PlayIcon } from "./icons";
 import { PlayerList } from "./player-list";
 import { Topbar } from "./topbar";
 import {
@@ -30,6 +31,7 @@ import {
   storePassPlayerNames,
 } from "@/lib/config";
 import { settingsFromSearchParams } from "@/lib/chain-settings";
+import { useGameFullscreen } from "@/hooks/use-game-fullscreen";
 
 type Seat = {
   id: string;
@@ -329,6 +331,191 @@ export function LocalGame({ nickname }: { nickname: string }) {
     applyMove(row, col, chain.turnPlayerId);
   };
 
+  const {
+    fullscreen,
+    enter: enterFullscreen,
+    exit: exitFullscreen,
+    toggle: toggleFullscreen,
+  } = useGameFullscreen(true);
+
+  const modeLabel = settings.mode === "pass" ? "Pass & play" : "Local";
+  const turnLabel = gameOver
+    ? "Game over"
+    : canPlay
+      ? settings.mode === "pass"
+        ? `${currentSeat?.nickname ?? "Player"} to play`
+        : "Your move"
+      : currentSeat
+        ? currentSeat.kind === "cpu"
+          ? `${currentSeat.nickname} is thinking`
+          : `${currentSeat.nickname}'s move`
+        : "Board settled";
+  const turnDetail = `${modeLabel} · ${chain.moveCount} move${chain.moveCount === 1 ? "" : "s"}`;
+  const turnColor = currentSeat?.color ?? humanSeat?.color ?? "var(--accent)";
+  const stageHint = gameOver
+    ? "Final board"
+    : canPlay
+      ? settings.confirmMoves
+        ? "Tap a cell twice to place · Arrow keys + Enter works too"
+        : "Tap an open cell · Arrow keys + Enter works too"
+      : "Watch the chain settle";
+
+  const stageTimer =
+    chain.turnEndsAt && !gameOver ? (
+      <span className="stage-clock" aria-label={`${remaining} seconds left`}>
+        <ClockIcon size={14} />
+        <span className="stage-clock-value num">{remaining}</span>
+        <span className="stage-clock-track">
+          <span className="stage-clock-fill" style={{ width: `${progress * 100}%` }} />
+        </span>
+      </span>
+    ) : (
+      <span className="stage-pill">{gameOver ? "Finished" : "Ready"}</span>
+    );
+
+  const gameOverOverlay = gameOver ? (
+    <div className="canvas-overlay">
+      <div className="overlay-card">
+        <p className="eyebrow">Game over</p>
+        <p className="overlay-title">
+          {winner ? `${winner.nickname} wins the board` : "Final board"}
+        </p>
+        <p className="overlay-sub">
+          {seats.length} players · {chain.moveCount} moves played
+        </p>
+        <div className="result-rankings">
+          {rankings.map((playerId, index) => {
+            const seat = seats.find((entry) => entry.id === playerId);
+            if (!seat) return null;
+            return (
+              <div
+                className={`result-rank-row ${playerId === chain.winnerId ? "result-rank-row--winner" : ""}`}
+                key={playerId}
+              >
+                <span className="rank">{index + 1}</span>
+                <span className="result-rank-name">{seat.nickname}</span>
+                <span className="result-rank-score">
+                  {countOrbs(chain.cells, playerId)}{" "}
+                  <span className="small faint">orbs</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="overlay-actions">
+          <button className="btn btn--primary" type="button" onClick={restart}>
+            <PlayIcon size={14} />
+            Play again
+          </button>
+          <Link href="/" className="btn btn--ghost">
+            Change settings
+          </Link>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const boardArea = (
+    <div className="board-shell">
+      <Board
+        chain={chain}
+        players={players}
+        meId={canPlay ? chain.turnPlayerId : humanSeat.id}
+        canPlay={canPlay}
+        onPlace={onPlace}
+        flash={flash}
+        confirmMoves={settings.confirmMoves}
+        theme={settings.theme}
+        fullscreen={fullscreen}
+        onToggleFullscreen={() => void toggleFullscreen()}
+      />
+      {gameOverOverlay}
+    </div>
+  );
+
+  const localMenu = (
+    <>
+      <GameMenuSection title="Match" aside={<span className="pill">{modeLabel}</span>}>
+        <GameMenuFacts
+          items={[
+            { label: "Board", value: `${settings.rows} × ${settings.cols}` },
+            { label: "Moves", value: chain.moveCount },
+            { label: "Turn clock", value: `${turnTime}s` },
+            { label: "Confirm moves", value: settings.confirmMoves ? "On" : "Off" },
+            {
+              label: "Table",
+              value: `${seats.length} players${cpuCount > 0 ? ` · ${cpuCount} CPU` : ""}`,
+            },
+            { label: "Status", value: gameOver ? "Finished" : turnLabel },
+          ]}
+        />
+      </GameMenuSection>
+
+      <GameMenuSection title="Leaderboard" aside={<span className="pill">Orbs</span>}>
+        <PlayerList
+          players={players}
+          meId={canPlay ? chain.turnPlayerId : humanSeat.id}
+          hostId={seats[0]?.id ?? ""}
+          turnPlayerId={chain.turnPlayerId}
+          eliminatedIds={chain.eliminatedPlayerIds}
+        />
+      </GameMenuSection>
+
+      {settings.mode === "pass" && (
+        <GameMenuSection title="Player names" aside={<span className="pill">Saved here</span>}>
+          <div className="stage-name-list">
+            {inputNames.map((name, index) => (
+              <label className="field" key={`stage-player-name-${index}`}>
+                <span className="field-label">Player {index + 1}</span>
+                <input
+                  className="input"
+                  value={name}
+                  onChange={(event) => renamePlayer(index, event.target.value)}
+                  maxLength={MAX_NICKNAME_LENGTH}
+                  placeholder={defaultNames[index]}
+                  autoComplete="off"
+                  aria-label={`Player ${index + 1} name`}
+                />
+              </label>
+            ))}
+          </div>
+        </GameMenuSection>
+      )}
+
+      <GameMenuSection title="Actions">
+        <div className="stage-action-grid">
+          <button className="btn btn--primary btn--block" type="button" onClick={restart}>
+            <PlayIcon size={14} />
+            Restart match
+          </button>
+          <Link href="/" className="btn btn--block">
+            Game setup
+          </Link>
+          <a className="btn btn--ghost btn--block" href={MAIN_URL}>
+            Main Yaply page
+          </a>
+        </div>
+      </GameMenuSection>
+    </>
+  );
+
+  if (fullscreen) {
+    return (
+      <GameStage
+        turnLabel={turnLabel}
+        turnColor={turnColor}
+        detail={turnDetail}
+        timer={stageTimer}
+        hint={stageHint}
+        menu={localMenu}
+        menuLabel={settings.mode === "pass" ? "Pass & play match" : "Local match"}
+        onExitFullscreen={() => void exitFullscreen()}
+      >
+        {boardArea}
+      </GameStage>
+    );
+  }
+
   return (
     <div className="app-shell">
       <Topbar>
@@ -344,7 +531,11 @@ export function LocalGame({ nickname }: { nickname: string }) {
             On this device
           </span>
           <div className="room-bar-actions">
-            <button className="btn btn--sm" type="button" onClick={restart}>
+            <button className="btn btn--sm" type="button" onClick={() => void enterFullscreen()}>
+              <ExpandIcon size={13} />
+              Fullscreen
+            </button>
+            <button className="btn btn--ghost btn--sm" type="button" onClick={restart}>
               Restart
             </button>
             <Link href="/" className="btn btn--ghost btn--sm">
@@ -389,61 +580,7 @@ export function LocalGame({ nickname }: { nickname: string }) {
               </div>
             </div>
 
-            <div className="board-shell">
-              <Board
-                chain={chain}
-                players={players}
-                meId={canPlay ? chain.turnPlayerId : humanSeat.id}
-                canPlay={canPlay}
-                onPlace={onPlace}
-                flash={flash}
-                gridStyle={settings.gridStyle}
-                confirmMoves={settings.confirmMoves}
-                theme={settings.theme}
-              />
-
-              {gameOver && (
-                <div className="canvas-overlay">
-                  <div className="overlay-card">
-                    <p className="eyebrow">Game over</p>
-                    <p className="overlay-title">
-                      {winner ? `${winner.nickname} wins the board` : "Final board"}
-                    </p>
-                    <p className="overlay-sub">
-                      {seats.length} players · {chain.moveCount} moves played
-                    </p>
-                    <div className="result-rankings">
-                      {rankings.map((playerId, index) => {
-                        const seat = seats.find((entry) => entry.id === playerId);
-                        if (!seat) return null;
-                        return (
-                          <div
-                            className={`result-rank-row ${playerId === chain.winnerId ? "result-rank-row--winner" : ""}`}
-                            key={playerId}
-                          >
-                            <span className="rank">{index + 1}</span>
-                            <span className="result-rank-name">{seat.nickname}</span>
-                            <span className="result-rank-score">
-                              {countOrbs(chain.cells, playerId)}{" "}
-                              <span className="small faint">orbs</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="overlay-actions">
-                      <button className="btn btn--primary" type="button" onClick={restart}>
-                        <PlayIcon size={14} />
-                        Play again
-                      </button>
-                      <Link href="/" className="btn btn--ghost">
-                        Change settings
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {boardArea}
 
             <div className="chain-actions">
               <span className={`turn-pill ${canPlay ? "turn-pill--mine" : ""}`}>
@@ -541,7 +678,7 @@ export function LocalGame({ nickname }: { nickname: string }) {
             <section className="card">
               <div className="card-head">
                 <h2 className="card-title">Match settings</h2>
-                <span className="pill">{settings.gridStyle === "2d" ? "2D" : "3D"}</span>
+                <span className="pill">3D</span>
               </div>
               <div className="settings-list">
                 <div className="setting-row">

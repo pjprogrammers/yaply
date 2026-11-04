@@ -113,7 +113,7 @@ const MODES = [
 ];
 
 const SETTINGS: Array<{ label: string; value: string; swatches?: string[] }> = [
-  { label: "Board size", value: "5×7, 6×9, 8×12 or 10×14" },
+  { label: "Board size", value: "9×5, 11×6, 15×8 or 18×10" },
   { label: "Turn clock", value: "30, 45 or 60 seconds" },
   {
     label: "Palette",
@@ -121,7 +121,7 @@ const SETTINGS: Array<{ label: string; value: string; swatches?: string[] }> = [
     swatches: PLAYER_COLORS.slice(0, 5),
   },
   { label: "Table theme", value: "Dark, light or neon" },
-  { label: "Grid", value: "2D flat or 3D table" },
+  { label: "Board view", value: "Fullscreen 3D table" },
   { label: "Confirm moves", value: "Off for speed, on for safety" },
   { label: "CPU seats", value: "Easy, medium or hard" },
 ];
@@ -371,7 +371,7 @@ export default function Home() {
                   </h2>
                 </div>
                 <p className="cr-lede">
-                  Start on 5×7 for a quick knife fight, or open up 10×14 and let the chains run.
+                  Start on 9×5 for a quick knife fight, or open up 18×10 and let the chains run.
                   Every board uses the same critical-mass rule; bigger boards simply give a cascade
                   more room.
                 </p>
@@ -403,10 +403,10 @@ export default function Home() {
               </div>
 
               <Reveal className="cr-board-note" delay={80}>
-                <span className="cr-mini-pill">2D / 3D</span>
+                <span className="cr-mini-pill">3D table</span>
                 <p>
-                  The same board, two ways to see it. Flat and fast, or a perspective table with
-                  spherical orbs. The rules do not change.
+                  Every match opens fullscreen on a wireframe depth grid with spherical orbs.
+                  Triple-tap the table to slip in and out of the immersive view.
                 </p>
               </Reveal>
             </div>

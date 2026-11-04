@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chain Reaction 3D</title>
+<style>
+  :root{color-scheme:dark;--bg1:#34353d;--bg2:#0d0d12;--fg:#e8e8ee}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--fg);
+    background:linear-gradient(#38393f,#18181d 55%,#0b0b10);touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none}
+  .pill{padding:6px 14px;border-radius:99px;background:rgba(0,0,0,.45);font-size:14px;display:flex;align-items:center;gap:8px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(0,0,0,.6);font-size:28px}
+  button{font:inherit;font-size:16px;padding:10px 22px;border-radius:10px;border:0;background:#fff;color:#111;cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div class="pill"><span class="dot" id="dot"></span><span id="turn"></span></div><div class="pill" id="score"></div></div>
+<div id="over"><div id="msg"></div><button id="again">Play again</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const COLS=8, ROWS=16, COLORS=[0xff1010,0x10ff20], NAMES=["Red","Green"], CSS=["#ff3030","#30ff40"];
+const canvas=document.getElementById("c");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,1,0.1,200);
+scene.add(new THREE.AmbientLight(0xffffff,0.55));
+const dl=new THREE.DirectionalLight(0xffffff,0.9); dl.position.set(-3,6,10); scene.add(dl);
+
+// wireframe grid: every cell is a 3D box so depth lines converge toward the centre
+const pos=[];
+const cx=c=>c-COLS/2+0.5, cy=r=>ROWS/2-r-0.5;
+for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+  const x=cx(c),y=cy(r),h=0.5,z=0.5;
+  const v=[];
+  for(const zz of [z,-z])for(const [a,b] of [[-h,-h],[h,-h],[h,h],[-h,h]])v.push([x+a,y+b,zz]);
+  for(let i=0;i<4;i++){
+    pos.push(...v[i],...v[(i+1)%4]);
+    pos.push(...v[4+i],...v[4+(i+1)%4]);
+    pos.push(...v[i],...v[4+i]);
+  }
+}
+const lg=new THREE.BufferGeometry();
+lg.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+const lineMat=new THREE.LineBasicMaterial({color:0xe9d6df,transparent:true,opacity:0.8});
+scene.add(new THREE.LineSegments(lg,lineMat));
+
+// game state
+let cells,groups,player,played,busy,over;
+const sphereGeo=new THREE.SphereGeometry(0.24,28,20);
+const mats=COLORS.map(c=>new THREE.MeshPhongMaterial({color:c,shininess:70,specular:0x886666}));
+const root=new THREE.Group(); scene.add(root);
+
+function crit(i){const r=Math.floor(i/COLS),c=i%COLS;return 4-(r===0||r===ROWS-1?1:0)-(c===0||c===COLS-1?1:0);}
+function neighbors(i){const r=Math.floor(i/COLS),c=i%COLS,o=[];
+  if(r>0)o.push(i-COLS); if(r<ROWS-1)o.push(i+COLS); if(c>0)o.push(i-1); if(c<COLS-1)o.push(i+1); return o;}
+
+function redraw(i){
+  const g=groups[i]; while(g.children.length)g.remove(g.children[0]);
+  const {n,owner}=cells[i]; g.rotation.set(0,0,0);
+  if(!n)return;
+  const offs=n===1?[[0,0]]:n===2?[[-0.17,0],[0.17,0]]:[0,1,2].map(k=>{const a=Math.PI/2+k*2*Math.PI/3;return [Math.cos(a)*0.17,Math.sin(a)*0.17-0.03];});
+  offs.forEach(([x,y])=>{const m=new THREE.Mesh(sphereGeo,mats[owner]);m.position.set(x,y,0);g.add(m);});
+  g.userData.n=n; g.userData.ph=Math.random()*6;
+}
+
+function reset(){
+  while(root.children.length)root.remove(root.children[0]);
+  cells=Array.from({length:COLS*ROWS},()=>({n:0,owner:-1}));
+  groups=cells.map((_,i)=>{const g=new THREE.Group();g.position.set(cx(i%COLS),cy(Math.floor(i/COLS)),0);root.add(g);return g;});
+  player=0;played=[false,false];busy=false;over=false;
+  document.getElementById("over").style.display="none";
+  hud();
+}
+function hud(){
+  document.getElementById("dot").style.background=CSS[player];
+  document.getElementById("turn").textContent=NAMES[player]+" to play";
+  const cnt=[0,0];cells.forEach(c=>{if(c.owner>=0)cnt[c.owner]+=c.n;});
+  document.getElementById("score").innerHTML=`<span style="color:${CSS[0]}">${cnt[0]}</span> : <span style="color:${CSS[1]}">${cnt[1]}</span>`;
+  lineMat.color.set(COLORS[player]).lerp(new THREE.Color(0xf2e4ea),0.55);
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function fly(from,to,owner){
+  return new Promise(res=>{
+    const m=new THREE.Mesh(sphereGeo,mats[owner]);root.add(m);
+    const a=groups[from].position,b=groups[to].position,t0=performance.now(),D=260;
+    (function step(t){const k=Math.min(1,(t-t0)/D),e=k*k*(3-2*k);
+      m.position.lerpVectors(a,b,e);m.position.z=Math.sin(k*Math.PI)*0.4;
+      if(k<1)requestAnimationFrame(step);else{root.remove(m);res();}})(t0);
+  });
+}
+function winner(){
+  if(!played[0]||!played[1])return -1;
+  const o=new Set(cells.filter(c=>c.n).map(c=>c.owner));
+  return o.size===1?[...o][0]:-1;
+}
+async function play(i){
+  if(busy||over)return;
+  const c=cells[i]; if(c.owner!==-1&&c.owner!==player)return;
+  busy=true; c.owner=player;c.n++;played[player]=true;redraw(i);hud();
+  for(let guard=0;guard<500;guard++){
+    if(winner()>=0)break;
+    const un=[];cells.forEach((x,k)=>{if(x.n>=crit(k))un.push(k);});
+    if(!un.length)break;
+    const flights=[];
+    un.forEach(k=>{const ow=cells[k].owner;cells[k].n-=crit(k);if(!cells[k].n)cells[k].owner=-1;redraw(k);
+      neighbors(k).forEach(nb=>flights.push(fly(k,nb,ow).then(()=>{cells[nb].owner=ow;cells[nb].n++;redraw(nb);})));});
+    await Promise.all(flights);hud();
+  }
+  const w=winner();
+  if(w>=0){over=true;document.getElementById("msg").innerHTML=`<span style="color:${CSS[w]}">${NAMES[w]}</span> wins!`;
+    document.getElementById("over").style.display="flex";}
+  else player=1-player;
+  hud();busy=false;
+}
+document.getElementById("again").onclick=reset;
+
+// input
+const ray=new THREE.Raycaster(),plane=new THREE.Plane(new THREE.Vector3(0,0,1),0),pt=new THREE.Vector3();
+canvas.addEventListener("pointerdown",e=>{
+  const r=canvas.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1)),camera);
+  if(!ray.ray.intersectPlane(plane,pt))return;
+  const c=Math.floor(pt.x+COLS/2),row=Math.floor(ROWS/2-pt.y);
+  if(c>=0&&c<COLS&&row>=0&&row<ROWS)play(row*COLS+c);
+});
+
+function resize(){
+  const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;
+  const t=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+  const d=Math.max((ROWS/2+0.8)/t,(COLS/2+0.5)/(t*camera.aspect))+0.5;
+  camera.position.set(0,0,d);camera.lookAt(0,0,0);camera.updateProjectionMatrix();
+}
+addEventListener("resize",resize);resize();reset();
+
+// animation: 1 orb still, 2 and 3 orbs tumble in 3D (faster as the cell fills)
+renderer.setAnimationLoop(t=>{
+  const s=t/1000;
+  groups.forEach(g=>{const n=g.userData.n;
+    if(n>1&&g.children.length){const sp=n===2?1.8:2.3;
+      g.rotation.x=s*sp*0.8+g.userData.ph;g.rotation.y=s*sp;g.rotation.z=s*sp*0.5;}});
+  renderer.render(scene,camera);
+});
+</script>
+</body>
+</html>

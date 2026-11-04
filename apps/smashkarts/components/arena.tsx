@@ -5,6 +5,7 @@ import { GameEngine } from "@/game/engine";
 import { createInitialSnapshot, GameStore } from "@/game/store";
 import { readMuted, type PlayerSettings } from "@/lib/settings";
 import { Hud } from "./hud";
+import { OrientationGate } from "./orientation-gate";
 
 interface ArenaProps {
   settings: PlayerSettings;
@@ -61,6 +62,7 @@ export function Arena({ settings, onQuit, onRestart }: ArenaProps) {
     <div className="game-screen relative">
       <div ref={containerRef} className="absolute inset-0" />
       <Hud store={store} engineRef={engineRef} onQuit={onQuit} onRestart={onRestart} />
+      <OrientationGate />
     </div>
   );
 }

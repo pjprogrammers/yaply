@@ -4,7 +4,7 @@ import { buildKart, disposeObject, type KartVisual } from "./kart-mesh";
 import { buildPickup, type PickupVisual } from "./pickup-mesh";
 import { GameAudio } from "./audio";
 import { ParticleField } from "./particles";
-import { createSparkTexture, createSmokeTexture, cssToHex } from "./assets";
+import { createSparkTexture, createSmokeTexture, cssToHex, paintHealthBar } from "./assets";
 import { BOT_COLORS, BOT_NAMES, KART, PICKUP_POOL, WEAPONS } from "./constants";
 import { getMap } from "./maps";
 import type { GameStore } from "./store";
@@ -683,6 +683,7 @@ export class GameEngine {
     kart.visual.shield.visible = false;
     kart.visual.shieldWire.visible = false;
     kart.visual.tag.visible = !kart.isPlayer;
+    paintHealthBar(kart.visual.healthTexture, 1);
   }
 
   private frame = (now: number) => {
@@ -2383,6 +2384,7 @@ export class GameEngine {
       visual.group.visible = true;
       visual.group.position.set(kart.x, kart.y, kart.z);
       visual.group.rotation.y = kart.yaw;
+      paintHealthBar(visual.healthTexture, clamp(kart.hp / KART.hp, 0, 1));
 
       const speedRatio = clamp(Math.abs(kart.speed) / KART.maxSpeed, 0, 1.4);
       kart.wheelSpin += (kart.speed * dt) / 0.47;
@@ -2458,7 +2460,9 @@ export class GameEngine {
         visual.tag.visible = !kart.isPlayer;
       }
 
-      visual.tag.position.y = 3.45 + Math.sin(this.elapsed * 2 + kart.x) * 0.04;
+      const tagBob = Math.sin(this.elapsed * 2 + kart.x) * 0.04;
+      visual.tag.position.y = 3.75 + tagBob;
+      visual.healthBar.position.y = 3.05 + tagBob;
     }
 
     for (const pickup of this.pickups) {

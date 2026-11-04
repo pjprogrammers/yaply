@@ -53,6 +53,28 @@ describe("Worker routing", () => {
     expect(body.environment).toBe("development");
   });
 
+  it("answers the root with a friendly development message", async () => {
+    const { env } = makeEnv();
+    const response = await worker.fetch(request("/"), env);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.ok).toBe(true);
+    expect(body.service).toBe("yaply-realtime");
+    expect(body.environment).toBe("development");
+    expect(body.message).toContain("Hello world");
+    expect(body.endpoints.health).toBe("/health");
+    expect(body.endpoints.createRoom).toBe("POST /rooms");
+  });
+
+  it("answers the root with a production message", async () => {
+    const { env } = makeEnv({ ENVIRONMENT: "production" });
+    const response = await worker.fetch(request("/"), env);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.environment).toBe("production");
+    expect(body.message).not.toContain("Hello world");
+  });
+
   it("returns 404 for unknown routes", async () => {
     const { env } = makeEnv();
     const response = await worker.fetch(request("/nope"), env);

@@ -7,6 +7,7 @@ import { createInitialSnapshot, GameStore } from "@/game/store";
 import type { MapId, OnlinePlayer } from "@/game/types";
 import { readMuted } from "@/lib/settings";
 import { Hud } from "./hud";
+import { OrientationGate } from "./orientation-gate";
 
 interface OnlineArenaProps {
   role: "online-host" | "online-guest";
@@ -117,6 +118,7 @@ export function OnlineArena({
         onQuit={onQuit}
         onRestart={onRematch}
       />
+      <OrientationGate />
     </div>
   );
 }

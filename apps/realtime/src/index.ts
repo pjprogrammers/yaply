@@ -185,6 +185,28 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
 
+    if (url.pathname === "/" && request.method === "GET") {
+      const production = isProduction(env);
+      return json(
+        {
+          ok: true,
+          service: "yaply-realtime",
+          environment: production ? "production" : "development",
+          message: production
+            ? "Yaply realtime Worker is running. Use /health, /version, or connect a game to /room/:code?game=skribbl."
+            : "Hello world! This is the Yaply realtime Worker in development. Use /health, /version, or connect a game to /room/:code?game=skribbl.",
+          endpoints: {
+            health: "/health",
+            version: "/version",
+            createRoom: "POST /rooms",
+            roomSocket: "GET /room/:code?game=skribbl|chain|smashkarts (WebSocket)",
+          },
+        },
+        200,
+        { "access-control-allow-origin": "*" },
+      );
+    }
+
     if (url.pathname === "/health") {
       return json(
         { ok: true, service: "yaply-realtime" },

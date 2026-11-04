@@ -9,7 +9,13 @@ import {
   createWindowTexture,
   hexToCss,
 } from "./assets";
-import type { MapDef, ObstacleDef, SceneryDef } from "./types";
+import type {
+  MapDef,
+  ObstacleDef,
+  PlatformDef,
+  RampDef,
+  SceneryDef,
+} from "./types";
 
 export interface ArenaWorld {
   group: THREE.Group;
@@ -177,7 +183,7 @@ function buildWalls(map: MapDef): THREE.Group {
 
 function buildObstacle(def: ObstacleDef, map: MapDef): THREE.Group {
   const group = new THREE.Group();
-  group.position.set(def.x, 0, def.z);
+  group.position.set(def.x, def.base ?? 0, def.z);
   const w = def.hx * 2;
   const d = def.hz * 2;
   const h = def.h;
@@ -701,6 +707,176 @@ function buildMounds(map: MapDef): THREE.Group {
   return group;
 }
 
+function platformColor(def: PlatformDef): number {
+  if (def.color !== undefined) return def.color;
+  if (def.kind === "steel") return 0x4b4740;
+  if (def.kind === "wreck") return 0x8a6a45;
+  return 0x2e2e36;
+}
+
+function buildPlatform(def: PlatformDef, map: MapDef): THREE.Group {
+  const group = new THREE.Group();
+  group.position.set(def.x, 0, def.z);
+  const w = def.hx * 2;
+  const d = def.hz * 2;
+  const h = def.height;
+  const baseColor = platformColor(def);
+  const bodyMaterial = new THREE.MeshStandardMaterial({
+    color: baseColor,
+    roughness: def.kind === "steel" ? 0.72 : 0.9,
+    metalness: def.kind === "steel" ? 0.45 : 0.15,
+  });
+  const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.12), bodyMaterial);
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const topMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(baseColor).multiplyScalar(1.22),
+    roughness: 0.8,
+    metalness: def.kind === "steel" ? 0.4 : 0.1,
+  });
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, 0.16, d + 0.16), topMaterial);
+  top.position.y = h + 0.02;
+  top.receiveShadow = true;
+  group.add(top);
+
+  const accent = new THREE.MeshBasicMaterial({
+    color: map.theme.accent,
+    transparent: true,
+    opacity: 0.82,
+  });
+  const frontStrip = new THREE.BoxGeometry(w * 0.92, 0.08, 0.08);
+  const flankStrip = new THREE.BoxGeometry(0.08, 0.08, d * 0.92);
+  for (const side of [-1, 1]) {
+    const front = new THREE.Mesh(frontStrip, accent);
+    front.position.set(0, h - 0.18, side * (d / 2 + 0.05));
+    group.add(front);
+    const flank = new THREE.Mesh(flankStrip, accent);
+    flank.position.set(side * (w / 2 + 0.05), h - 0.18, 0);
+    group.add(flank);
+  }
+
+  const ribMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(baseColor).multiplyScalar(0.72),
+    roughness: 0.9,
+  });
+  const ribGeometry = new THREE.BoxGeometry(0.18, h * 0.82, 0.18);
+  for (const x of [-w / 2 + 1.2, 0, w / 2 - 1.2]) {
+    for (const side of [-1, 1]) {
+      const rib = new THREE.Mesh(ribGeometry, ribMaterial);
+      rib.position.set(x, h * 0.41, side * (d / 2 + 0.02));
+      group.add(rib);
+    }
+  }
+
+  return group;
+}
+
+function rampColor(def: RampDef): number {
+  if (def.color !== undefined) return def.color;
+  if (def.kind === "steel") return 0x5a554c;
+  if (def.kind === "wreck") return 0x9a7a52;
+  return 0x35353e;
+}
+
+function buildRamp(def: RampDef, map: MapDef): THREE.Group {
+  const group = new THREE.Group();
+  group.position.set(def.x, 0, def.z);
+  const along = def.axis === "z" ? def.hz : def.hx;
+  const across = def.axis === "z" ? def.hx : def.hz;
+  const length = along * 2;
+  const width = across * 2;
+  const h = def.height;
+  const halfWidth = width / 2;
+  const halfLength = length / 2;
+
+  // Local ramp rises toward +Z; the group is rotated to match the map axis.
+  const vertices = new Float32Array([
+    -halfWidth, 0, -halfLength,
+    halfWidth, 0, -halfLength,
+    halfWidth, 0, halfLength,
+    -halfWidth, 0, halfLength,
+    -halfWidth, h, halfLength,
+    halfWidth, h, halfLength,
+  ]);
+  const indices = [
+    0, 1, 2, 0, 2, 3,
+    0, 5, 1, 0, 4, 5,
+    3, 2, 5, 3, 5, 4,
+    0, 3, 4, 1, 5, 2,
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const baseColor = rampColor(def);
+  const wedge = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      color: baseColor,
+      roughness: def.kind === "steel" ? 0.7 : 0.9,
+      metalness: def.kind === "steel" ? 0.42 : 0.12,
+    }),
+  );
+  wedge.castShadow = true;
+  wedge.receiveShadow = true;
+  group.add(wedge);
+
+  const slope = Math.atan2(h, length);
+  const slopeLength = Math.hypot(h, length);
+  const chevron = createChevronTexture();
+  chevron.wrapS = THREE.RepeatWrapping;
+  chevron.wrapT = THREE.RepeatWrapping;
+  chevron.repeat.set(1, Math.max(1, Math.round(length / 4)));
+  const top = new THREE.Mesh(
+    new THREE.PlaneGeometry(width * 0.82, slopeLength * 0.94),
+    new THREE.MeshBasicMaterial({
+      map: chevron,
+      color: map.theme.accent,
+      transparent: true,
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  top.rotation.x = -Math.PI / 2 - slope;
+  top.position.y = h / 2 + 0.04;
+  group.add(top);
+
+  const railMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(baseColor).multiplyScalar(0.62),
+    roughness: 0.9,
+  });
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, slopeLength * 0.96, 0.24),
+      railMaterial,
+    );
+    rail.position.set(side * (width / 2 - 0.14), h / 2 + 0.08, 0);
+    rail.rotation.x = Math.PI / 2 - slope;
+    group.add(rail);
+  }
+
+  const lip = new THREE.Mesh(
+    new THREE.BoxGeometry(width, 0.12, 0.28),
+    new THREE.MeshStandardMaterial({ color: map.theme.accent, roughness: 0.7 }),
+  );
+  lip.position.set(0, 0.06, -length / 2 + 0.14);
+  group.add(lip);
+
+  if (def.axis === "z") {
+    group.rotation.y = def.dir === 1 ? 0 : Math.PI;
+  } else {
+    group.rotation.y = def.dir === 1 ? Math.PI / 2 : -Math.PI / 2;
+  }
+
+  return group;
+}
+
 export function buildArena(map: MapDef): ArenaWorld {
   const group = new THREE.Group();
   const animated: Array<(time: number, dt: number) => void> = [];
@@ -734,6 +910,13 @@ export function buildArena(map: MapDef): ArenaWorld {
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   group.add(ground);
+
+  for (const deck of map.platforms) {
+    group.add(buildPlatform(deck, map));
+  }
+  for (const slope of map.ramps) {
+    group.add(buildRamp(slope, map));
+  }
 
   group.add(buildWalls(map));
   group.add(buildMounds(map));
@@ -852,16 +1035,76 @@ export function buildArena(map: MapDef): ArenaWorld {
   };
 }
 
+export function rampHeightAt(ramp: RampDef, x: number, z: number): number {
+  if (
+    Math.abs(x - ramp.x) > ramp.hx ||
+    Math.abs(z - ramp.z) > ramp.hz
+  ) {
+    return 0;
+  }
+  const length = (ramp.axis === "x" ? ramp.hx : ramp.hz) * 2;
+  const along =
+    ramp.axis === "x"
+      ? x - (ramp.x - ramp.hx)
+      : z - (ramp.z - ramp.hz);
+  const t = ramp.dir === 1 ? along / length : 1 - along / length;
+  return THREE.MathUtils.clamp(t, 0, 1) * ramp.height;
+}
+
+/**
+ * Walkable height at a point. Ramps are always sampled; platform tops only
+ * count once the kart is high enough to land on them, so side collision keeps
+ * ground-level karts out from underneath.
+ */
+export function groundHeightAt(
+  map: MapDef,
+  x: number,
+  z: number,
+  y = Number.POSITIVE_INFINITY,
+): number {
+  let height = 0;
+  for (const ramp of map.ramps) {
+    if (
+      Math.abs(x - ramp.x) <= ramp.hx &&
+      Math.abs(z - ramp.z) <= ramp.hz
+    ) {
+      height = Math.max(height, rampHeightAt(ramp, x, z));
+    }
+  }
+  for (const platform of map.platforms) {
+    if (
+      Math.abs(x - platform.x) <= platform.hx &&
+      Math.abs(z - platform.z) <= platform.hz &&
+      y >= platform.height - 0.7
+    ) {
+      height = Math.max(height, platform.height);
+    }
+  }
+  return height;
+}
+
 export function obstacleHeightAt(map: MapDef, x: number, z: number): number {
+  let height = 0;
   for (const obstacle of map.obstacles) {
     if (
       Math.abs(x - obstacle.x) <= obstacle.hx &&
       Math.abs(z - obstacle.z) <= obstacle.hz
     ) {
-      return obstacle.h;
+      height = Math.max(height, obstacle.h + (obstacle.base ?? 0));
     }
   }
-  return 0;
+  for (const platform of map.platforms) {
+    if (
+      Math.abs(x - platform.x) <= platform.hx &&
+      Math.abs(z - platform.z) <= platform.hz
+    ) {
+      height = Math.max(height, platform.height);
+    }
+  }
+  for (const ramp of map.ramps) {
+    height = Math.max(height, rampHeightAt(ramp, x, z));
+  }
+  return height;
 }
 
 export { hexToCss };

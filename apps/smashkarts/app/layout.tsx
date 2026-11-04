@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   description:
     "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, six weapons, and up to seven bots. Drift, fire, repeat.",
   applicationName: "Smash Karts",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Smash Karts",
+  },
   openGraph: {
     title: "Smash Karts",
     description:

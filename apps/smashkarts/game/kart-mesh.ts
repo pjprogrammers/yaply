@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { createNameTexture } from "./assets";
+import { createHealthBarTexture, createNameTexture, type HealthBarTexture } from "./assets";
 
 export interface KartVisual {
   group: THREE.Group;
@@ -12,6 +12,8 @@ export interface KartVisual {
   shieldWire: THREE.Mesh;
   turret: THREE.Group;
   tag: THREE.Sprite;
+  healthBar: THREE.Sprite;
+  healthTexture: HealthBarTexture;
   boostGlow: THREE.Mesh;
 }
 
@@ -298,9 +300,24 @@ export function buildKart(name: string, colorHex: string, accentHex: string): Ka
     }),
   );
   tag.scale.set(3.4, 0.85, 1);
-  tag.position.y = 3.45;
-  tag.renderOrder = 20;
+  tag.position.y = 3.75;
+  tag.renderOrder = 21;
   group.add(tag);
+
+  const healthTexture = createHealthBarTexture();
+  const healthBar = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: healthTexture.texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    }),
+  );
+  healthBar.name = "health-bar";
+  healthBar.scale.set(3.2, 0.58, 1);
+  healthBar.position.y = 3.05;
+  healthBar.renderOrder = 30;
+  group.add(healthBar);
 
   const boostGlow = new THREE.Mesh(
     new THREE.CircleGeometry(2.1, 20),
@@ -326,6 +343,8 @@ export function buildKart(name: string, colorHex: string, accentHex: string): Ka
     shieldWire,
     turret,
     tag,
+    healthBar,
+    healthTexture,
     boostGlow,
   };
 }

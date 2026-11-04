@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   CHAIN_BOARD_PRESETS,
   CHAIN_BOARD_SIZE_IDS,
-  CHAIN_GRID_STYLES,
   CHAIN_PALETTES,
   CHAIN_THEMES,
   CPU_DIFFICULTIES,
@@ -13,7 +12,6 @@ import {
 } from "@yaply/shared/constants";
 import type {
   ChainBoardSize,
-  ChainGridStyle,
   ChainPaletteId,
   ChainTheme,
   CpuDifficulty,
@@ -242,19 +240,6 @@ export function ChainSettingsFields({
           options={CHAIN_THEMES}
           disabled={disabled}
           onChange={(theme) => onChange({ theme })}
-        />
-      </div>
-
-      <div className="setting-row setting-row--stack">
-        <div className="setting-row-head">
-          <span className="setting-label">Grid style</span>
-        </div>
-        <OptionCards
-          label="Grid style"
-          value={(value.gridStyle ?? "3d") as ChainGridStyle}
-          options={CHAIN_GRID_STYLES}
-          disabled={disabled}
-          onChange={(gridStyle) => onChange({ gridStyle })}
         />
       </div>
 

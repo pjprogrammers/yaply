@@ -145,6 +145,14 @@ export function XIcon(props: IconProps) {
   );
 }
 
+export function MenuIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
 export function ExpandIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

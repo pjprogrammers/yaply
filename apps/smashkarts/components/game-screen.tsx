@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { PlayerSettings } from "@/lib/settings";
 import { readSettings, writeSettings } from "@/lib/settings";
 import { createRoomCode, roomPath, storeNickname } from "@/lib/config";
+import { useAutoFullscreen } from "@/lib/fullscreen";
 import { Arena } from "./arena";
 import { Lobby } from "./lobby";
 
@@ -14,6 +15,7 @@ interface Run {
 }
 
 export function GameScreen() {
+  useAutoFullscreen();
   const router = useRouter();
   const [settings, setSettings] = useState<PlayerSettings>(() => readSettings());
   const [run, setRun] = useState<Run | null>(null);

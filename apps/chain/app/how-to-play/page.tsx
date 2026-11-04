@@ -31,7 +31,7 @@ export default function HowToPlay() {
         <div className="fact-strip" style={{ marginTop: 0, marginBottom: 16 }}>
           <div className="fact">
             <p className="fact-label">Boards</p>
-            <p className="fact-value">5×7 – 10×14</p>
+            <p className="fact-value">9×5 – 18×10</p>
           </div>
           <div className="fact">
             <p className="fact-label">Players</p>
@@ -132,13 +132,15 @@ export default function HowToPlay() {
                 <ClockIcon size={11} /> 30–60s turns
               </span>
               <span className="pill">
-                <WifiIcon size={11} /> 2D / 3D
+                <WifiIcon size={11} /> Online or local
               </span>
             </div>
             <p className="subline" style={{ marginTop: 10 }}>
-              The setup screen sets players, board size, palette, theme, grid style, confirm moves
-              and CPU difficulty. Online, the host can change the same options in the lobby; settings
-              lock when the game starts and reopen before a rematch.
+              The setup screen sets players, board size, palette, theme, confirm moves and CPU
+              difficulty. Games open in a fullscreen 3D table. Use the menu button for the
+              leaderboard, room details and chat, or triple-tap the board to leave the immersive
+              view. Online, the host can change the same options in the lobby; settings lock when
+              the game starts and reopen before a rematch.
             </p>
             <div className="form-actions">
               <Link href="/create" className="btn btn--primary">

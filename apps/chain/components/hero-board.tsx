@@ -221,7 +221,7 @@ export function ChainHeroBoard() {
                 Demo table · FUSE42
               </span>
               <span className="cr-demo-meta">
-                {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : "6 × 9"} · turn 12
+                {pops > 0 ? `${pops} ${pops === 1 ? "pop" : "pops"}` : "11 × 6"} · turn 12
               </span>
             </div>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { WEAPONS } from "@/game/constants";
 import type { GameEngine } from "@/game/engine";
 import { MAPS } from "@/game/maps";
 import type { GameStore } from "@/game/store";
 import type { WeaponId } from "@/game/types";
+import { useFullscreen } from "@/lib/fullscreen";
 import { Minimap } from "./minimap";
 import { TouchControls } from "./touch-controls";
 import { WeaponGlyph } from "./weapon-glyph";
@@ -42,9 +43,12 @@ export function Hud({
   onRematch,
 }: HudProps) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const fullscreen = useFullscreen();
   const [toast, setToast] = useState<Toast | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const previousWeapon = useRef<WeaponId | null>(null);
   const toastKey = useRef(0);
+  const wasPaused = useRef(false);
 
   const player = snapshot.karts.find((kart) => kart.id === snapshot.playerId) ?? null;
   const map = MAPS[snapshot.mapId];
@@ -53,11 +57,6 @@ export function Hud({
   const standings = [...snapshot.karts].sort(
     (a, b) => b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name),
   );
-  // A 40-seat room should not push the live table past the viewport. The final
-  // screen still lists everyone; during the match the rail shows the top pack.
-  const standingsShown = standings.slice(0, 8);
-  const lockTarget =
-    snapshot.karts.find((kart) => kart.id === snapshot.aimTargetId) ?? null;
   const winner = snapshot.winner;
 
   useEffect(() => {
@@ -84,6 +83,56 @@ export function Hud({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // A local pause (Esc, tab blur, or the menu) opens the drawer so the player
+  // always has a visible way back into the race. Online matches never pause.
+  useEffect(() => {
+    if (snapshot.phase === "paused") {
+      wasPaused.current = true;
+      // The pause may come from Esc, a tab blur, or the menu itself. Opening
+      // the drawer here keeps every pause path recoverable.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMenuOpen(true);
+    } else if (snapshot.phase === "playing" && wasPaused.current) {
+      wasPaused.current = false;
+      setMenuOpen(false);
+    } else if (snapshot.phase === "over") {
+      wasPaused.current = false;
+      setMenuOpen(false);
+    }
+  }, [snapshot.phase]);
+
+  const openMenu = useCallback(() => {
+    setMenuOpen(true);
+    if (!online) {
+      engineRef.current?.pause();
+    }
+  }, [online, engineRef]);
+
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    if (!online && snapshot.phase === "paused") {
+      engineRef.current?.resume();
+    }
+  }, [online, snapshot.phase, engineRef]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+    };
+    // Capture so the arena's Esc-to-pause handler does not immediately
+    // re-pause the race after the drawer resumes it.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [menuOpen, closeMenu]);
+
   if (snapshot.phase === "booting" || !player) {
     return (
       <div className="hud-root flex items-center justify-center">
@@ -100,6 +149,11 @@ export function Hud({
   const driftPercent = Math.min(100, (player.driftCharge / 2.4) * 100);
   const accuracy = snapshot.shots > 0 ? Math.round((snapshot.hits / snapshot.shots) * 100) : 0;
   const playerPlace = standings.findIndex((kart) => kart.id === player.id) + 1;
+  const menuTitle = online
+    ? "Match menu"
+    : snapshot.phase === "paused"
+      ? "Paused"
+      : "Race menu";
 
   return (
     <div className="hud-root select-none">
@@ -110,208 +164,91 @@ export function Hud({
         />
       ) : null}
 
-      <div className="hud-top absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2 sm:p-3">
-        <div className="hud-panel hud-player-panel w-[248px] p-2.5 sm:w-[300px]">
-          <div className="flex items-center gap-2">
+      <div className="hud-top">
+        <div className="hud-panel hud-player-panel">
+          <div className="hud-player-id">
             <span
-              className="h-3.5 w-3.5 shrink-0"
+              className="hud-player-dot"
               style={{ backgroundColor: player.color }}
               aria-hidden="true"
             />
-            <span className="truncate text-sm font-bold">{player.name}</span>
-            <span className="hud-label">you</span>
-            <span className="display ml-auto text-lg tabular-nums md:hidden">
-              {formatTime(snapshot.timeLeft)}
+            <span className="hud-player-name">{player.name}</span>
+            <span className="hud-player-you">you</span>
+          </div>
+
+          <div
+            className="hud-health"
+            role="progressbar"
+            aria-label="Hull health"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.max(0, Math.round(player.hp))}
+          >
+            <span
+              className="hud-health-fill"
+              style={{
+                width: `${Math.max(0, Math.min(100, player.hp))}%`,
+                backgroundColor: hullColor,
+              }}
+            />
+            <span className="hud-health-text">{Math.max(0, Math.round(player.hp))}</span>
+          </div>
+
+          <div className="hud-weapon">
+            <span
+              className="hud-weapon-icon"
+              style={{ color: WEAPONS[player.weapon].css }}
+              aria-hidden="true"
+            >
+              <WeaponGlyph weapon={player.weapon} className="h-4 w-4" />
+            </span>
+            <span className="hud-weapon-name">{WEAPONS[player.weapon].name}</span>
+            <span className="hud-weapon-ammo tabular-nums">
+              {player.weapon === "pulse" ? "∞" : player.ammo}
             </span>
           </div>
-
-          <div className="hud-segmented mt-2" aria-hidden="true">
-            {Array.from({ length: 10 }).map((_, index) => (
-              <span
-                key={index}
-                className={player.hp > index * 10 ? "on" : ""}
-                style={player.hp > index * 10 ? { backgroundColor: hullColor } : undefined}
-              />
-            ))}
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="hud-label">Hull</span>
-            <span className="hud-label tabular-nums">{player.hp} / 100</span>
-          </div>
-
-          <div className="mt-2.5 flex items-center gap-2 border-t border-line pt-2.5">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center bg-ink"
-              style={{ color: WEAPONS[player.weapon].css }}
-            >
-              <WeaponGlyph weapon={player.weapon} className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <div className="hud-label">Weapon</div>
-              <div className="truncate text-sm font-bold">{WEAPONS[player.weapon].name}</div>
-            </div>
-            <div className="ml-auto text-right">
-              <div className="hud-label">Ammo</div>
-              <div className="hud-value tabular-nums">
-                {player.weapon === "pulse" ? "∞" : player.ammo}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-1.5 flex min-h-[20px] flex-wrap gap-1">
-            {player.shield > 0 ? (
-              <span className="bg-[#2fd4c8] px-1.5 py-0.5 text-[10px] font-bold text-ink">
-                Shield {Math.ceil(player.shield)}s
-              </span>
-            ) : null}
-            {player.boost > 0 ? (
-              <span className="bg-toxic px-1.5 py-0.5 text-[10px] font-bold text-ink">
-                Overdrive {Math.ceil(player.boost)}s
-              </span>
-            ) : null}
-            {player.slow > 0 ? (
-              <span className="bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-bold text-bone">
-                Shocked {Math.ceil(player.slow)}s
-              </span>
-            ) : null}
-            {player.shield <= 0 && player.boost <= 0 && player.slow <= 0 ? (
-              <span className="hud-label">No active mods</span>
-            ) : null}
-          </div>
         </div>
 
-        <div className="hidden flex-col items-center md:flex">
-          <div className="hud-panel px-5 py-2 text-center">
-            <div className="display text-3xl tabular-nums">{formatTime(snapshot.timeLeft)}</div>
-            <div className="hud-label">first to {snapshot.killTarget} wrecks</div>
-          </div>
-          {lockTarget ? (
-            <div
-              className="mt-1 bg-ink px-2 py-1 text-[11px] font-bold"
-              style={{ color: lockTarget.color }}
-            >
-              Lock · {lockTarget.name}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex gap-1.5">
+        <div className="hud-actions">
+          {fullscreen.supported ? (
             <button
               type="button"
-              className="hud-button"
-              onClick={() => engineRef.current?.toggleMute()}
-              aria-label={snapshot.muted ? "Unmute game audio" : "Mute game audio"}
-              title={snapshot.muted ? "Unmute" : "Mute"}
+              className="hud-icon-button"
+              data-fullscreen-control
+              onClick={() => void fullscreen.toggle()}
+              aria-label={fullscreen.active ? "Exit fullscreen" : "Enter fullscreen"}
+              aria-pressed={fullscreen.active}
+              title={fullscreen.active ? "Exit fullscreen" : "Fullscreen"}
             >
-              <SoundIcon muted={snapshot.muted} />
+              <FullscreenIcon active={fullscreen.active} />
             </button>
-            {!online ? (
-              <button
-                type="button"
-                className="hud-button"
-                onClick={() => engineRef.current?.togglePause()}
-                aria-label="Pause game"
-              >
-                <PauseIcon />
-                <span className="hidden sm:inline">Pause</span>
-              </button>
-            ) : (
-              <button type="button" className="hud-button" onClick={onQuit}>
-                <span className="hidden sm:inline">Leave room</span>
-                <span className="sm:hidden">Leave</span>
-              </button>
-            )}
-          </div>
-
-          <div className="hud-panel hud-standings hidden w-[190px] p-2 md:block">
-            <div className="hud-label mb-1">
-              Standings{standings.length > standingsShown.length ? ` · top ${standingsShown.length}` : ""}
-            </div>
-            <table className="score-table">
-              <thead>
-                <tr>
-                  <th scope="col">Driver</th>
-                  <th scope="col" className="text-right">
-                    W
-                  </th>
-                  <th scope="col" className="text-right">
-                    D
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {standingsShown.map((kart) => (
-                  <tr key={kart.id} className={kart.isPlayer ? "is-player" : undefined}>
-                    <td className="max-w-[110px] truncate">
-                      <span className="mr-1 inline-block h-2 w-2" style={{ backgroundColor: kart.color }} />
-                      {kart.name}
-                      {!kart.alive ? <span className="text-ash"> · out</span> : null}
-                    </td>
-                    <td className="text-right tabular-nums">{kart.kills}</td>
-                    <td className="text-right tabular-nums">{kart.deaths}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="kill-feed hidden sm:flex">
-            {snapshot.feed.slice(0, 4).map((entry) => (
-              <div key={entry.id} className="kill-feed-row">
-                <span className="font-bold">{entry.killer}</span>
-                <WeaponGlyph weapon={entry.weapon} className="h-3.5 w-3.5" />
-                {entry.self ? (
-                  <span className="text-ash">self-destructed</span>
-                ) : (
-                  <span className="text-ash">{entry.victim}</span>
-                )}
-              </div>
-            ))}
-          </div>
+          ) : null}
+          <button
+            type="button"
+            className="hud-icon-button hud-menu-toggle"
+            onClick={openMenu}
+            aria-label="Open game menu"
+            aria-expanded={menuOpen}
+            aria-controls="hud-game-menu"
+          >
+            <MenuIcon />
+            <span className="hud-menu-text">Menu</span>
+          </button>
         </div>
       </div>
 
-      <div className="hud-drive absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
-        <div className="hud-panel w-[178px] px-3 py-2 sm:w-[212px]">
-          <div className="flex items-end gap-1">
-            <span className="display text-4xl tabular-nums sm:text-5xl">{speed}</span>
-            <span className="hud-label mb-1">km/h</span>
-            <span
-              className="ml-auto mb-1 text-[10px] font-bold"
-              style={{ color: player.boost > 0 ? "#9ef01a" : player.drifting ? "#ffc233" : "#a8a293" }}
-            >
-              {player.alive ? (player.boost > 0 ? "Boost" : player.drifting ? "Drift" : "Pulse") : "Out"}
-            </span>
-          </div>
-          <div className="hud-bar mt-1.5">
-            <span
-              style={{
-                width: `${driftPercent}%`,
-                backgroundColor: player.driftCharge >= 1 ? "#ffc233" : "#9ef01a",
-              }}
-            />
-          </div>
-          <div className="hud-label mt-1">
-            {player.drifting
-              ? "Charging mini-turbo"
-              : player.driftCharge > 0
-                ? "Straighten out for a boost"
-                : "Hard turns charge a mini-turbo"}
-          </div>
-        </div>
+      <div className="hud-panel hud-clock">
+        <span className="display hud-clock-time tabular-nums">
+          {formatTime(snapshot.timeLeft)}
+        </span>
+        <span className="hud-clock-goal">first to {snapshot.killTarget}</span>
       </div>
 
       <div className="hud-minimap absolute">
-        <div className="hud-panel h-[116px] w-[116px] p-1 sm:h-[172px] sm:w-[172px]">
+        <div className="hud-panel h-[108px] w-[108px] p-1 sm:h-[148px] sm:w-[148px]">
           <Minimap snapshot={snapshot} />
         </div>
         <div className="hud-label mt-1 text-right">{map.name}</div>
-      </div>
-
-      <div className="hud-keyhints absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
-        <KeyHint k="WASD / Arrows" label="drive" />
-        <KeyHint k="Space" label="fire" />
       </div>
 
       {snapshot.phase === "playing" ? (
@@ -336,64 +273,270 @@ export function Hud({
       {toast ? (
         <div
           key={toast.key}
-          className="absolute left-1/2 top-[30%] -translate-x-1/2 border-2 bg-ink/90 px-3 py-1.5 text-sm font-bold"
+          className="hud-toast"
           style={{ borderColor: toast.color, color: toast.color }}
+          role="status"
         >
           {toast.text}
         </div>
       ) : null}
 
-      {snapshot.phase === "paused" ? (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <p className="hud-label">
-              {map.name} · first to {snapshot.killTarget}
-            </p>
-            <h2 className="modal-title">Paused</h2>
-            <p className="text-sm text-ash">
-              The arena is holding its breath. Audio is {snapshot.muted ? "off" : "on"}.
-            </p>
-            <div className="modal-actions">
+      {menuOpen ? (
+        <div
+          className="hud-menu-backdrop"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeMenu();
+            }
+          }}
+        >
+          <aside
+            id="hud-game-menu"
+            className="hud-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hud-menu-title"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <header className="hud-menu-head">
+              <div className="min-w-0">
+                <p className="hud-label">
+                  {map.name} · {online ? "online match" : "bot match"}
+                </p>
+                <h2 id="hud-menu-title" className="hud-menu-title">
+                  {menuTitle}
+                </h2>
+              </div>
               <button
                 type="button"
-                className="button button-primary"
-                onClick={() => engineRef.current?.resume()}
+                className="hud-icon-button hud-menu-close"
+                onClick={closeMenu}
+                aria-label="Close game menu"
               >
-                Resume
+                <CloseIcon />
               </button>
-              <button
-                type="button"
-                className="button button-outline"
-                onClick={() => engineRef.current?.toggleMute()}
-              >
-                {snapshot.muted ? "Unmute" : "Mute"}
-              </button>
-              <button type="button" className="button button-outline" onClick={onRestart}>
-                Restart
-              </button>
-              <button type="button" className="button button-dark" onClick={onQuit}>
-                Quit to garage
-              </button>
+            </header>
+
+            <div className="hud-menu-scroll">
+              <div className="hud-menu-actions">
+                <button
+                  type="button"
+                  className="button button-primary is-wide"
+                  onClick={closeMenu}
+                >
+                  {online
+                    ? "Back to the race"
+                    : snapshot.phase === "paused"
+                      ? "Resume race"
+                      : "Close menu"}
+                </button>
+                <button
+                  type="button"
+                  className="button button-dark"
+                  onClick={() => engineRef.current?.toggleMute()}
+                >
+                  <SoundIcon muted={snapshot.muted} />
+                  {snapshot.muted ? "Unmute audio" : "Mute audio"}
+                </button>
+                {fullscreen.supported ? (
+                  <button
+                    type="button"
+                    className="button button-dark"
+                    data-fullscreen-control
+                    onClick={() => void fullscreen.toggle()}
+                  >
+                    {fullscreen.active ? "Exit fullscreen" : "Fullscreen"}
+                  </button>
+                ) : null}
+                {!online ? (
+                  <button
+                    type="button"
+                    className="button button-dark is-wide"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onRestart();
+                    }}
+                  >
+                    Restart race
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="button button-outline is-wide hud-menu-leave"
+                  onClick={onQuit}
+                >
+                  {online ? "Leave room" : "Quit to garage"}
+                </button>
+              </div>
+
+              {online ? (
+                <p className="hud-menu-note">
+                  Online matches keep running while this menu is open.
+                </p>
+              ) : null}
+              {!fullscreen.supported ? (
+                <p className="hud-menu-note">
+                  Fullscreen is not available in this browser. On iPhone, add Smash
+                  Karts to your Home Screen for a full-screen view.
+                </p>
+              ) : null}
+
+              <section className="hud-menu-section" aria-labelledby="hud-menu-match">
+                <h3 id="hud-menu-match" className="hud-menu-section-title">
+                  Match
+                </h3>
+                <dl className="hud-menu-stats">
+                  <div>
+                    <dt>Time left</dt>
+                    <dd className="tabular-nums">{formatTime(snapshot.timeLeft)}</dd>
+                  </div>
+                  <div>
+                    <dt>First to</dt>
+                    <dd>{snapshot.killTarget} wrecks</dd>
+                  </div>
+                  <div>
+                    <dt>Your place</dt>
+                    <dd>{ordinal(playerPlace)}</dd>
+                  </div>
+                  <div>
+                    <dt>Wrecks / deaths</dt>
+                    <dd className="tabular-nums">
+                      {player.kills} / {player.deaths}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="hud-menu-section" aria-labelledby="hud-menu-kart">
+                <h3 id="hud-menu-kart" className="hud-menu-section-title">
+                  Your kart
+                </h3>
+                <dl className="hud-menu-stats">
+                  <div>
+                    <dt>Speed</dt>
+                    <dd className="tabular-nums">{speed} km/h</dd>
+                  </div>
+                  <div>
+                    <dt>Mini-turbo</dt>
+                    <dd className="tabular-nums">{Math.round(driftPercent)}%</dd>
+                  </div>
+                  <div>
+                    <dt>Weapon</dt>
+                    <dd>{WEAPONS[player.weapon].name}</dd>
+                  </div>
+                  <div>
+                    <dt>Ammo</dt>
+                    <dd className="tabular-nums">
+                      {player.weapon === "pulse" ? "∞" : player.ammo}
+                    </dd>
+                  </div>
+                </dl>
+                {player.shield > 0 || player.boost > 0 || player.slow > 0 ? (
+                  <div className="hud-menu-mods">
+                    {player.shield > 0 ? (
+                      <span className="hud-mod hud-mod-shield">
+                        Shield {Math.ceil(player.shield)}s
+                      </span>
+                    ) : null}
+                    {player.boost > 0 ? (
+                      <span className="hud-mod hud-mod-boost">
+                        Overdrive {Math.ceil(player.boost)}s
+                      </span>
+                    ) : null}
+                    {player.slow > 0 ? (
+                      <span className="hud-mod hud-mod-slow">
+                        Shocked {Math.ceil(player.slow)}s
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="hud-menu-section" aria-labelledby="hud-menu-standings">
+                <h3 id="hud-menu-standings" className="hud-menu-section-title">
+                  Standings
+                </h3>
+                <div className="hud-menu-table">
+                  <table className="score-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Driver</th>
+                        <th scope="col" className="text-right">
+                          W
+                        </th>
+                        <th scope="col" className="text-right">
+                          D
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {standings.map((kart, index) => (
+                        <tr key={kart.id} className={kart.isPlayer ? "is-player" : undefined}>
+                          <td className="tabular-nums">{index + 1}</td>
+                          <td className="max-w-[150px] truncate">
+                            <span
+                              className="mr-1 inline-block h-2 w-2"
+                              style={{ backgroundColor: kart.color }}
+                            />
+                            {kart.name}
+                            {!kart.alive ? <span className="text-ash"> · out</span> : null}
+                          </td>
+                          <td className="text-right tabular-nums">{kart.kills}</td>
+                          <td className="text-right tabular-nums">{kart.deaths}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {snapshot.feed.length > 0 ? (
+                <section className="hud-menu-section" aria-labelledby="hud-menu-feed">
+                  <h3 id="hud-menu-feed" className="hud-menu-section-title">
+                    Kill feed
+                  </h3>
+                  <div className="kill-feed hud-menu-feed">
+                    {snapshot.feed.map((entry) => (
+                      <div key={entry.id} className="kill-feed-row">
+                        <span className="font-bold">{entry.killer}</span>
+                        <WeaponGlyph weapon={entry.weapon} className="h-3.5 w-3.5" />
+                        {entry.self ? (
+                          <span className="text-ash">self-destructed</span>
+                        ) : (
+                          <span className="text-ash">{entry.victim}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="hud-menu-section" aria-labelledby="hud-menu-controls">
+                <h3 id="hud-menu-controls" className="hud-menu-section-title">
+                  Controls
+                </h3>
+                <dl className="hud-menu-controls">
+                  <div>
+                    <dt>Drive</dt>
+                    <dd>WASD / arrows / left stick</dd>
+                  </div>
+                  <div>
+                    <dt>Fire</dt>
+                    <dd>Space / fire button</dd>
+                  </div>
+                  <div>
+                    <dt>Pause</dt>
+                    <dd>Menu button · Esc when windowed</dd>
+                  </div>
+                  <div>
+                    <dt>Mini-turbo</dt>
+                    <dd>Hard turns charge a boost</dd>
+                  </div>
+                </dl>
+              </section>
             </div>
-            <dl className="mt-5 grid grid-cols-2 gap-2 text-sm text-ash">
-              <div>
-                <dt className="hud-label">Drive</dt>
-                <dd>WASD, arrows, or the stick</dd>
-              </div>
-              <div>
-                <dt className="hud-label">Fire</dt>
-                <dd>Space or the fire button</dd>
-              </div>
-              <div>
-                <dt className="hud-label">Mini-turbo</dt>
-                <dd>Automatic on hard turns</dd>
-              </div>
-              <div>
-                <dt className="hud-label">Pause</dt>
-                <dd>Pause button</dd>
-              </div>
-            </dl>
-          </div>
+          </aside>
         </div>
       ) : null}
 
@@ -524,15 +667,6 @@ function ordinal(value: number): string {
   return `${value}th`;
 }
 
-function KeyHint({ k, label }: { k: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5 bg-ink/80 px-2 py-1 text-[11px]">
-      <span className="display text-xs">{k}</span>
-      <span className="text-ash">{label}</span>
-    </span>
-  );
-}
-
 function SoundIcon({ muted }: { muted: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -546,11 +680,65 @@ function SoundIcon({ muted }: { muted: boolean }) {
   );
 }
 
-function PauseIcon() {
+function FullscreenIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <rect x="6" y="5" width="4" height="14" />
-      <rect x="14" y="5" width="4" height="14" />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {active ? (
+        <>
+          <path d="M9 4v5H4" />
+          <path d="M15 4v5h5" />
+          <path d="M9 20v-5H4" />
+          <path d="M15 20v-5h5" />
+        </>
+      ) : (
+        <>
+          <path d="M4 9V4h5" />
+          <path d="M20 9V4h-5" />
+          <path d="M4 15v5h5" />
+          <path d="M20 15v5h-5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="m6 6 12 12M18 6 6 18" />
     </svg>
   );
 }

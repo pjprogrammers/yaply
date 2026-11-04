@@ -77,6 +77,7 @@ NEXT_PUBLIC_REALTIME_URL=ws://localhost:8787/room \
 Useful Worker endpoints while developing:
 
 ```bash
+curl http://localhost:8787/
 curl http://localhost:8787/health
 curl http://localhost:8787/version
 curl -X POST http://localhost:8787/rooms \
@@ -231,7 +232,7 @@ Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaply-web.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
 ```
 
 Rules:
@@ -267,6 +268,7 @@ Future schema changes require a new migration tag.
 After deployment, verify:
 
 ```bash
+curl https://<realtime-worker-host>/
 curl https://<realtime-worker-host>/health
 curl https://<realtime-worker-host>/version
 ```
