@@ -6,9 +6,29 @@ import { ColorLab } from "@/components/color-lab";
 import { Reveal } from "@/components/reveal";
 import { WeaponGlyph } from "@/components/weapon-glyph";
 
-const TICKER_WORDS = ["Drift", "Fire", "Ram", "Repeat", "Three arenas", "Six weapons", "No brakes"];
+const TICKER_WORDS = [
+  "Drift",
+  "Fire",
+  "Ram",
+  "Repeat",
+  "Three arenas",
+  "Eleven weapons",
+  "No brakes",
+];
 
-const WEAPON_ORDER: WeaponId[] = ["pulse", "missile", "mine", "shield", "turbo", "shock"];
+const WEAPON_ORDER: WeaponId[] = [
+  "machinegun",
+  "bullets",
+  "rockets",
+  "cannonballs",
+  "nuke",
+  "grenuke",
+  "snowball",
+  "mines",
+  "spikey",
+  "invincibility",
+  "fakebox",
+];
 
 export default function Home() {
   return (
@@ -39,7 +59,7 @@ export default function Home() {
             </h1>
             <p className="hero-sub">
               A free-for-all kart arena in your browser. Three scrap-built maps,
-              six weapons, and up to seven bots that will absolutely ram you.
+              eleven weapons, and up to seven bots that will absolutely ram you.
             </p>
             <div className="hero-actions">
               <Link href="/play" className="button button-primary">
@@ -61,11 +81,11 @@ export default function Home() {
           <div className="hero-media">
             <img
               src="/media/hero.jpg"
-              alt="Karts circle the furnace in the Melt Shop arena."
+              alt="Karts fight around the slag pool in the Melt Shop arena."
               width={1100}
               height={1180}
             />
-            <span className="hero-caption">Melt Shop. Furnace optional.</span>
+            <span className="hero-caption">Melt Shop. Mind the slag.</span>
           </div>
         </div>
       </section>
@@ -111,7 +131,9 @@ export default function Home() {
                 <dl className="arena-stats">
                   <div>
                     <dt>Footprint</dt>
-                    <dd>{map.size}m</dd>
+                    <dd>
+                      {map.size} × {map.depth}
+                    </dd>
                   </div>
                   <div>
                     <dt>Hard cover</dt>
@@ -144,14 +166,15 @@ export default function Home() {
         <div className="margins">
           <Reveal className="section-head">
             <h2 id="arsenal-title" className="display section-title">
-              Six weapons.
+              Eleven weapons.
               <br />
-              One pulse.
+              One slot.
             </h2>
             <p className="section-lede">
-              You always have the pulse cannon. Everything else is a temporary
-              upgrade with a short shelf life. Crates respawn every nine
-              seconds. They do not wait for you.
+              Mystery crates hide the whole arsenal. You carry one weapon at a
+              time, and the crate keeps its secret until you touch it. Machine
+              Gun tracks; everything else needs your own aim. Crates respawn
+              every nine seconds.
             </p>
           </Reveal>
 
@@ -167,9 +190,7 @@ export default function Home() {
                     <h3>{weapon.name}</h3>
                     <p>{weapon.tagline}</p>
                   </div>
-                  <p className="weapon-ammo">
-                    {id === "pulse" ? "Unlimited" : `${weapon.ammo} rounds`}
-                  </p>
+                  <p className="weapon-ammo">{weapon.ammoLabel}</p>
                 </Reveal>
               );
             })}
@@ -195,8 +216,9 @@ export default function Home() {
             </h2>
             <p className="section-lede">
               Arcade handling, no gearbox, no tyre temperatures. Point the kart,
-              hold a hard turn to charge the turbo, and keep the pulse cannon
-              hot. On a phone, the stick and fire button appear automatically.
+              hold a hard turn to charge the mini-turbo, and keep the weapon
+              circle hot. On a phone, the stick and the same fire circle appear
+              automatically.
             </p>
           </Reveal>
 
@@ -213,8 +235,9 @@ export default function Home() {
               </div>
               <p className="key-note">
                 Drive with WASD or the arrow keys. Hard turns charge a mini-turbo
-                automatically, then straighten out to spend it. Space fires. On
-                touch screens, use the joystick and the round fire button.
+                automatically, then straighten out to spend it. Space or the
+                weapon circle fires. On touch screens, use the joystick and tap
+                the circle on the right.
               </p>
             </Reveal>
 
@@ -311,8 +334,8 @@ export default function Home() {
             </h2>
             <div className="cta-row">
               <p>
-                Three maps, six weapons, seven bots, and one pulse cannon that
-                never runs dry. The arena is one click away.
+                Three maps, eleven weapons, seven bots, and a weapon circle that
+                is also the trigger. The arena is one click away.
               </p>
               <Link href="/play" className="button button-primary">
                 Enter the arena

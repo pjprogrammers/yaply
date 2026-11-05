@@ -1,6 +1,9 @@
 import type {
+  HazardDef,
+  HazardKind,
   MapDef,
   MapId,
+  MapRoute,
   ObstacleDef,
   PlatformDef,
   RampDef,
@@ -15,7 +18,8 @@ const box = (
   kind: ObstacleDef["kind"],
   color?: number,
   base?: number,
-): ObstacleDef => ({ x, z, hx, hz, h, kind, color, base });
+  rot?: number,
+): ObstacleDef => ({ x, z, hx, hz, h, kind, color, base, rot });
 
 const platform = (
   x: number,
@@ -39,19 +43,58 @@ const ramp = (
   color?: number,
 ): RampDef => ({ x, z, hx, hz, height, axis, dir, kind, color });
 
-const ring = (radius: number, count = 8, offset = 0): Array<[number, number]> =>
-  Array.from({ length: count }, (_, i) => {
-    const a = (i / count) * Math.PI * 2 + offset;
-    return [Math.round(Math.cos(a) * radius), Math.round(Math.sin(a) * radius)] as [number, number];
-  });
+const hazard = (x: number, z: number, radius: number, kind: HazardKind): HazardDef => ({
+  x,
+  z,
+  radius,
+  kind,
+});
+
+const route = (
+  name: string,
+  kind: MapRoute["kind"],
+  waypoints: Array<[number, number]>,
+): MapRoute => ({ name, kind, waypoints });
+
+const flatten = (routes: MapRoute[]): Array<[number, number]> =>
+  routes.flatMap((entry) => entry.waypoints);
+
+/**
+ * A rectangular loop. Keeping the corners square makes the authored lanes easy
+ * to reason about; props live on the islands between loops.
+ */
+const loop = (
+  name: string,
+  kind: MapRoute["kind"],
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+): MapRoute =>
+  route(name, kind, [
+    [maxX, maxZ],
+    [maxX, minZ],
+    [minX, minZ],
+    [minX, maxZ],
+  ]);
+
+const crate = (x: number, z: number, base?: number, size = 2.5): ObstacleDef =>
+  box(x, z, size, size, size * 2, "crate", undefined, base);
+
+const FOUNDRY_ROUTES: MapRoute[] = [
+  loop("Outer sweep", "main", -45, 45, -45, 45),
+  loop("Slag ring", "main", -20, 20, -20, 20),
+  loop("East slingshot", "secondary", 20, 34, -20, 20),
+];
 
 const FOUNDRY: MapDef = {
   id: "foundry",
   name: "Melt Shop",
   tagline: "Pour floor, bad ideas.",
   description:
-    "A working foundry built around a raised furnace deck. Two long ramps open an elevated ring, while container lanes and outer chicanes keep the floor honest.",
+    "A working foundry wrapped around a slag pool. Two service decks lift the fight above the floor, while stacked containers form three fast lanes around the burn.",
   size: 100,
+  depth: 100,
   theme: {
     skyTop: 0x14161c,
     skyBottom: 0x4a2a19,
@@ -71,47 +114,45 @@ const FOUNDRY: MapDef = {
     wallHeight: 4.6,
   },
   platforms: [
-    platform(0, 0, 12, 12, 2.2, "steel", 0x4b4740),
+    platform(0, 34, 5, 5, 2.2, "steel", 0x4b4740),
+    platform(0, -34, 5, 5, 2.2, "steel", 0x4b4740),
   ],
   ramps: [
-    ramp(0, 17, 4.5, 5, 2.2, "z", -1, "steel", 0x5a554c),
-    ramp(0, -17, 4.5, 5, 2.2, "z", 1, "steel", 0x5a554c),
+    ramp(0, 27, 4.5, 3, 2.2, "z", 1, "steel", 0x5a554c),
+    ramp(0, -27, 4.5, 3, 2.2, "z", -1, "steel", 0x5a554c),
   ],
+  hazards: [hazard(0, 0, 14, "lava")],
   obstacles: [
-    // Furnace sits on the raised central deck.
-    box(0, 0, 5, 5, 5.4, "furnace", undefined, 2.2),
+    // Container islands between the inner and outer lanes.
+    box(-32, -32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(32, -32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-32, 32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(32, 32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-32, 0, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-32, 20, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-32, -20, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-20, 32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(20, 32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(-20, -32, 5, 5, 2.6, "concrete", 0x4b4740),
+    box(20, -32, 5, 5, 2.6, "concrete", 0x4b4740),
 
-    // Four heavy container blocks frame the inner ring.
-    box(-28, -22, 7, 5, 4.4, "concrete", 0x4b4740),
-    box(28, -22, 5, 7, 4.4, "concrete", 0x4b4740),
-    box(-28, 22, 5, 7, 4.4, "concrete", 0x4b4740),
-    box(28, 22, 7, 5, 4.4, "concrete", 0x4b4740),
+    // Deck cover.
+    crate(-2.5, 34, 2.2),
+    crate(2.5, 34, 2.2),
+    crate(-2.5, -34, 2.2),
+    crate(2.5, -34, 2.2),
 
-    // Outer-ring chicanes.
-    box(-14, -40, 5, 1, 2, "barrier"),
-    box(14, -40, 5, 1, 2, "barrier"),
-    box(-14, 40, 5, 1, 2, "barrier"),
-    box(14, 40, 5, 1, 2, "barrier"),
-    box(-40, 14, 1, 5, 2, "barrier"),
-    box(-40, -14, 1, 5, 2, "barrier"),
-    box(40, 14, 1, 5, 2, "barrier"),
-    box(40, -14, 1, 5, 2, "barrier"),
-
-    // Central cover and corner clutter.
-    box(-22, 10, 2, 2, 2.6, "crate"),
-    box(22, 10, 2, 2, 2.6, "crate"),
-    box(-22, -10, 2, 2, 2.6, "crate"),
-    box(22, -10, 2, 2, 2.6, "crate"),
-    box(-42, 42, 2, 2, 2.6, "crate"),
-    box(42, 42, 2, 2, 2.6, "crate"),
-    box(-42, -42, 2, 2, 2.6, "crate"),
-    box(42, -42, 2, 2, 2.6, "crate"),
+    // Loot stacked on the container roofs.
+    crate(-32, -32, 2.6),
+    crate(32, -32, 2.6),
+    crate(-32, 32, 2.6),
+    crate(32, 32, 2.6),
   ],
   scenery: [
-    { kind: "lamp", x: -44, z: -44 },
-    { kind: "lamp", x: 44, z: -44 },
-    { kind: "lamp", x: 44, z: 44 },
-    { kind: "lamp", x: -44, z: 44 },
+    { kind: "lamp", x: -46, z: -46 },
+    { kind: "lamp", x: 46, z: -46 },
+    { kind: "lamp", x: 46, z: 46 },
+    { kind: "lamp", x: -46, z: 46 },
     { kind: "pipes", x: -28, z: -48 },
     { kind: "pipes", x: 28, z: -48 },
     { kind: "pipes", x: 0, z: 48, rot: Math.PI },
@@ -127,51 +168,50 @@ const FOUNDRY: MapDef = {
     { x: 42, y: 6, z: 42, color: 0xffb072, intensity: 160, distance: 38 },
   ],
   boostPads: [
-    { x: 0, z: 33, rot: 0 },
-    { x: 33, z: 0, rot: Math.PI / 2 },
-    { x: 0, z: -33, rot: 0 },
-    { x: -33, z: 0, rot: Math.PI / 2 },
+    { x: 20, z: 45, rot: Math.PI / 2 },
+    { x: 45, z: 30, rot: 0 },
+    { x: -20, z: -45, rot: Math.PI / 2 },
+    { x: -45, z: -30, rot: 0 },
   ],
   spawns: [
-    [0, 45],
-    [34, 34],
+    [12, 45],
+    [42, 20],
     [45, 0],
-    [34, -34],
-    [0, -45],
-    [-34, -34],
+    [42, -20],
+    [-12, -45],
+    [-42, -20],
     [-45, 0],
-    [-34, 34],
+    [-42, 20],
   ],
-  waypoints: [
-    ...ring(45),
-    ...ring(33, 8, Math.PI / 8),
-    ...ring(24),
-    [34, 34],
-    [-34, -34],
-    [34, -34],
-    [-34, 34],
-  ],
+  waypoints: flatten(FOUNDRY_ROUTES),
+  routes: FOUNDRY_ROUTES,
   pickups: [
-    [0, 28],
-    [26, 0],
-    [0, -28],
-    [-26, 0],
-    [10, 18],
-    [-10, -18],
-    [30, 40],
-    [-30, -40],
-    [36, -34],
-    [-36, 34],
+    [0, 20],
+    [20, 0],
+    [0, -20],
+    [-20, 0],
+    [30, 45],
+    [45, -30],
+    [-30, -45],
+    [-45, 30],
+    [34, 20],
   ],
 };
+
+const SCRAPYARD_ROUTES: MapRoute[] = [
+  loop("Outer sweep", "main", -45, 45, -57, 57),
+  loop("Sludge ring", "main", -21, 21, -21, 21),
+  loop("East slingshot", "secondary", 21, 36, -21, 21),
+];
 
 const SCRAPYARD: MapDef = {
   id: "scrapyard",
   name: "Scrap Sea",
   tagline: "Everything here is already broken.",
   description:
-    "A sun-bleached yard of stacked wrecks and tire piles. A raised wreck plateau splits the arena into fast outer lanes and tight scrap chicanes.",
+    "A long sun-bleached yard of stacked wrecks and tire piles. A raised wreck plateau splits the arena into fast outer lanes, while a sludge pit guards the middle.",
   size: 100,
+  depth: 125,
   theme: {
     skyTop: 0x4f87bd,
     skyBottom: 0xf0d3a6,
@@ -191,74 +231,62 @@ const SCRAPYARD: MapDef = {
     wallHeight: 3,
   },
   platforms: [
-    platform(0, 0, 11, 9, 2.4, "wreck", 0x8a6a45),
+    platform(0, 42, 5, 5, 2.4, "wreck", 0x8a6a45),
+    platform(0, -42, 5, 5, 2.4, "wreck", 0x8a6a45),
   ],
   ramps: [
-    ramp(15.5, 0, 4.5, 4, 2.4, "x", -1, "wreck", 0x9a7a52),
-    ramp(-15.5, 0, 4.5, 4, 2.4, "x", 1, "wreck", 0x9a7a52),
+    ramp(0, 34.5, 4.5, 3, 2.4, "z", 1, "wreck", 0x9a7a52),
+    ramp(0, -34.5, 4.5, 3, 2.4, "z", -1, "wreck", 0x9a7a52),
   ],
+  hazards: [hazard(0, 0, 15, "sludge")],
   obstacles: [
-    // Raised plateau cover.
-    box(0, 0, 3.5, 2.5, 2.2, "wreck", 0x9e5a3a, 2.4),
-    box(-7, 4, 1.8, 1.8, 2, "crate", undefined, 2.4),
-    box(7, -4, 1.8, 1.8, 2, "crate", undefined, 2.4),
+    box(-32, -34, 5, 5, 2.6, "wreck", 0x9e5a3a),
+    box(32, -34, 5, 5, 2.6, "wreck", 0x7a6a52),
+    box(-32, 34, 5, 5, 2.6, "wreck", 0xa06a3e),
+    box(32, 34, 5, 5, 2.6, "wreck", 0x6a7a52),
 
-    // Wreck clusters.
-    box(-27, -22, 8, 4, 2.6, "wreck", 0x9e5a3a),
-    box(27, -22, 4, 8, 2.6, "wreck", 0x7a6a52),
-    box(-27, 22, 4, 8, 2.4, "wreck", 0xa06a3e),
-    box(27, 22, 8, 4, 2.4, "wreck", 0x6a7a52),
+    box(-20, 42, 5, 5, 2.6, "wreck", 0x8a5a3a),
+    box(20, 42, 5, 5, 2.6, "wreck", 0x7a5a42),
+    box(-20, -42, 5, 5, 2.6, "wreck", 0x7a5a42),
+    box(20, -42, 5, 5, 2.6, "wreck", 0x8a5a3a),
 
-    // Outer chicanes.
-    box(-4, -38, 6, 3, 2.2, "wreck", 0x8a4a3a),
-    box(4, 38, 6, 3, 2.2, "wreck", 0x8a4a3a),
-    box(38, -4, 3, 6, 2.2, "wreck", 0x7a4a2e),
-    box(-38, 4, 3, 6, 2.2, "wreck", 0x7a4a2e),
+    box(-34, 0, 5, 5, 2.6, "wreck", 0x8a4a3a),
+    box(-34, 22, 5, 5, 2.6, "wreck", 0x7a4a2e),
+    box(-34, -22, 5, 5, 2.6, "wreck", 0x7a4a2e),
+    box(-32, 12, 5, 5, 2.6, "wreck", 0x8a4a3a),
+    box(-32, -12, 5, 5, 2.6, "wreck", 0x8a4a3a),
 
-    // Tire piles.
-    box(-22, 10, 2, 2, 2.4, "tire"),
-    box(22, -10, 2, 2, 2.4, "tire"),
-    box(10, 30, 2, 2, 2.4, "tire"),
-    box(-10, -30, 2, 2, 2.4, "tire"),
-    box(20, 12, 2, 2, 2.4, "tire"),
-    box(-20, -12, 2, 2, 2.4, "tire"),
-
-    // Barriers.
-    box(-18, -40, 5, 1, 1.8, "barrier"),
-    box(18, 40, 5, 1, 1.8, "barrier"),
-    box(-40, 18, 1, 5, 1.8, "barrier"),
-    box(40, -18, 1, 5, 1.8, "barrier"),
-    box(-14, 16, 5, 1, 1.8, "barrier"),
-    box(14, -16, 5, 1, 1.8, "barrier"),
-
-    // Crates.
-    box(-42, 30, 2, 2, 2.4, "crate"),
-    box(42, -30, 2, 2, 2.4, "crate"),
-    box(-30, -42, 2, 2, 2.4, "crate"),
-    box(30, 42, 2, 2, 2.4, "crate"),
-    box(0, 20, 2, 2, 2.4, "crate"),
-    box(0, -20, 2, 2, 2.4, "crate"),
-    box(-30, 0, 2, 2, 2.4, "crate"),
-    box(30, 0, 2, 2, 2.4, "crate"),
+    crate(-2.5, 42, 2.4),
+    crate(2.5, 42, 2.4),
+    crate(-2.5, -42, 2.4),
+    crate(2.5, -42, 2.4),
+    crate(-32, -34, 2.6),
+    crate(32, -34, 2.6),
+    crate(-32, 34, 2.6),
+    crate(32, 34, 2.6),
+    crate(-20, 42, 2.6),
+    crate(20, 42, 2.6),
+    crate(-20, -42, 2.6),
+    crate(20, -42, 2.6),
   ],
   scenery: [
-    { kind: "crane", x: -44, z: -46 },
-    { kind: "stack", x: 42, z: 42 },
-    { kind: "stack", x: -42, z: 38, rot: 0.8 },
+    { kind: "crane", x: -48, z: -50 },
+    { kind: "stack", x: 42, z: 46 },
+    { kind: "stack", x: -42, z: 40, rot: 0.8 },
     { kind: "barrel", x: 16, z: -14, color: 0x6b5a32 },
     { kind: "barrel", x: 17, z: -13, color: 0x8b3a1f },
     { kind: "barrel", x: -20, z: 18, color: 0x4a5a32 },
     { kind: "barrel", x: -19, z: 19.2, color: 0x8b3a1f },
-    { kind: "barrel", x: 34, z: 36, color: 0x6b5a32 },
-    { kind: "barrel", x: 33, z: 37, color: 0x6b5a32 },
-    { kind: "lamp", x: 45, z: -45 },
-    { kind: "lamp", x: -45, z: 45 },
+    { kind: "barrel", x: 34, z: 46, color: 0x6b5a32 },
+    { kind: "barrel", x: 33, z: 47, color: 0x6b5a32 },
+    { kind: "lamp", x: 46, z: -48 },
+    { kind: "lamp", x: -46, z: 48 },
     { kind: "stack", x: 0, z: -52, rot: 0.4 },
     { kind: "stack", x: -16, z: -51, rot: 1.2 },
     { kind: "stack", x: 26, z: 51, rot: 0.2 },
     { kind: "stack", x: 52, z: 26, rot: 1.6 },
     { kind: "stack", x: -52, z: -30, rot: 0.9 },
-    { kind: "neon", x: 0, z: -54.2, y: 5.6, text: "SCRAP KING", color: 0xffc233 },
+    { kind: "neon", x: 0, z: -61.2, y: 5.6, text: "SCRAP KING", color: 0xffc233 },
   ],
   lights: [
     { x: 34, y: 7, z: -34, color: 0xffc48a, intensity: 160, distance: 36 },
@@ -266,47 +294,51 @@ const SCRAPYARD: MapDef = {
     { x: 0, y: 6, z: 0, color: 0xffd7a0, intensity: 110, distance: 40 },
   ],
   boostPads: [
-    { x: 0, z: 32, rot: 0 },
-    { x: 32, z: 0, rot: Math.PI / 2 },
-    { x: 0, z: -32, rot: 0 },
-    { x: -32, z: 0, rot: Math.PI / 2 },
+    { x: 20, z: 57, rot: Math.PI / 2 },
+    { x: 45, z: 15, rot: 0 },
+    { x: -20, z: -57, rot: Math.PI / 2 },
+    { x: -45, z: 15, rot: 0 },
   ],
   spawns: [
-    [0, 45],
-    [34, 34],
+    [12, 57],
+    [44, 28],
     [45, 0],
-    [34, -34],
-    [0, -45],
-    [-34, -34],
+    [44, -28],
+    [-12, -57],
+    [-44, -28],
     [-45, 0],
-    [-34, 34],
+    [-44, 28],
   ],
-  waypoints: [
-    ...ring(46),
-    ...ring(36, 8, Math.PI / 8),
-    ...ring(28, 8, Math.PI / 8),
-  ],
+  waypoints: flatten(SCRAPYARD_ROUTES),
+  routes: SCRAPYARD_ROUTES,
   pickups: [
-    [0, 14],
-    [26, 0],
-    [0, -14],
-    [-26, 0],
-    [24, 14],
-    [-24, -14],
-    [36, 38],
-    [-36, -38],
-    [38, -34],
-    [-38, 34],
+    [0, 21],
+    [21, 0],
+    [0, -21],
+    [-21, 0],
+    [30, 57],
+    [45, 45],
+    [-30, -57],
+    [-45, -45],
+    [36, 21],
+    [-45, -20],
   ],
 };
+
+const ROOFTOP_ROUTES: MapRoute[] = [
+  loop("Parapet sweep", "main", -45, 45, -45, 45),
+  loop("Service ring", "main", -22, 22, -22, 22),
+  loop("Northwest cut", "secondary", -34, -22, 22, 34),
+];
 
 const ROOFTOP: MapDef = {
   id: "rooftop",
   name: "Night Shift",
   tagline: "Forty storeys up. No rails.",
   description:
-    "A neon-lit rooftop with two raised service decks, dense HVAC cover, and a central brawl pit. The ramps are the only way up, so watch the parapet.",
+    "A neon-lit rooftop wrapped around a raised service deck. Four open vents drop into the dark, and stacked HVAC cover turns every lane into a close-quarters brawl.",
   size: 100,
+  depth: 100,
   theme: {
     skyTop: 0x070a1a,
     skyBottom: 0x371741,
@@ -325,66 +357,47 @@ const ROOFTOP: MapDef = {
     wallColor: 0x24242b,
     wallHeight: 1.6,
   },
-  platforms: [
-    platform(0, -28, 10, 6, 1.9, "roof", 0x2e2e36),
-    platform(0, 28, 10, 6, 1.9, "roof", 0x2e2e36),
-  ],
+  platforms: [platform(0, 0, 9, 9, 2, "roof", 0x2e2e36)],
   ramps: [
-    ramp(0, -18, 4, 4, 1.9, "z", -1, "roof", 0x35353e),
-    ramp(0, 18, 4, 4, 1.9, "z", 1, "roof", 0x35353e),
+    ramp(0, 12, 4.5, 3, 2, "z", -1, "roof", 0x35353e),
+    ramp(0, -12, 4.5, 3, 2, "z", 1, "roof", 0x35353e),
+  ],
+  hazards: [
+    hazard(0, 34, 7, "void"),
+    hazard(0, -34, 7, "void"),
+    hazard(34, 0, 7, "void"),
+    hazard(-34, 0, 7, "void"),
   ],
   obstacles: [
-    // Cover on the two service decks.
-    box(-6, -28, 3, 2, 1.8, "ac", undefined, 1.9),
-    box(6, -28, 1.8, 1.8, 1.6, "crate", undefined, 1.9),
-    box(6, 28, 3, 2, 1.8, "ac", undefined, 1.9),
-    box(-6, 28, 1.8, 1.8, 1.6, "crate", undefined, 1.9),
+    box(32, 32, 5, 5, 2.4, "ac"),
+    box(32, -32, 5, 5, 2.4, "ac"),
+    box(-32, -32, 5, 5, 2.4, "ac"),
+    box(32, 12, 5, 5, 2.4, "ac"),
+    box(32, -12, 5, 5, 2.4, "ac"),
+    box(12, 32, 5, 5, 2.4, "ac"),
+    box(12, -32, 5, 5, 2.4, "ac"),
 
-    // Main HVAC clusters.
-    box(-24, -16, 4, 3, 1.8, "ac"),
-    box(24, -16, 3, 4, 1.8, "ac"),
-    box(-24, 16, 3, 4, 1.8, "ac"),
-    box(24, 16, 4, 3, 1.8, "ac"),
+    // Deck cover around the central brawl pit.
+    crate(-5, 5, 2),
+    crate(0, 5, 2),
+    crate(5, 5, 2),
+    crate(-5, 0, 2),
+    crate(5, 0, 2),
+    crate(-5, -5, 2),
+    crate(0, -5, 2),
+    crate(5, -5, 2),
 
-    // Outer rooftop units.
-    box(-38, -36, 3, 4, 1.6, "ac"),
-    box(38, 36, 3, 4, 1.6, "ac"),
-    box(-38, 36, 4, 3, 1.6, "ac"),
-    box(38, -36, 4, 3, 1.6, "ac"),
-    box(-20, -30, 4, 2.5, 1.8, "ac"),
-    box(20, 30, 4, 2.5, 1.8, "ac"),
-
-    // Central brawl-pit cover.
-    box(-10, -6, 5, 1, 2.2, "concrete", 0x2e2e34),
-    box(10, 6, 5, 1, 2.2, "concrete", 0x2e2e34),
-    box(-14, 6, 1, 5, 2.2, "concrete", 0x2e2e34),
-    box(14, -6, 1, 5, 2.2, "concrete", 0x2e2e34),
-    box(-30, 0, 1, 6, 2.2, "concrete", 0x2e2e34),
-    box(30, 0, 1, 6, 2.2, "concrete", 0x2e2e34),
-
-    // Planters and pillars.
-    box(-18, 0, 3, 1, 1.2, "planter"),
-    box(18, 0, 3, 1, 1.2, "planter"),
-    box(0, -10, 3, 1, 1.2, "planter"),
-    box(0, 10, 3, 1, 1.2, "planter"),
-    box(-40, -10, 2, 2, 2.8, "pillar"),
-    box(40, 10, 2, 2, 2.8, "pillar"),
-    box(-10, 40, 2, 2, 2.8, "pillar"),
-    box(10, -40, 2, 2, 2.8, "pillar"),
-
-    // Outer barriers and crates.
-    box(-14, -40, 5, 1, 2.2, "concrete", 0x2e2e34),
-    box(14, 40, 5, 1, 2.2, "concrete", 0x2e2e34),
-    box(-40, 14, 1, 5, 2.2, "concrete", 0x2e2e34),
-    box(40, -14, 1, 5, 2.2, "concrete", 0x2e2e34),
-    box(-20, 36, 2, 2, 2.4, "crate"),
-    box(20, -36, 2, 2, 2.4, "crate"),
-    box(-28, 40, 2, 2, 2.4, "crate"),
-    box(28, -40, 2, 2, 2.4, "crate"),
-    box(-8, 0, 2, 2, 2.4, "crate"),
-    box(8, 0, 2, 2, 2.4, "crate"),
-    box(0, -6, 2, 2, 2.4, "crate"),
-    box(0, 6, 2, 2, 2.4, "crate"),
+    // Rooftop loot stacks.
+    crate(32, 32, 2.4),
+    crate(32, -32, 2.4),
+    crate(-32, -32, 2.4),
+    crate(32, 12, 2.4),
+    crate(32, -12, 2.4),
+    crate(12, 32, 2.4),
+    crate(12, -32, 2.4),
+    crate(30, 34, 2.4, 2),
+    crate(34, 30, 2.4, 2),
+    crate(-34, -30, 2.4, 2),
   ],
   scenery: [
     { kind: "neon", x: 0, z: -54.2, y: 4.9, text: "RIOT", color: 0xff3d81 },
@@ -402,38 +415,33 @@ const ROOFTOP: MapDef = {
     { x: -38, y: 5, z: 0, color: 0x37f5e0, intensity: 190, distance: 36 },
   ],
   boostPads: [
-    { x: 8, z: 14, rot: 0 },
-    { x: -8, z: -14, rot: 0 },
-    { x: 12, z: 0, rot: Math.PI / 2 },
-    { x: -12, z: 0, rot: Math.PI / 2 },
+    { x: 0, z: 22, rot: 0 },
+    { x: 22, z: 0, rot: Math.PI / 2 },
+    { x: 0, z: -22, rot: 0 },
+    { x: -22, z: 0, rot: Math.PI / 2 },
   ],
   spawns: [
-    [0, 45],
-    [30, 30],
-    [45, 0],
-    [30, -30],
-    [0, -45],
-    [-30, -30],
-    [-45, 0],
-    [-30, 30],
+    [40, 40],
+    [45, 15],
+    [45, -15],
+    [40, -40],
+    [-40, -40],
+    [-45, -15],
+    [-45, 15],
+    [-40, 40],
   ],
-  waypoints: [
-    ...ring(47, 8, Math.PI / 8),
-    ...ring(36, 8, Math.PI / 8),
-    ...ring(20, 8, Math.PI / 8),
-    [6, 12],
-    [-6, -12],
-  ],
+  waypoints: flatten(ROOFTOP_ROUTES),
+  routes: ROOFTOP_ROUTES,
   pickups: [
-    [0, 0],
-    [24, 0],
-    [-24, 0],
-    [12, 16],
-    [-12, -16],
-    [38, 22],
-    [-38, -22],
-    [26, 42],
-    [-26, -42],
+    [15, 15],
+    [15, -15],
+    [-15, -15],
+    [-15, 15],
+    [30, 45],
+    [45, 45],
+    [-30, -45],
+    [-45, -45],
+    [34, 22],
   ],
 };
 

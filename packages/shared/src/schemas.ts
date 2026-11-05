@@ -70,7 +70,29 @@ export const SmashInputSchema = z
   })
   .strict();
 
-const SmashWeaponSchema = z.enum(["pulse", "missile", "mine", "shield", "turbo", "shock"]);
+const SmashWeaponSchema = z.enum([
+  "machinegun",
+  "bullets",
+  "rockets",
+  "cannonballs",
+  "nuke",
+  "grenuke",
+  "snowball",
+  "mines",
+  "spikey",
+  "invincibility",
+  "fakebox",
+]);
+const SmashWeaponSlotSchema = z.union([SmashWeaponSchema, z.literal("none")]);
+const SmashProjectileKindSchema = z.enum([
+  "tracer",
+  "bullet",
+  "rocket",
+  "cannonball",
+  "nuke",
+  "grenuke",
+  "snowball",
+]);
 const SmashPositionSchema = z.number().finite().min(-512).max(512);
 
 export const SmashKartSnapshotSchema = z
@@ -79,13 +101,15 @@ export const SmashKartSnapshotSchema = z
     name: z.string().min(1).max(32),
     color: StrokeColorSchema,
     x: SmashPositionSchema,
+    y: z.number().finite().min(-64).max(512),
     z: SmashPositionSchema,
     yaw: z.number().finite().min(-Math.PI * 8).max(Math.PI * 8),
     hp: z.number().finite().min(0).max(1000),
     shield: z.number().finite().min(0).max(120),
     boost: z.number().finite().min(0).max(120),
     slow: z.number().finite().min(0).max(120),
-    weapon: SmashWeaponSchema,
+    spike: z.number().finite().min(0).max(120),
+    weapon: SmashWeaponSlotSchema,
     ammo: z.number().int().min(0).max(100),
     kills: z.number().int().min(0).max(100000),
     deaths: z.number().int().min(0).max(100000),
@@ -123,7 +147,7 @@ export const SmashMatchSnapshotSchema = z
         z
           .object({
             id: z.number().int().min(0).max(10_000_000),
-            kind: z.enum(["bolt", "missile"]),
+            kind: SmashProjectileKindSchema,
             x: SmashPositionSchema,
             y: z.number().finite().min(-64).max(512),
             z: SmashPositionSchema,
@@ -134,12 +158,14 @@ export const SmashMatchSnapshotSchema = z
           .strict(),
       )
       .max(128),
-    mines: z
+    traps: z
       .array(
         z
           .object({
             id: z.number().int().min(0).max(10_000_000),
+            kind: z.enum(["mine", "fake"]),
             x: SmashPositionSchema,
+            y: z.number().finite().min(-64).max(512),
             z: SmashPositionSchema,
           })
           .strict(),

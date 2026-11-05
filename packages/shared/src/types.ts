@@ -15,7 +15,27 @@ export type ChainGridStyle = "2d" | "3d";
 export type CpuDifficulty = "easy" | "medium" | "hard";
 
 export type SmashMapId = "foundry" | "scrapyard" | "rooftop";
-export type SmashWeaponId = "pulse" | "missile" | "mine" | "shield" | "turbo" | "shock";
+export type SmashWeaponId =
+  | "machinegun"
+  | "bullets"
+  | "rockets"
+  | "cannonballs"
+  | "nuke"
+  | "grenuke"
+  | "snowball"
+  | "mines"
+  | "spikey"
+  | "invincibility"
+  | "fakebox";
+export type SmashWeaponSlot = SmashWeaponId | "none";
+export type SmashProjectileKind =
+  | "tracer"
+  | "bullet"
+  | "rocket"
+  | "cannonball"
+  | "nuke"
+  | "grenuke"
+  | "snowball";
 
 export type GamePhase =
   | "lobby"
@@ -126,13 +146,15 @@ export type SmashKartSnapshot = {
   name: string;
   color: string;
   x: number;
+  y: number;
   z: number;
   yaw: number;
   hp: number;
   shield: number;
   boost: number;
   slow: number;
-  weapon: SmashWeaponId;
+  spike: number;
+  weapon: SmashWeaponSlot;
   ammo: number;
   kills: number;
   deaths: number;
@@ -152,7 +174,7 @@ export type SmashPickupSnapshot = {
 
 export type SmashProjectileSnapshot = {
   id: number;
-  kind: "bolt" | "missile";
+  kind: SmashProjectileKind;
   x: number;
   y: number;
   z: number;
@@ -161,9 +183,11 @@ export type SmashProjectileSnapshot = {
   vz: number;
 };
 
-export type SmashMineSnapshot = {
+export type SmashTrapSnapshot = {
   id: number;
+  kind: "mine" | "fake";
   x: number;
+  y: number;
   z: number;
 };
 
@@ -196,7 +220,7 @@ export type SmashMatchSnapshot = {
   karts: SmashKartSnapshot[];
   pickups: SmashPickupSnapshot[];
   projectiles: SmashProjectileSnapshot[];
-  mines: SmashMineSnapshot[];
+  traps: SmashTrapSnapshot[];
   feed: SmashFeedEntry[];
   winner: SmashWinner | null;
 };

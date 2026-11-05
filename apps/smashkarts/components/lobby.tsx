@@ -285,7 +285,9 @@ export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps
               <dl className="grid w-full grid-cols-3 gap-2">
                 <div>
                   <dt className="hud-label">Footprint</dt>
-                  <dd className="display text-xl">{selected.size}m</dd>
+                  <dd className="display text-xl">
+                    {selected.size} × {selected.depth}
+                  </dd>
                 </div>
                 <div>
                   <dt className="hud-label">Hard cover</dt>

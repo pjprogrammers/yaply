@@ -5,7 +5,8 @@ import { buildPickup, type PickupVisual } from "./pickup-mesh";
 import { GameAudio } from "./audio";
 import { ParticleField } from "./particles";
 import { createSparkTexture, createSmokeTexture, cssToHex, paintHealthBar } from "./assets";
-import { BOT_COLORS, BOT_NAMES, KART, PICKUP_POOL, WEAPONS } from "./constants";
+import { BOT_COLORS, BOT_NAMES, KART, OBSTACLE_RULES, PICKUP_POOL, WEAPONS } from "./constants";
+import { ARENA_STANDARD, pointInHazard } from "./arena-spec";
 import { getMap } from "./maps";
 import type { GameStore } from "./store";
 import type {
@@ -17,8 +18,10 @@ import type {
   MapDef,
   OnlinePlayer,
   PickupSnapshot,
+  ProjectileKind,
   VehicleInput,
   WeaponId,
+  WeaponSlot,
 } from "./types";
 import type {
   SmashInput,
@@ -49,12 +52,15 @@ interface KartActor {
   boostPadCooldown: number;
   speed: number;
   hp: number;
-  weapon: WeaponId;
+  weapon: WeaponSlot;
   ammo: number;
   cooldown: number;
   shieldTime: number;
   boostTime: number;
   slowTime: number;
+  spikeTime: number;
+  ramCooldown: number;
+  burstLeft: number;
   invuln: number;
   respawnIn: number;
   alive: boolean;
@@ -69,22 +75,25 @@ interface KartActor {
   driftCharge: number;
   wheelSpin: number;
   bodyRoll: number;
-  lockId: string | null;
-  lastHitBy: string | null;
-  lastHitWeapon: WeaponId;
   ai: BotBrain | null;
 }
 
 interface Projectile {
   id: number;
   ownerId: string;
-  kind: "bolt" | "missile";
+  kind: ProjectileKind;
+  weapon: WeaponId;
+  origin: THREE.Vector3;
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   speed: number;
   life: number;
   damage: number;
   splash: number;
+  gravity: number;
+  fuse: number;
+  landed: boolean;
+  radius: number;
   targetId: string | null;
   mesh: THREE.Object3D;
   /** Guest-only targets copied from the latest host snapshot. */
@@ -92,16 +101,19 @@ interface Projectile {
   netVelocity: THREE.Vector3 | null;
 }
 
-interface MineActor {
+interface TrapActor {
   id: number;
   ownerId: string;
+  kind: "mine" | "fake";
   x: number;
   y: number;
   z: number;
   arm: number;
   life: number;
+  phase: number;
   mesh: THREE.Group;
-  lamp: THREE.Mesh;
+  lamp: THREE.Mesh | null;
+  pickup: PickupVisual | null;
 }
 
 interface PickupActor {
@@ -154,6 +166,16 @@ function shuffle<T>(items: readonly T[]): T[] {
   return copy;
 }
 
+const PROJECTILE_WEAPONS: Record<ProjectileKind, WeaponId> = {
+  tracer: "machinegun",
+  bullet: "bullets",
+  rocket: "rockets",
+  cannonball: "cannonballs",
+  nuke: "nuke",
+  grenuke: "grenuke",
+  snowball: "snowball",
+};
+
 export class GameEngine {
   private readonly container: HTMLElement;
   private readonly store: GameStore;
@@ -173,7 +195,7 @@ export class GameEngine {
   private readonly karts: KartActor[] = [];
   private player!: KartActor;
   private readonly projectiles: Projectile[] = [];
-  private readonly mines: MineActor[] = [];
+  private readonly traps: TrapActor[] = [];
   private readonly pickups: PickupActor[] = [];
   private readonly shockwaves: Shockwave[] = [];
   private readonly feed: GameSnapshot["feed"] = [];
@@ -193,7 +215,7 @@ export class GameEngine {
   private lastPublish = 0;
   private feedId = 0;
   private projectileId = 0;
-  private mineId = 0;
+  private trapId = 0;
   private shake = 0;
   private muted: boolean;
   private readonly cameraLook = new THREE.Vector3();
@@ -201,6 +223,7 @@ export class GameEngine {
 
   private readonly keys = new Set<string>();
   private keyFire = false;
+  private firePulse = 0;
   private touchSteer = 0;
   private touchThrottle = 0;
   private touchFire = false;
@@ -360,7 +383,7 @@ export class GameEngine {
     this.audio.unlock();
   }
 
-  /** Held state of the on-screen fire button. */
+  /** Held state of the on-screen weapon circle. */
   setTouchFire(firing: boolean) {
     this.touchFire = firing;
     if (firing) {
@@ -368,11 +391,21 @@ export class GameEngine {
     }
   }
 
+  /**
+   * Guarantees at least one simulation tick sees the trigger, even when a tap
+   * starts and ends between two animation frames.
+   */
+  pulseFire() {
+    this.firePulse = Math.max(this.firePulse, 0.08);
+    this.audio.unlock();
+  }
+
   /** Releases the on-screen controls, e.g. when the HUD unmounts. */
   clearTouchInput() {
     this.touchSteer = 0;
     this.touchThrottle = 0;
     this.touchFire = false;
+    this.firePulse = 0;
   }
 
   /** Drops every held control. Used on pause, blur, tab hide and match end. */
@@ -482,6 +515,7 @@ export class GameEngine {
     this.keys.add(code);
     if (code === "Space") {
       this.keyFire = true;
+      this.pulseFire();
     }
     this.audio.unlock();
   };
@@ -548,6 +582,10 @@ export class GameEngine {
         fireIn: Math.random() * 0.6,
         jitter: Math.random(),
         waypoint: Math.floor(Math.random() * this.arenaMap.waypoints.length),
+        route: index % this.arenaMap.routes.length,
+        routePoint: Math.floor(
+          Math.random() * this.arenaMap.routes[index % this.arenaMap.routes.length].waypoints.length,
+        ),
         wander: false,
         skill: 0.55 + Math.random() * 0.4,
       };
@@ -587,12 +625,15 @@ export class GameEngine {
       boostPadCooldown: 0,
       speed: 0,
       hp: KART.hp,
-      weapon: "pulse",
+      weapon: "none",
       ammo: 0,
       cooldown: 0,
       shieldTime: 0,
       boostTime: 0,
       slowTime: 0,
+      spikeTime: 0,
+      ramCooldown: 0,
+      burstLeft: 0,
       invuln: 0,
       respawnIn: 0,
       alive: true,
@@ -607,9 +648,6 @@ export class GameEngine {
       driftCharge: 0,
       wheelSpin: 0,
       bodyRoll: 0,
-      lockId: null,
-      lastHitBy: null,
-      lastHitWeapon: "pulse",
       ai,
     };
   }
@@ -638,12 +676,13 @@ export class GameEngine {
     if (this.weaponBag.length === 0) {
       this.weaponBag = shuffle(PICKUP_POOL);
     }
-    return this.weaponBag.pop() ?? "missile";
+    return this.weaponBag.pop() ?? "machinegun";
   }
 
   private placeAtSpawns() {
     const spawns = shuffle(this.arenaMap.spawns);
-    const limit = this.arenaMap.size / 2 - 3;
+    const limitX = this.arenaMap.size / 2 - 3;
+    const limitZ = this.arenaMap.depth / 2 - 3;
     this.karts.forEach((kart, index) => {
       const spawn = spawns[index % spawns.length];
       const lap = Math.floor(index / spawns.length);
@@ -655,8 +694,8 @@ export class GameEngine {
         const radius = 2.6 * lap;
         for (let attempt = 0; attempt < 10; attempt += 1) {
           const angle = index * 2.399963 + attempt * 0.7;
-          const candidateX = clamp(spawn[0] + Math.cos(angle) * radius, -limit, limit);
-          const candidateZ = clamp(spawn[1] + Math.sin(angle) * radius, -limit, limit);
+          const candidateX = clamp(spawn[0] + Math.cos(angle) * radius, -limitX, limitX);
+          const candidateZ = clamp(spawn[1] + Math.sin(angle) * radius, -limitZ, limitZ);
           if (!this.pointBlocked(candidateX, candidateZ, KART.radius + 0.6)) {
             x = candidateX;
             z = candidateZ;
@@ -684,23 +723,25 @@ export class GameEngine {
     kart.boostPadCooldown = 0;
     kart.speed = 0;
     kart.hp = KART.hp;
-    kart.weapon = "pulse";
+    kart.weapon = "none";
     kart.ammo = 0;
     kart.cooldown = 0;
     kart.shieldTime = 0;
     kart.boostTime = 0;
     kart.slowTime = 0;
+    kart.spikeTime = 0;
+    kart.ramCooldown = 0;
+    kart.burstLeft = 0;
     kart.invuln = KART.spawnProtection;
     kart.alive = true;
     kart.drifting = false;
     kart.driftCharge = 0;
-    kart.lastHitBy = null;
-    kart.lockId = null;
     kart.visual.group.visible = true;
     kart.visual.group.position.set(x, kart.y, z);
     kart.visual.group.rotation.y = kart.yaw;
     kart.visual.shield.visible = false;
     kart.visual.shieldWire.visible = false;
+    kart.visual.spikes.visible = false;
     kart.visual.tag.visible = !kart.isPlayer;
     paintHealthBar(kart.visual.healthTexture, 1);
   }
@@ -713,6 +754,7 @@ export class GameEngine {
     const raw = (now - this.lastFrame) / 1000;
     this.lastFrame = now;
     const dt = clamp(raw, 0, 0.05);
+    this.firePulse = Math.max(0, this.firePulse - dt);
 
     this.frames += 1;
     this.fpsTimer += raw;
@@ -745,7 +787,6 @@ export class GameEngine {
     this.smoke.update(dt);
     if (this.role === "online-guest") {
       this.interpolateGuestProjectiles(dt);
-      this.animateGuestMines();
     }
     this.updateVisuals(dt);
     this.updateCamera(dt);
@@ -775,13 +816,15 @@ export class GameEngine {
       this.updateTimers(kart, dt);
       this.driveKart(kart, dt);
       this.resolveWorldCollision(kart);
+      this.checkHazards(kart);
       this.collectPickups(kart);
       this.tryFire(kart);
     }
 
     this.resolveKartCollisions();
+    this.resolveContactWeapons();
     this.updateProjectiles(dt);
-    this.updateMines(dt);
+    this.updateTraps(dt);
     this.updatePickups(dt);
     this.updateShockwaves(dt);
 
@@ -818,7 +861,7 @@ export class GameEngine {
     // whole game needs only movement and fire.
     this.player.input.drift =
       Math.abs(this.player.input.steer) > 0.55 && Math.abs(this.player.speed) > 7;
-    this.player.input.fire = this.keyFire || this.touchFire;
+    this.player.input.fire = this.keyFire || this.touchFire || this.firePulse > 0;
   }
 
   private sendGuestInput(now: number) {
@@ -929,15 +972,16 @@ export class GameEngine {
   }
 
   private findOpenSpawn(): [number, number] {
-    const limit = this.arenaMap.size / 2 - 4;
+    const limitX = this.arenaMap.size / 2 - 4;
+    const limitZ = this.arenaMap.depth / 2 - 4;
     const spawns = this.arenaMap.spawns;
     for (let attempt = 0; attempt < 90; attempt += 1) {
       const spawn = spawns[attempt % spawns.length];
       const ring = Math.floor(attempt / spawns.length);
       const angle = attempt * 2.399963;
       const radius = ring === 0 ? 0 : 2.2 + ring * 1.8;
-      const x = clamp(spawn[0] + Math.cos(angle) * radius, -limit, limit);
-      const z = clamp(spawn[1] + Math.sin(angle) * radius, -limit, limit);
+      const x = clamp(spawn[0] + Math.cos(angle) * radius, -limitX, limitX);
+      const z = clamp(spawn[1] + Math.sin(angle) * radius, -limitZ, limitZ);
       if (this.pointBlocked(x, z, KART.radius + 0.7)) continue;
       const crowded = this.karts.some(
         (kart) => kart.alive && Math.hypot(kart.x - x, kart.z - z) < KART.radius * 2.2,
@@ -971,12 +1015,12 @@ export class GameEngine {
       (max, projectile) => Math.max(max, projectile.id),
       this.projectileId,
     );
-    this.mineId = snapshot.mines.reduce((max, mine) => Math.max(max, mine.id), this.mineId);
+    this.trapId = snapshot.traps.reduce((max, trap) => Math.max(max, trap.id), this.trapId);
 
-    // Projectiles and mines are transient: dropping them avoids handing a new
+    // Projectiles and traps are transient: dropping them avoids handing a new
     // host half-simulated explosions it never authored.
     this.clearGuestProjectiles();
-    this.clearGuestMines();
+    this.clearGuestTraps();
   }
 
   /** Applies one host frame to a guest's renderer. */
@@ -989,7 +1033,7 @@ export class GameEngine {
     this.syncFeed(snapshot);
     this.applyPickupStates(snapshot);
     this.syncGuestProjectiles(snapshot);
-    this.syncGuestMines(snapshot);
+    this.syncGuestTraps(snapshot);
 
     for (const kartSnapshot of snapshot.karts) {
       const kart = this.ensureKart(kartSnapshot);
@@ -1052,6 +1096,7 @@ export class GameEngine {
     kart.shieldTime = snapshot.shield;
     kart.boostTime = snapshot.boost;
     kart.slowTime = snapshot.slow;
+    kart.spikeTime = snapshot.spike;
     kart.weapon = snapshot.weapon;
     kart.ammo = snapshot.ammo;
     kart.kills = snapshot.kills;
@@ -1098,18 +1143,26 @@ export class GameEngine {
       seen.add(state.id);
       let projectile = this.projectiles.find((entry) => entry.id === state.id);
       if (!projectile) {
-        const mesh = state.kind === "missile" ? this.buildMissileMesh() : this.buildBoltMesh(WEAPONS.pulse.color);
+        const weapon = PROJECTILE_WEAPONS[state.kind];
+        const mesh = this.buildProjectileMesh(state.kind, weapon);
         this.scene.add(mesh);
+        const position = new THREE.Vector3(state.x, state.y, state.z);
         projectile = {
           id: state.id,
           ownerId: "",
           kind: state.kind,
-          position: new THREE.Vector3(state.x, state.y, state.z),
+          weapon,
+          origin: position.clone(),
+          position,
           velocity: new THREE.Vector3(state.vx, state.vy, state.vz),
           speed: Math.hypot(state.vx, state.vy, state.vz) || 1,
           life: 1,
           damage: 0,
           splash: 0,
+          gravity: 0,
+          fuse: 0,
+          landed: false,
+          radius: 1.6,
           targetId: null,
           mesh,
           netPosition: null,
@@ -1137,31 +1190,19 @@ export class GameEngine {
     }
   }
 
-  private syncGuestMines(snapshot: SmashMatchSnapshot) {
+  private syncGuestTraps(snapshot: SmashMatchSnapshot) {
     const seen = new Set<number>();
-    for (const state of snapshot.mines) {
+    for (const state of snapshot.traps) {
       seen.add(state.id);
-      if (this.mines.some((mine) => mine.id === state.id)) continue;
-      const { group, lamp } = this.buildMineVisual(state.x, state.z, state.y);
-      this.scene.add(group);
-      this.mines.push({
-        id: state.id,
-        ownerId: "",
-        x: state.x,
-        y: state.y,
-        z: state.z,
-        arm: 0,
-        life: 1,
-        mesh: group,
-        lamp,
-      });
+      if (this.traps.some((trap) => trap.id === state.id)) continue;
+      this.traps.push(this.buildTrap(state.id, "", state.kind, state.x, state.y, state.z));
     }
-    for (let index = this.mines.length - 1; index >= 0; index -= 1) {
-      const mine = this.mines[index];
-      if (seen.has(mine.id)) continue;
-      mine.mesh.removeFromParent();
-      disposeObject(mine.mesh);
-      this.mines.splice(index, 1);
+    for (let index = this.traps.length - 1; index >= 0; index -= 1) {
+      const trap = this.traps[index];
+      if (seen.has(trap.id)) continue;
+      trap.mesh.removeFromParent();
+      disposeObject(trap.mesh);
+      this.traps.splice(index, 1);
     }
   }
 
@@ -1173,12 +1214,12 @@ export class GameEngine {
     this.projectiles.length = 0;
   }
 
-  private clearGuestMines() {
-    for (const mine of this.mines) {
-      mine.mesh.removeFromParent();
-      disposeObject(mine.mesh);
+  private clearGuestTraps() {
+    for (const trap of this.traps) {
+      trap.mesh.removeFromParent();
+      disposeObject(trap.mesh);
     }
-    this.mines.length = 0;
+    this.traps.length = 0;
   }
 
   private interpolateGuestProjectiles(dt: number) {
@@ -1187,14 +1228,6 @@ export class GameEngine {
       if (!projectile.netPosition) continue;
       projectile.position.lerp(projectile.netPosition, rate);
       projectile.mesh.position.copy(projectile.position);
-    }
-  }
-
-  private animateGuestMines() {
-    for (const mine of this.mines) {
-      const material = mine.lamp.material as THREE.MeshBasicMaterial;
-      material.transparent = true;
-      material.opacity = Math.sin(this.elapsed * 7) > 0 ? 1 : 0.15;
     }
   }
 
@@ -1211,8 +1244,9 @@ export class GameEngine {
       shield: kart.shieldTime,
       boost: kart.boostTime,
       slow: kart.slowTime,
+      spike: kart.spikeTime,
       weapon: kart.weapon,
-      ammo: kart.weapon === "pulse" ? 0 : kart.ammo,
+      ammo: kart.ammo,
       kills: kart.kills,
       deaths: kart.deaths,
       shots: kart.shots,
@@ -1243,7 +1277,13 @@ export class GameEngine {
         vy: projectile.velocity.y,
         vz: projectile.velocity.z,
       })),
-      mines: this.mines.map((mine) => ({ id: mine.id, x: mine.x, y: mine.y, z: mine.z })),
+      traps: this.traps.map((trap) => ({
+        id: trap.id,
+        kind: trap.kind,
+        x: trap.x,
+        y: trap.y,
+        z: trap.z,
+      })),
       feed: this.feed.map((entry) => ({ ...entry })),
       winner: this.winner,
     };
@@ -1279,6 +1319,8 @@ export class GameEngine {
     kart.boostTime = Math.max(0, kart.boostTime - dt);
     kart.boostPadCooldown = Math.max(0, kart.boostPadCooldown - dt);
     kart.slowTime = Math.max(0, kart.slowTime - dt);
+    kart.spikeTime = Math.max(0, kart.spikeTime - dt);
+    kart.ramCooldown = Math.max(0, kart.ramCooldown - dt);
     kart.invuln = Math.max(0, kart.invuln - dt);
     if (!kart.alive) {
       kart.respawnIn -= dt;
@@ -1353,7 +1395,7 @@ export class GameEngine {
     // step is a side wall: refuse the move instead of teleporting the kart up.
     const ground = groundHeightAt(this.arenaMap, kart.x, kart.z, kart.y + 0.5);
     const rise = ground - kart.y;
-    if (rise > 0.6) {
+    if (rise > KART.stepHeight) {
       kart.x = previousX;
       kart.z = previousZ;
       kart.vx *= 0.15;
@@ -1419,66 +1461,105 @@ export class GameEngine {
   }
 
   private resolveWorldCollision(kart: KartActor) {
-    const limit = this.arenaMap.size / 2 - KART.radius - 0.3;
-    if (kart.x > limit) {
-      kart.x = limit;
+    const limitX = this.arenaMap.size / 2 - KART.radius - 0.3;
+    const limitZ = this.arenaMap.depth / 2 - KART.radius - 0.3;
+    if (kart.x > limitX) {
+      kart.x = limitX;
       if (kart.vx > 0) kart.vx *= -0.28;
-    } else if (kart.x < -limit) {
-      kart.x = -limit;
+    } else if (kart.x < -limitX) {
+      kart.x = -limitX;
       if (kart.vx < 0) kart.vx *= -0.28;
     }
-    if (kart.z > limit) {
-      kart.z = limit;
+    if (kart.z > limitZ) {
+      kart.z = limitZ;
       if (kart.vz > 0) kart.vz *= -0.28;
-    } else if (kart.z < -limit) {
-      kart.z = -limit;
+    } else if (kart.z < -limitZ) {
+      kart.z = -limitZ;
       if (kart.vz < 0) kart.vz *= -0.28;
     }
 
-    for (const obstacle of this.arenaMap.obstacles) {
-      if (kart.y > obstacle.h * 0.85) {
+    const solids = [
+      ...this.arenaMap.obstacles.map((obstacle) => ({
+        x: obstacle.x,
+        z: obstacle.z,
+        hx: obstacle.hx,
+        hz: obstacle.hz,
+        rot: obstacle.rot ?? 0,
+        bottom: obstacle.base ?? 0,
+        top: (obstacle.base ?? 0) + obstacle.h,
+      })),
+      ...this.arenaMap.platforms.map((platform) => ({
+        x: platform.x,
+        z: platform.z,
+        hx: platform.hx,
+        hz: platform.hz,
+        rot: 0,
+        bottom: 0,
+        top: platform.height,
+      })),
+    ];
+
+    for (const solid of solids) {
+      // A kart above the surface has already climbed it; one far below a
+      // raised prop is protected by the deck it stands on.
+      if (kart.y >= solid.top - 0.45 || kart.y < solid.bottom - 0.6) {
         continue;
       }
-      const nearestX = clamp(kart.x, obstacle.x - obstacle.hx, obstacle.x + obstacle.hx);
-      const nearestZ = clamp(kart.z, obstacle.z - obstacle.hz, obstacle.z + obstacle.hz);
-      let dx = kart.x - nearestX;
-      let dz = kart.z - nearestZ;
-      const distSq = dx * dx + dz * dz;
+
+      const cos = Math.cos(solid.rot);
+      const sin = Math.sin(solid.rot);
+      const dx = kart.x - solid.x;
+      const dz = kart.z - solid.z;
+      // Inverse-rotate the kart into the box's local frame so the collision
+      // test stays a cheap axis-aligned clamp for rotated chicanes.
+      const localX = dx * cos - dz * sin;
+      const localZ = dx * sin + dz * cos;
+      const nearestLocalX = clamp(localX, -solid.hx, solid.hx);
+      const nearestLocalZ = clamp(localZ, -solid.hz, solid.hz);
+      const offsetX = localX - nearestLocalX;
+      const offsetZ = localZ - nearestLocalZ;
+      const distSq = offsetX * offsetX + offsetZ * offsetZ;
       if (distSq >= KART.radius * KART.radius) {
         continue;
       }
-      let normalX: number;
-      let normalZ: number;
+
+      let normalLocalX: number;
+      let normalLocalZ: number;
       let penetration: number;
       if (distSq > 0.000001) {
         const dist = Math.sqrt(distSq);
-        normalX = dx / dist;
-        normalZ = dz / dist;
+        normalLocalX = offsetX / dist;
+        normalLocalZ = offsetZ / dist;
         penetration = KART.radius - dist;
       } else {
-        const toRight = obstacle.x + obstacle.hx - kart.x;
-        const toLeft = kart.x - (obstacle.x - obstacle.hx);
-        const toFront = obstacle.z + obstacle.hz - kart.z;
-        const toBack = kart.z - (obstacle.z - obstacle.hz);
+        const toRight = solid.hx - localX;
+        const toLeft = localX + solid.hx;
+        const toFront = solid.hz - localZ;
+        const toBack = localZ + solid.hz;
         const minimum = Math.min(toRight, toLeft, toFront, toBack);
         if (minimum === toRight) {
-          normalX = 1;
-          normalZ = 0;
+          normalLocalX = 1;
+          normalLocalZ = 0;
           penetration = toRight + KART.radius;
         } else if (minimum === toLeft) {
-          normalX = -1;
-          normalZ = 0;
+          normalLocalX = -1;
+          normalLocalZ = 0;
           penetration = toLeft + KART.radius;
         } else if (minimum === toFront) {
-          normalX = 0;
-          normalZ = 1;
+          normalLocalX = 0;
+          normalLocalZ = 1;
           penetration = toFront + KART.radius;
         } else {
-          normalX = 0;
-          normalZ = -1;
+          normalLocalX = 0;
+          normalLocalZ = -1;
           penetration = toBack + KART.radius;
         }
       }
+
+      const normalX = normalLocalX * cos + normalLocalZ * sin;
+      const normalZ = -normalLocalX * sin + normalLocalZ * cos;
+      const nearestX = solid.x + nearestLocalX * cos + nearestLocalZ * sin;
+      const nearestZ = solid.z - nearestLocalX * sin + nearestLocalZ * cos;
       kart.x += normalX * penetration;
       kart.z += normalZ * penetration;
       const velocityAlongNormal = kart.vx * normalX + kart.vz * normalZ;
@@ -1486,10 +1567,29 @@ export class GameEngine {
         kart.vx -= velocityAlongNormal * normalX * 1.22;
         kart.vz -= velocityAlongNormal * normalZ * 1.22;
         if (Math.abs(velocityAlongNormal) > 7) {
-          this.sparks.burst(nearestX, 0.7, nearestZ, 0xffc233, 6, 6, 0.4, 0.3, 10);
+          this.sparks.burst(nearestX, kart.y + 0.7, nearestZ, 0xffc233, 6, 6, 0.4, 0.3, 10);
         }
       }
     }
+  }
+
+  /** Lava, sludge and open vents eliminate a kart that drives into them. */
+  private checkHazards(kart: KartActor) {
+    if (!kart.alive || kart.y > 2) return;
+    if (!pointInHazard(this.arenaMap, kart.x, kart.z)) return;
+    const hazard = this.arenaMap.hazards.find((entry) => {
+      if (entry.radius !== undefined) {
+        return Math.hypot(kart.x - entry.x, kart.z - entry.z) <= entry.radius;
+      }
+      return (
+        Math.abs(kart.x - entry.x) <= (entry.hx ?? 0) &&
+        Math.abs(kart.z - entry.z) <= (entry.hz ?? 0)
+      );
+    });
+    const color =
+      hazard?.kind === "sludge" ? 0x8fd14a : hazard?.kind === "void" ? 0xff3d81 : 0xff6a2b;
+    this.sparks.burst(kart.x, kart.y + 0.7, kart.z, color, 22, 9, 0.7, 0.5, 4);
+    this.damageKart(kart, 1000, kart.id, "nuke");
   }
 
   private resolveKartCollisions() {
@@ -1500,6 +1600,7 @@ export class GameEngine {
       for (let j = i + 1; j < this.karts.length; j += 1) {
         const b = this.karts[j];
         if (!b.alive) continue;
+        if (Math.abs(a.y - b.y) > 1.7) continue;
         const dx = b.x - a.x;
         const dz = b.z - a.z;
         const distSq = dx * dx + dz * dz;
@@ -1530,163 +1631,391 @@ export class GameEngine {
     }
   }
 
+  /**
+   * Spikey-Go-Round and Invincibility turn the kart itself into a weapon.
+   * Contact is lethal to unprotected karts, but spawn protection and stars
+   * still absorb the hit.
+   */
+  private resolveContactWeapons() {
+    const reach = KART.radius * 2 + 0.5;
+    for (let i = 0; i < this.karts.length; i += 1) {
+      const a = this.karts[i];
+      if (!a.alive) continue;
+      for (let j = i + 1; j < this.karts.length; j += 1) {
+        const b = this.karts[j];
+        if (!b.alive) continue;
+        if (Math.abs(a.y - b.y) > 1.9) continue;
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        if (dx * dx + dz * dz > reach * reach) continue;
+
+        const aLethal = a.spikeTime > 0 || a.shieldTime > 0;
+        const bLethal = b.spikeTime > 0 || b.shieldTime > 0;
+        if (!aLethal && !bLethal) continue;
+
+        if (aLethal) {
+          const weapon: WeaponId = a.spikeTime > 0 ? "spikey" : "invincibility";
+          this.damageKart(b, 1000, a.id, weapon);
+          this.sparks.burst(
+            (a.x + b.x) / 2,
+            1.1,
+            (a.z + b.z) / 2,
+            WEAPONS[weapon].color,
+            16,
+            8,
+            0.5,
+            0.45,
+            3,
+          );
+        }
+        if (bLethal && b.alive) {
+          const weapon: WeaponId = b.spikeTime > 0 ? "spikey" : "invincibility";
+          this.damageKart(a, 1000, b.id, weapon);
+          this.sparks.burst(
+            (a.x + b.x) / 2,
+            1.1,
+            (a.z + b.z) / 2,
+            WEAPONS[weapon].color,
+            16,
+            8,
+            0.5,
+            0.45,
+            3,
+          );
+        }
+      }
+    }
+  }
+
   private collectPickups(kart: KartActor) {
     for (const pickup of this.pickups) {
       if (!pickup.active) continue;
       const dx = kart.x - pickup.x;
       const dz = kart.z - pickup.z;
       if (dx * dx + dz * dz > 3.4 * 3.4) continue;
+      if (Math.abs(kart.y - pickup.y) > 2.2) continue;
       pickup.active = false;
-      pickup.timer = 9;
+      pickup.timer = ARENA_STANDARD.pickup.respawnSeconds;
       pickup.visual.group.visible = false;
-      kart.weapon = pickup.weapon;
-      kart.ammo = WEAPONS[pickup.weapon].ammo;
+      // Contents stay secret until the moment of collection.
+      const weapon = this.drawWeapon();
+      kart.weapon = weapon;
+      kart.ammo = WEAPONS[weapon].ammo;
       kart.cooldown = Math.min(kart.cooldown, 0.2);
       if (kart.isPlayer) {
         this.audio.pickup();
-        this.sparks.burst(pickup.x, 1.2, pickup.z, WEAPONS[pickup.weapon].color, 18, 8, 0.5, 0.6, 5);
+        this.sparks.burst(pickup.x, pickup.y + 1.2, pickup.z, WEAPONS[weapon].color, 18, 8, 0.5, 0.6, 5);
       }
     }
   }
 
   private tryFire(kart: KartActor) {
-    if (!kart.alive || kart.cooldown > 0) {
+    if (!kart.alive) return;
+    if (kart.weapon === "none" || kart.ammo <= 0) {
+      if (kart.weapon !== "none") {
+        kart.weapon = "none";
+        kart.ammo = 0;
+      }
+      kart.burstLeft = 0;
       return;
     }
-    let weapon = kart.weapon;
-    if (weapon !== "pulse" && kart.ammo <= 0) {
-      weapon = "pulse";
-      kart.weapon = "pulse";
-    }
+    if (kart.cooldown > 0) return;
+
+    const weapon = kart.weapon;
     const spec = WEAPONS[weapon];
-    const isProjectile = weapon === "pulse" || weapon === "missile" || weapon === "mine";
-    if (isProjectile && !kart.input.fire) {
-      return;
-    }
-    if (!isProjectile && !kart.firePressed) {
+
+    // Bullets are the only burst weapon: three rounds per pull, then a short
+    // reset before the next burst.
+    if (weapon === "bullets") {
+      if (kart.burstLeft <= 0) {
+        if (!kart.firePressed && !kart.input.fire) return;
+        kart.burstLeft = 3;
+      }
+      this.fireBullet(kart);
+      kart.burstLeft -= 1;
+      kart.ammo -= 1;
+      kart.cooldown = kart.burstLeft > 0 ? spec.cooldown : 0.3;
+      this.noteShot(kart, "bullets");
+      if (kart.ammo <= 0) {
+        kart.ammo = 0;
+        kart.weapon = "none";
+        kart.burstLeft = 0;
+      }
       return;
     }
 
-    if (weapon === "pulse") {
-      this.fireBolt(kart);
-      kart.cooldown = spec.cooldown;
-      if (kart.isPlayer) {
-        kart.shots += 1;
-        this.audio.shot();
-      } else if (this.nearPlayer(kart.x, kart.z, 45)) {
-        this.audio.shot();
-      }
-    } else if (weapon === "missile") {
-      this.fireMissile(kart);
-      kart.ammo -= 1;
-      kart.cooldown = spec.cooldown;
-      if (kart.isPlayer) {
-        kart.shots += 1;
-        this.audio.missile();
-      }
-    } else if (weapon === "mine") {
-      this.dropMine(kart);
-      kart.ammo -= 1;
-      kart.cooldown = spec.cooldown;
-      if (kart.isPlayer) {
-        this.audio.missile();
-      }
-    } else if (weapon === "shield") {
-      kart.ammo -= 1;
-      kart.cooldown = spec.cooldown;
-      kart.shieldTime = 7;
-      this.audio.shield();
-      this.sparks.burst(kart.x, 1.2, kart.z, 0x2fd4c8, 22, 7, 0.55, 0.7, 2);
-    } else if (weapon === "turbo") {
-      kart.ammo -= 1;
-      kart.cooldown = spec.cooldown;
-      kart.boostTime = Math.max(kart.boostTime, 2.6);
-      kart.vx += Math.sin(kart.yaw) * 7;
-      kart.vz += Math.cos(kart.yaw) * 7;
-      this.audio.boost();
-      this.sparks.burst(kart.x, 0.5, kart.z, 0xa8e10c, 18, 8, 0.5, 0.5, 6);
-    } else if (weapon === "shock") {
-      kart.ammo -= 1;
-      kart.cooldown = spec.cooldown;
-      this.triggerShock(kart);
+    // Every other weapon is a single trigger pull. Machine Gun is the only
+    // exception because its spec is marked as a hold weapon.
+    if (!spec.hold && !kart.firePressed) return;
+
+    switch (weapon) {
+      case "machinegun":
+        this.fireMachineGun(kart);
+        break;
+      case "rockets":
+        this.fireRocket(kart);
+        break;
+      case "cannonballs":
+        this.fireCannonball(kart);
+        break;
+      case "nuke":
+        this.fireNuke(kart);
+        break;
+      case "grenuke":
+        this.fireGrenuke(kart);
+        break;
+      case "snowball":
+        this.fireSnowball(kart);
+        break;
+      case "mines":
+        this.dropTrap(kart, "mine");
+        break;
+      case "spikey":
+        kart.spikeTime = Math.max(kart.spikeTime, 6);
+        this.audio.shield();
+        this.sparks.burst(kart.x, 1.1, kart.z, WEAPONS.spikey.color, 24, 8, 0.6, 0.7, 2);
+        break;
+      case "invincibility":
+        kart.shieldTime = Math.max(kart.shieldTime, 5);
+        this.audio.shield();
+        this.sparks.burst(
+          kart.x,
+          1.1,
+          kart.z,
+          WEAPONS.invincibility.color,
+          28,
+          9,
+          0.65,
+          0.7,
+          2,
+        );
+        break;
+      case "fakebox":
+        this.dropTrap(kart, "fake");
+        break;
+      default:
+        break;
     }
 
-    if (kart.ammo <= 0 && kart.weapon !== "pulse") {
-      kart.weapon = "pulse";
+    kart.ammo -= 1;
+    kart.cooldown = spec.cooldown;
+    this.noteShot(kart, weapon);
+    if (kart.ammo <= 0) {
       kart.ammo = 0;
+      kart.weapon = "none";
+      kart.burstLeft = 0;
     }
   }
 
-  private fireBolt(kart: KartActor) {
-    const target = this.findAimTarget(kart);
-    const aim = this.aimPoint(kart, target);
-    const origin = new THREE.Vector3(
-      kart.x + Math.sin(kart.yaw) * 1.3,
-      kart.y + 2.15,
-      kart.z + Math.cos(kart.yaw) * 1.3,
+  private noteShot(kart: KartActor, weapon: WeaponId) {
+    if (kart.isPlayer) {
+      kart.shots += 1;
+      if (weapon === "machinegun" || weapon === "bullets" || weapon === "snowball") {
+        this.audio.shot();
+      } else if (
+        weapon === "rockets" ||
+        weapon === "cannonballs" ||
+        weapon === "nuke" ||
+        weapon === "grenuke"
+      ) {
+        this.audio.missile();
+      }
+      return;
+    }
+    if (
+      (weapon === "machinegun" || weapon === "bullets") &&
+      this.nearPlayer(kart.x, kart.z, 45)
+    ) {
+      this.audio.shot();
+    }
+  }
+
+  private muzzlePoint(kart: KartActor): THREE.Vector3 {
+    return new THREE.Vector3(
+      kart.x + Math.sin(kart.yaw) * 1.5,
+      kart.y + 1.45,
+      kart.z + Math.cos(kart.yaw) * 1.5,
     );
-    const direction = aim.clone().sub(origin).normalize();
-    const mesh = this.buildBoltMesh(WEAPONS.pulse.color);
+  }
+
+  private launchProjectile(
+    kart: KartActor,
+    kind: ProjectileKind,
+    weapon: WeaponId,
+    direction: THREE.Vector3,
+    options: {
+      speed: number;
+      life: number;
+      damage: number;
+      splash?: number;
+      gravity?: number;
+      fuse?: number;
+      radius?: number;
+      targetId?: string | null;
+      mesh?: THREE.Object3D;
+      origin?: THREE.Vector3;
+    },
+  ) {
+    const origin = options.origin ?? this.muzzlePoint(kart);
+    const mesh = options.mesh ?? this.buildProjectileMesh(kind, weapon);
+    const normalized = direction.clone().normalize();
     mesh.position.copy(origin);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normalized);
     this.scene.add(mesh);
     this.projectiles.push({
       id: ++this.projectileId,
       ownerId: kart.id,
-      kind: "bolt",
-      position: origin,
-      velocity: direction.clone().multiplyScalar(92),
-      speed: 92,
-      life: 1.15,
-      damage: 7,
-      splash: 0,
-      targetId: null,
+      kind,
+      weapon,
+      origin: origin.clone(),
+      position: origin.clone(),
+      velocity: normalized.multiplyScalar(options.speed),
+      speed: options.speed,
+      life: options.life,
+      damage: options.damage,
+      splash: options.splash ?? 0,
+      gravity: options.gravity ?? 0,
+      fuse: options.fuse ?? 0,
+      landed: false,
+      radius: options.radius ?? 1.6,
+      targetId: options.targetId ?? null,
       mesh,
       netPosition: null,
       netVelocity: null,
-    });
-    this.sparks.spawn({
-      x: origin.x,
-      y: origin.y,
-      z: origin.z,
-      vx: direction.x * 3,
-      vy: direction.y * 3,
-      vz: direction.z * 3,
-      color: 0xfff0b0,
-      size: 0.7,
-      life: 0.12,
-      gravity: 0,
     });
   }
 
-  private fireMissile(kart: KartActor) {
-    const target = this.findAimTarget(kart, 0.95, 78);
-    const aim = this.aimPoint(kart, target);
-    const origin = new THREE.Vector3(
-      kart.x + Math.sin(kart.yaw) * 1.2,
-      kart.y + 2.15,
-      kart.z + Math.cos(kart.yaw) * 1.2,
-    );
-    const direction = aim.clone().sub(origin).normalize();
-    const mesh = this.buildMissileMesh();
-    mesh.position.copy(origin);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
-    this.scene.add(mesh);
-    this.projectiles.push({
-      id: ++this.projectileId,
-      ownerId: kart.id,
-      kind: "missile",
-      position: origin,
-      velocity: direction.clone().multiplyScalar(46),
-      speed: 46,
-      life: 3.2,
-      damage: 32,
-      splash: 7,
+  private forwardDirection(kart: KartActor, lift = 0): THREE.Vector3 {
+    return new THREE.Vector3(Math.sin(kart.yaw), lift, Math.cos(kart.yaw)).normalize();
+  }
+
+  private fireMachineGun(kart: KartActor) {
+    const target = this.findTrackingTarget(kart, 0.85, 58);
+    const origin = this.muzzlePoint(kart);
+    const aim = target
+      ? new THREE.Vector3(target.x, target.y + 1.1, target.z)
+      : new THREE.Vector3(
+          kart.x + Math.sin(kart.yaw) * 40,
+          kart.y + 1.4,
+          kart.z + Math.cos(kart.yaw) * 40,
+        );
+    const direction = aim.sub(origin).normalize();
+    this.launchProjectile(kart, "tracer", "machinegun", direction, {
+      speed: 86,
+      life: 1.1,
+      damage: 9,
+      radius: 1.5,
       targetId: target?.id ?? null,
-      mesh,
-      netPosition: null,
-      netVelocity: null,
     });
+  }
+
+  private fireBullet(kart: KartActor) {
+    this.launchProjectile(kart, "bullet", "bullets", this.forwardDirection(kart), {
+      speed: 96,
+      life: 1.2,
+      damage: 10,
+      radius: 1.4,
+    });
+  }
+
+  private fireRocket(kart: KartActor) {
+    this.launchProjectile(kart, "rocket", "rockets", this.forwardDirection(kart), {
+      speed: 52,
+      life: 3,
+      damage: 32,
+      splash: 6.5,
+      radius: 1.7,
+    });
+  }
+
+  private fireCannonball(kart: KartActor) {
+    this.launchProjectile(kart, "cannonball", "cannonballs", this.forwardDirection(kart, 0.28), {
+      speed: 42,
+      life: 5,
+      damage: 30,
+      splash: 5.5,
+      gravity: 24,
+      radius: 1.8,
+    });
+  }
+
+  private fireNuke(kart: KartActor) {
+    this.launchProjectile(kart, "nuke", "nuke", this.forwardDirection(kart, 0.12), {
+      speed: 36,
+      life: 5,
+      damage: 72,
+      splash: 17,
+      gravity: 12,
+      radius: 2.2,
+    });
+  }
+
+  private fireGrenuke(kart: KartActor) {
+    this.launchProjectile(kart, "grenuke", "grenuke", this.forwardDirection(kart, 0.55), {
+      speed: 32,
+      life: 6,
+      damage: 52,
+      splash: 9,
+      gravity: 30,
+      fuse: 1.35,
+      radius: 1.8,
+    });
+  }
+
+  private fireSnowball(kart: KartActor) {
+    this.launchProjectile(kart, "snowball", "snowball", this.forwardDirection(kart), {
+      speed: 68,
+      life: 2.2,
+      damage: 8,
+      radius: 1.6,
+    });
+  }
+
+  private buildProjectileMesh(kind: ProjectileKind, weapon: WeaponId): THREE.Object3D {
+    switch (kind) {
+      case "tracer":
+        return this.buildBoltMesh(WEAPONS[weapon].color);
+      case "bullet":
+        return this.buildBoltMesh(WEAPONS.bullets.color);
+      case "rocket":
+        return this.buildMissileMesh();
+      case "cannonball":
+        return this.buildBallMesh(0.34, 0x4a4a44, 0.15);
+      case "nuke":
+        return this.buildBallMesh(0.52, 0xa8e10c, 0.55);
+      case "grenuke":
+        return this.buildBallMesh(0.4, 0x7bd94a, 0.45);
+      case "snowball":
+        return this.buildBallMesh(0.36, 0xf2fbff, 0.7);
+    }
+  }
+
+  private buildBallMesh(radius: number, color: number, emissive: number): THREE.Object3D {
+    const group = new THREE.Group();
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 14, 10),
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.45,
+        metalness: 0.35,
+        emissive: color,
+        emissiveIntensity: emissive,
+      }),
+    );
+    group.add(ball);
+    const glow = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.sparkTexture,
+        color,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    glow.scale.set(radius * 4, radius * 4, 1);
+    group.add(glow);
+    return group;
   }
 
   private buildBoltMesh(color: number): THREE.Object3D {
@@ -1754,7 +2083,7 @@ export class GameEngine {
     return group;
   }
 
-  private buildMineVisual(x: number, z: number): { group: THREE.Group; lamp: THREE.Mesh } {
+  private buildMineVisual(x: number, z: number, y = 0): { group: THREE.Group; lamp: THREE.Mesh } {
     const group = new THREE.Group();
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.7, 0.7, 0.22, 12),
@@ -1775,66 +2104,94 @@ export class GameEngine {
     );
     lamp.position.y = 0.38;
     group.add(lamp);
-    group.position.set(x, 0, z);
+    group.position.set(x, y, z);
     return { group, lamp };
   }
 
-  private dropMine(kart: KartActor) {
-    if (this.mines.length >= 10) {
-      const oldest = this.mines.shift();
-      if (oldest) {
-        oldest.mesh.removeFromParent();
-        disposeObject(oldest.mesh);
-      }
+  private buildTrap(
+    id: number,
+    ownerId: string,
+    kind: "mine" | "fake",
+    x: number,
+    y: number,
+    z: number,
+  ): TrapActor {
+    if (kind === "fake") {
+      const pickup = buildPickup(this.pickupGlowTexture);
+      pickup.group.position.set(x, y, z);
+      this.scene.add(pickup.group);
+      return {
+        id,
+        ownerId,
+        kind,
+        x,
+        y,
+        z,
+        arm: 0.8,
+        life: 30,
+        phase: Math.random() * Math.PI * 2,
+        mesh: pickup.group,
+        lamp: null,
+        pickup,
+      };
     }
-    const x = kart.x - Math.sin(kart.yaw) * 2.3;
-    const z = kart.z - Math.cos(kart.yaw) * 2.3;
-    const { group, lamp } = this.buildMineVisual(x, z);
+    const { group, lamp } = this.buildMineVisual(x, z, y);
     this.scene.add(group);
-    this.mines.push({
-      id: ++this.mineId,
-      ownerId: kart.id,
+    return {
+      id,
+      ownerId,
+      kind,
       x,
+      y,
       z,
       arm: 0.8,
       life: 22,
+      phase: 0,
       mesh: group,
       lamp,
-    });
+      pickup: null,
+    };
   }
 
-  private triggerShock(kart: KartActor) {
-    const radius = 17;
-    this.createShockwave(kart.x, kart.z, WEAPONS.shock.color, radius, 0.55);
-    this.audio.shock();
-    this.shake = Math.max(this.shake, 0.6);
-    for (const other of this.karts) {
-      if (!other.alive || other.id === kart.id) continue;
-      const dx = other.x - kart.x;
-      const dz = other.z - kart.z;
-      if (dx * dx + dz * dz > radius * radius) continue;
-      if (!this.hasLineOfSight(kart.x, kart.z, other.x, other.z)) continue;
-      other.slowTime = Math.max(other.slowTime, 2.6);
-      this.damageKart(other, 16, kart.id, "shock");
+  private dropTrap(kart: KartActor, kind: "mine" | "fake") {
+    const limit = kind === "mine" ? 12 : 6;
+    const sameKind = this.traps.filter((trap) => trap.kind === kind);
+    if (sameKind.length >= limit) {
+      const oldest = sameKind[0];
+      oldest.mesh.removeFromParent();
+      disposeObject(oldest.mesh);
+      this.traps.splice(this.traps.indexOf(oldest), 1);
     }
-    this.sparks.burst(kart.x, 1.1, kart.z, WEAPONS.shock.color, 36, 15, 0.6, 0.7, 0);
+    const x = kart.x - Math.sin(kart.yaw) * 2.4;
+    const z = kart.z - Math.cos(kart.yaw) * 2.4;
+    const y = groundHeightAt(this.arenaMap, x, z, kart.y + 0.6);
+    this.traps.push(this.buildTrap(++this.trapId, kart.id, kind, x, y, z));
+    if (kart.isPlayer) {
+      if (kind === "mine") {
+        this.audio.missile();
+      } else {
+        this.audio.pickup();
+      }
+    }
   }
 
   private updateProjectiles(dt: number) {
-    const up = new THREE.Vector3(0, 1, 0);
     for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
       const projectile = this.projectiles[i];
       projectile.life -= dt;
 
-      if (projectile.kind === "missile" && projectile.targetId) {
-        const target = this.karts.find((kart) => kart.id === projectile.targetId);
-        if (target && target.alive) {
-          const desired = new THREE.Vector3(target.x, target.y + 1.1, target.z)
+      // Machine Gun is the only tracking weapon in the arsenal.
+      if (projectile.kind === "tracer" && projectile.targetId) {
+        const target = this.karts.find(
+          (kart) => kart.id === projectile.targetId && kart.alive,
+        );
+        if (target) {
+          const desired = new THREE.Vector3(target.x, target.y + 1.05, target.z)
             .sub(projectile.position)
             .normalize();
           const current = projectile.velocity.clone().normalize();
           const angle = current.angleTo(desired);
-          const turn = 3.1 * dt;
+          const turn = 5.5 * dt;
           if (angle > 0.0001) {
             const next = current.lerp(desired, Math.min(1, turn / angle)).normalize();
             projectile.velocity.copy(next.multiplyScalar(projectile.speed));
@@ -1842,14 +2199,51 @@ export class GameEngine {
         }
       }
 
+      if (projectile.kind === "grenuke" && projectile.landed) {
+        projectile.fuse -= dt;
+        projectile.mesh.position.copy(projectile.position);
+        if (Math.random() > 0.72) {
+          this.sparks.spawn({
+            x: projectile.position.x + (Math.random() - 0.5) * 0.5,
+            y: projectile.position.y + 0.25,
+            z: projectile.position.z + (Math.random() - 0.5) * 0.5,
+            vx: 0,
+            vy: 1.5,
+            vz: 0,
+            color: WEAPONS.grenuke.color,
+            size: 0.24,
+            life: 0.28,
+            gravity: 4,
+          });
+        }
+        if (projectile.fuse <= 0) {
+          this.detonateProjectile(projectile);
+          this.removeProjectile(i);
+        }
+        continue;
+      }
+
+      if (projectile.gravity > 0) {
+        projectile.velocity.y -= projectile.gravity * dt;
+      }
+
       projectile.position.addScaledVector(projectile.velocity, dt);
       projectile.mesh.position.copy(projectile.position);
-      if (projectile.kind === "missile") {
+
+      if (
+        projectile.kind === "rocket" ||
+        projectile.kind === "tracer" ||
+        projectile.kind === "bullet" ||
+        projectile.kind === "snowball"
+      ) {
         projectile.mesh.quaternion.setFromUnitVectors(
           new THREE.Vector3(0, 0, 1),
           projectile.velocity.clone().normalize(),
         );
-        if (Math.random() > 0.35) {
+      }
+
+      if (projectile.kind === "rocket" || projectile.kind === "nuke") {
+        if (Math.random() > 0.3) {
           this.smoke.spawn({
             x: projectile.position.x,
             y: projectile.position.y,
@@ -1864,31 +2258,79 @@ export class GameEngine {
             drag: 1,
           });
         }
-      } else if (Math.random() > 0.5) {
+      } else if (projectile.kind === "tracer" || projectile.kind === "bullet") {
+        if (Math.random() > 0.5) {
+          this.sparks.spawn({
+            x: projectile.position.x,
+            y: projectile.position.y,
+            z: projectile.position.z,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            color: WEAPONS[projectile.weapon].color,
+            size: 0.28,
+            life: 0.16,
+            gravity: 0,
+          });
+        }
+      } else if (projectile.kind === "snowball" && Math.random() > 0.45) {
         this.sparks.spawn({
           x: projectile.position.x,
           y: projectile.position.y,
           z: projectile.position.z,
-          vx: 0,
-          vy: 0,
-          vz: 0,
-          color: WEAPONS.pulse.color,
-          size: 0.28,
-          life: 0.16,
-          gravity: 0,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: Math.random() * 1.5,
+          vz: (Math.random() - 0.5) * 1.5,
+          color: 0xdff6ff,
+          size: 0.3,
+          life: 0.3,
+          gravity: 3,
         });
       }
 
-      let hit = false;
-      if (projectile.life <= 0) {
-        hit = true;
+      // Cannon balls, nukes and lob-grenukes arc. Grenukes settle on the
+      // ground, tick down their fuse and then detonate.
+      if (projectile.gravity > 0) {
+        const ground = groundHeightAt(
+          this.arenaMap,
+          projectile.position.x,
+          projectile.position.z,
+          projectile.position.y + 0.6,
+        );
+        if (projectile.position.y <= ground + 0.24) {
+          projectile.position.y = ground + 0.24;
+          projectile.mesh.position.copy(projectile.position);
+          if (projectile.kind === "grenuke") {
+            projectile.landed = true;
+            projectile.velocity.set(0, 0, 0);
+            this.smoke.burst(
+              projectile.position.x,
+              projectile.position.y,
+              projectile.position.z,
+              0x6b6357,
+              5,
+              2,
+              0.7,
+              0.35,
+              1,
+            );
+            continue;
+          }
+          this.detonateProjectile(projectile);
+          this.removeProjectile(i);
+          continue;
+        }
       }
 
+      let hit = projectile.life <= 0;
+      let victim: KartActor | null = null;
+
       if (!hit) {
-        const half = this.arenaMap.size / 2;
+        const halfX = this.arenaMap.size / 2;
+        const halfZ = this.arenaMap.depth / 2;
         if (
-          Math.abs(projectile.position.x) > half ||
-          Math.abs(projectile.position.z) > half ||
+          Math.abs(projectile.position.x) > halfX ||
+          Math.abs(projectile.position.z) > halfZ ||
           projectile.position.y < 0.1
         ) {
           hit = true;
@@ -1897,10 +2339,33 @@ export class GameEngine {
 
       if (!hit) {
         for (const obstacle of this.arenaMap.obstacles) {
-          if (projectile.position.y > obstacle.h) continue;
+          const base = obstacle.base ?? 0;
+          if (projectile.position.y > base + obstacle.h || projectile.position.y < base) {
+            continue;
+          }
+          const rot = obstacle.rot ?? 0;
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
+          const dx = projectile.position.x - obstacle.x;
+          const dz = projectile.position.z - obstacle.z;
+          const localX = dx * cos - dz * sin;
+          const localZ = dx * sin + dz * cos;
           if (
-            Math.abs(projectile.position.x - obstacle.x) < obstacle.hx + 0.2 &&
-            Math.abs(projectile.position.z - obstacle.z) < obstacle.hz + 0.2
+            Math.abs(localX) < obstacle.hx + 0.2 &&
+            Math.abs(localZ) < obstacle.hz + 0.2
+          ) {
+            hit = true;
+            break;
+          }
+        }
+      }
+
+      if (!hit) {
+        for (const platform of this.arenaMap.platforms) {
+          if (projectile.position.y > platform.height + 0.1) continue;
+          if (
+            Math.abs(projectile.position.x - platform.x) < platform.hx + 0.2 &&
+            Math.abs(projectile.position.z - platform.z) < platform.hz + 0.2
           ) {
             hit = true;
             break;
@@ -1913,88 +2378,138 @@ export class GameEngine {
           if (!kart.alive || kart.id === projectile.ownerId) continue;
           const dx = kart.x - projectile.position.x;
           const dz = kart.z - projectile.position.z;
-          if (dx * dx + dz * dz < 2.1 * 2.1 && Math.abs(kart.y + 1.1 - projectile.position.y) < 2.2) {
+          const reach = projectile.radius + KART.radius * 0.5;
+          if (
+            dx * dx + dz * dz < reach * reach &&
+            Math.abs(kart.y + 1.05 - projectile.position.y) < 2.3
+          ) {
+            victim = kart;
             hit = true;
             break;
           }
         }
       }
 
-      if (hit) {
-        if (projectile.splash > 0) {
-          this.explode(
-            projectile.position.x,
-            projectile.position.z,
-            projectile.splash,
-            projectile.damage,
-            projectile.ownerId,
-            "missile",
+      if (!hit) continue;
+
+      if (projectile.splash > 0) {
+        this.detonateProjectile(projectile);
+      } else if (victim) {
+        const falloff =
+          projectile.kind === "tracer"
+            ? clamp(1 - projectile.position.distanceTo(projectile.origin) / 58, 0.28, 1)
+            : 1;
+        this.damageKart(
+          victim,
+          projectile.damage * falloff,
+          projectile.ownerId,
+          projectile.weapon,
+        );
+        if (projectile.kind === "snowball") {
+          victim.slowTime = Math.max(victim.slowTime, 2.8);
+          this.sparks.burst(
+            victim.x,
+            victim.y + 1.1,
+            victim.z,
+            WEAPONS.snowball.color,
+            14,
+            7,
+            0.5,
+            0.4,
+            4,
           );
         } else {
-          const victim = this.karts.find((kart) => {
-            if (!kart.alive || kart.id === projectile.ownerId) return false;
-            const dx = kart.x - projectile.position.x;
-            const dz = kart.z - projectile.position.z;
-            return dx * dx + dz * dz < 2.2 * 2.2;
-          });
-          if (victim) {
-            this.damageKart(victim, projectile.damage, projectile.ownerId, "pulse");
-            this.sparks.burst(projectile.position.x, projectile.position.y, projectile.position.z, 0xffc233, 6, 5, 0.35, 0.3, 6);
-          } else if (projectile.life <= 0) {
-            this.sparks.burst(projectile.position.x, projectile.position.y, projectile.position.z, 0xffc233, 3, 2, 0.25, 0.2, 4);
-          }
+          this.sparks.burst(
+            projectile.position.x,
+            projectile.position.y,
+            projectile.position.z,
+            WEAPONS[projectile.weapon].color,
+            6,
+            5,
+            0.35,
+            0.3,
+            6,
+          );
         }
-        projectile.mesh.removeFromParent();
-        disposeObject(projectile.mesh);
-        this.projectiles.splice(i, 1);
       }
+      this.removeProjectile(i);
     }
   }
 
-  private updateMines(dt: number) {
-    for (let i = this.mines.length - 1; i >= 0; i -= 1) {
-      const mine = this.mines[i];
-      mine.arm = Math.max(0, mine.arm - dt);
-      mine.life -= dt;
-      const material = mine.lamp.material as THREE.MeshBasicMaterial;
-      const blink = Math.sin(this.elapsed * (mine.arm > 0 ? 20 : 7)) > 0 ? 1 : 0.15;
-      material.opacity = blink;
-      material.transparent = true;
+  private detonateProjectile(projectile: Projectile) {
+    this.explode(
+      projectile.position.x,
+      projectile.position.z,
+      projectile.position.y,
+      projectile.splash,
+      projectile.damage,
+      projectile.ownerId,
+      projectile.weapon,
+    );
+  }
 
-      let detonate = mine.life <= 0;
-      if (mine.arm <= 0) {
+  private removeProjectile(index: number) {
+    const projectile = this.projectiles[index];
+    if (!projectile) return;
+    projectile.mesh.removeFromParent();
+    disposeObject(projectile.mesh);
+    this.projectiles.splice(index, 1);
+  }
+
+  private updateTraps(dt: number) {
+    for (let i = this.traps.length - 1; i >= 0; i -= 1) {
+      const trap = this.traps[i];
+      trap.arm = Math.max(0, trap.arm - dt);
+      trap.life -= dt;
+      if (trap.lamp) {
+        const material = trap.lamp.material as THREE.MeshBasicMaterial;
+        const blink = Math.sin(this.elapsed * (trap.arm > 0 ? 20 : 7)) > 0 ? 1 : 0.15;
+        material.opacity = blink;
+        material.transparent = true;
+      }
+
+      let detonate = trap.life <= 0;
+      if (!detonate && trap.arm <= 0) {
         for (const kart of this.karts) {
           if (!kart.alive) continue;
-          const dx = kart.x - mine.x;
-          const dz = kart.z - mine.z;
-          if (dx * dx + dz * dz < 2.7 * 2.7) {
+          if (trap.kind === "fake" && kart.id === trap.ownerId) continue;
+          if (Math.abs(kart.y - trap.y) > 1.9) continue;
+          const dx = kart.x - trap.x;
+          const dz = kart.z - trap.z;
+          const reach = trap.kind === "mine" ? 2.7 : 3.1;
+          if (dx * dx + dz * dz < reach * reach) {
             detonate = true;
             break;
           }
         }
       }
 
-      if (detonate) {
-        this.explode(mine.x, mine.z, 7.5, 52, mine.ownerId, "mine");
-        mine.mesh.removeFromParent();
-        disposeObject(mine.mesh);
-        this.mines.splice(i, 1);
+      if (!detonate) continue;
+      if (trap.kind === "mine") {
+        this.explode(trap.x, trap.z, trap.y, 7.5, 55, trap.ownerId, "mines");
+      } else {
+        this.explode(trap.x, trap.z, trap.y, 8.5, 48, trap.ownerId, "fakebox");
       }
+      trap.mesh.removeFromParent();
+      disposeObject(trap.mesh);
+      this.traps.splice(i, 1);
     }
   }
 
   private explode(
     x: number,
     z: number,
+    y: number,
     radius: number,
     damage: number,
     ownerId: string,
     weapon: WeaponId,
   ) {
-    this.createShockwave(x, z, weapon === "mine" ? 0xe83f8b : 0xff7a1f, radius, 0.5);
-    this.sparks.burst(x, 1, z, 0xffb347, 30, 13, 0.7, 0.55, 9);
-    this.sparks.burst(x, 1, z, weapon === "mine" ? 0xe83f8b : 0xff5a1f, 16, 9, 0.5, 0.45, 5);
-    this.smoke.burst(x, 1.1, z, 0x3b352e, 20, 5, 2.6, 1.3, -2);
+    const color = WEAPONS[weapon].color;
+    this.createShockwave(x, z, y, color, radius, 0.5);
+    this.sparks.burst(x, y + 1, z, 0xffb347, 30, 13, 0.7, 0.55, 9);
+    this.sparks.burst(x, y + 1, z, color, 16, 9, 0.5, 0.45, 5);
+    this.smoke.burst(x, y + 1.1, z, 0x3b352e, 20, 5, 2.6, 1.3, -2);
     const distToPlayer = Math.hypot(this.player.x - x, this.player.z - z);
     if (distToPlayer < 55) {
       this.audio.explosion();
@@ -2017,7 +2532,14 @@ export class GameEngine {
     }
   }
 
-  private createShockwave(x: number, z: number, color: number, radius: number, duration: number) {
+  private createShockwave(
+    x: number,
+    z: number,
+    y: number,
+    color: number,
+    radius: number,
+    duration: number,
+  ) {
     const material = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -2028,7 +2550,7 @@ export class GameEngine {
     });
     const mesh = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 40), material);
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.18, z);
+    mesh.position.set(x, y + 0.18, z);
     this.scene.add(mesh);
     this.shockwaves.push({ mesh, material, life: duration, maxLife: duration, radius });
   }
@@ -2055,15 +2577,23 @@ export class GameEngine {
       return;
     }
     if (target.shieldTime > 0) {
-      this.sparks.burst(target.x, 1.2, target.z, 0x2fd4c8, 8, 6, 0.35, 0.3, 4);
+      this.sparks.burst(
+        target.x,
+        1.2,
+        target.z,
+        WEAPONS.invincibility.color,
+        8,
+        6,
+        0.35,
+        0.3,
+        4,
+      );
       if (target.isPlayer) {
         this.audio.shield();
       }
       return;
     }
     target.hp -= amount;
-    target.lastHitBy = ownerId;
-    target.lastHitWeapon = weapon;
 
     if (ownerId === PLAYER_ID && ownerId !== target.id) {
       this.player.hits += 1;
@@ -2090,10 +2620,18 @@ export class GameEngine {
     victim.visual.group.visible = false;
     victim.vx = 0;
     victim.vz = 0;
+    victim.vy = 0;
+    victim.grounded = false;
     victim.boostTime = 0;
     victim.shieldTime = 0;
+    victim.spikeTime = 0;
+    victim.weapon = "none";
+    victim.ammo = 0;
+    victim.cooldown = 0;
+    victim.burstLeft = 0;
     victim.drifting = false;
     victim.driftCharge = 0;
+    victim.visual.spikes.visible = false;
 
     const killer = this.karts.find((kart) => kart.id === ownerId);
     const self = !killer || killer.id === victim.id;
@@ -2115,6 +2653,7 @@ export class GameEngine {
     this.explode(
       victim.x,
       victim.z,
+      victim.y,
       6,
       22,
       killer && !self ? killer.id : victim.id,
@@ -2146,7 +2685,7 @@ export class GameEngine {
       }
     }
     this.spawnAt(kart, bestX, bestZ);
-    this.sparks.burst(bestX, 1, bestZ, cssToHex(kart.color), 24, 8, 0.6, 0.6, 2);
+    this.sparks.burst(bestX, kart.y + 1, bestZ, cssToHex(kart.color), 24, 8, 0.6, 0.6, 2);
     if (kart.isPlayer) {
       this.audio.respawn();
       this.snapCamera();
@@ -2189,7 +2728,7 @@ export class GameEngine {
     }
   }
 
-  private findAimTarget(kart: KartActor, cone = 0.9, range = 62): KartActor | null {
+  private findTrackingTarget(kart: KartActor, cone = 0.9, range = 62): KartActor | null {
     const forwardX = Math.sin(kart.yaw);
     const forwardZ = Math.cos(kart.yaw);
     let best: KartActor | null = null;
@@ -2226,20 +2765,10 @@ export class GameEngine {
     return best;
   }
 
-  private aimPoint(kart: KartActor, target: KartActor | null): THREE.Vector3 {
-    if (target) {
-      return new THREE.Vector3(target.x, target.y + 1.15, target.z);
-    }
-    return new THREE.Vector3(
-      kart.x + Math.sin(kart.yaw) * 40,
-      kart.y + 1.6,
-      kart.z + Math.cos(kart.yaw) * 40,
-    );
-  }
-
   private hasLineOfSight(x1: number, z1: number, x2: number, z2: number): boolean {
     for (const obstacle of this.arenaMap.obstacles) {
-      if (obstacle.h < 1.5) continue;
+      if (obstacle.h < 1.5 || (obstacle.base ?? 0) > 1.5) continue;
+      if (!OBSTACLE_RULES[obstacle.kind].blocksProjectiles) continue;
       if (this.segmentHitsAABB(x1, z1, x2, z2, obstacle)) {
         return false;
       }
@@ -2252,15 +2781,27 @@ export class GameEngine {
     z1: number,
     x2: number,
     z2: number,
-    obstacle: { x: number; z: number; hx: number; hz: number },
+    obstacle: { x: number; z: number; hx: number; hz: number; rot?: number },
   ): boolean {
-    const dx = x2 - x1;
-    const dz = z2 - z1;
+    const rot = obstacle.rot ?? 0;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const dx1 = x1 - obstacle.x;
+    const dz1 = z1 - obstacle.z;
+    const dx2 = x2 - obstacle.x;
+    const dz2 = z2 - obstacle.z;
+    const localX1 = dx1 * cos - dz1 * sin;
+    const localZ1 = dx1 * sin + dz1 * cos;
+    const localX2 = dx2 * cos - dz2 * sin;
+    const localZ2 = dx2 * sin + dz2 * cos;
+
+    const dx = localX2 - localX1;
+    const dz = localZ2 - localZ1;
     let tMin = 0;
     let tMax = 1;
     const axes: Array<[number, number, number, number]> = [
-      [x1, dx, obstacle.x - obstacle.hx, obstacle.x + obstacle.hx],
-      [z1, dz, obstacle.z - obstacle.hz, obstacle.z + obstacle.hz],
+      [localX1, dx, -obstacle.hx, obstacle.hx],
+      [localZ1, dz, -obstacle.hz, obstacle.hz],
     ];
     for (const [origin, delta, min, max] of axes) {
       if (Math.abs(delta) < 0.000001) {
@@ -2284,16 +2825,47 @@ export class GameEngine {
   }
 
   private pointBlocked(x: number, z: number, padding: number): boolean {
-    const limit = this.arenaMap.size / 2 - padding;
-    if (x > limit || x < -limit || z > limit || z < -limit) {
+    const limitX = this.arenaMap.size / 2 - padding;
+    const limitZ = this.arenaMap.depth / 2 - padding;
+    if (x > limitX || x < -limitX || z > limitZ || z < -limitZ) {
       return true;
     }
     for (const obstacle of this.arenaMap.obstacles) {
+      const rot = obstacle.rot ?? 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const dx = x - obstacle.x;
+      const dz = z - obstacle.z;
+      const localX = dx * cos - dz * sin;
+      const localZ = dx * sin + dz * cos;
       if (
-        x > obstacle.x - obstacle.hx - padding &&
-        x < obstacle.x + obstacle.hx + padding &&
-        z > obstacle.z - obstacle.hz - padding &&
-        z < obstacle.z + obstacle.hz + padding
+        Math.abs(localX) < obstacle.hx + padding &&
+        Math.abs(localZ) < obstacle.hz + padding
+      ) {
+        return true;
+      }
+    }
+    for (const platform of this.arenaMap.platforms) {
+      if (
+        x > platform.x - platform.hx - padding &&
+        x < platform.x + platform.hx + padding &&
+        z > platform.z - platform.hz - padding &&
+        z < platform.z + platform.hz + padding
+      ) {
+        return true;
+      }
+    }
+    // Bots treat lethal terrain as solid so path steering never sends them
+    // straight through a vent or a slag pool.
+    for (const hazard of this.arenaMap.hazards) {
+      const clearance = KART.radius + padding;
+      if (hazard.radius !== undefined) {
+        if (Math.hypot(x - hazard.x, z - hazard.z) < hazard.radius + clearance) {
+          return true;
+        }
+      } else if (
+        Math.abs(x - hazard.x) < (hazard.hx ?? 0) + clearance &&
+        Math.abs(z - hazard.z) < (hazard.hz ?? 0) + clearance
       ) {
         return true;
       }
@@ -2318,7 +2890,9 @@ export class GameEngine {
     let bestDist = maxDistance;
     for (const pickup of this.pickups) {
       if (!pickup.active) continue;
-      const dist = Math.hypot(pickup.x - kart.x, pickup.z - kart.z);
+      const dist =
+        Math.hypot(pickup.x - kart.x, pickup.z - kart.z) +
+        Math.abs(pickup.y - kart.y) * 0.5;
       if (dist < bestDist) {
         bestDist = dist;
         best = pickup;
@@ -2343,7 +2917,7 @@ export class GameEngine {
     }
 
     const pickup = this.nearestPickup(kart, 30);
-    const needsWeapon = kart.weapon === "pulse" || kart.ammo <= 0;
+    const needsWeapon = kart.weapon === "none" || kart.ammo <= 0;
     let destinationX = kart.x + Math.sin(kart.yaw) * 20;
     let destinationZ = kart.z + Math.cos(kart.yaw) * 20;
 
@@ -2365,12 +2939,25 @@ export class GameEngine {
         destinationZ = target.z + Math.sin(angle) * 18;
       }
     } else {
-      const waypoint = this.arenaMap.waypoints[brain.waypoint % this.arenaMap.waypoints.length];
-      if (Math.hypot(waypoint[0] - kart.x, waypoint[1] - kart.z) < 7) {
-        brain.waypoint = (brain.waypoint + 1) % this.arenaMap.waypoints.length;
+      const routes = this.arenaMap.routes;
+      if (routes.length > 0) {
+        const route = routes[brain.route % routes.length];
+        let point = route.waypoints[brain.routePoint % route.waypoints.length];
+        if (Math.hypot(point[0] - kart.x, point[1] - kart.z) < 7) {
+          brain.routePoint = (brain.routePoint + 1) % route.waypoints.length;
+          point = route.waypoints[brain.routePoint];
+        }
+        destinationX = point[0];
+        destinationZ = point[1];
+      } else {
+        const waypoint =
+          this.arenaMap.waypoints[brain.waypoint % this.arenaMap.waypoints.length];
+        if (Math.hypot(waypoint[0] - kart.x, waypoint[1] - kart.z) < 7) {
+          brain.waypoint = (brain.waypoint + 1) % this.arenaMap.waypoints.length;
+        }
+        destinationX = waypoint[0];
+        destinationZ = waypoint[1];
       }
-      destinationX = waypoint[0];
-      destinationZ = waypoint[1];
     }
 
     // If the direct line is blocked, aim for an open shoulder instead.
@@ -2425,11 +3012,22 @@ export class GameEngine {
     for (const pickup of this.pickups) {
       if (pickup.active) continue;
       pickup.timer -= dt;
-      if (pickup.timer <= 0) {
-        pickup.active = true;
-        pickup.visual.group.visible = true;
-        pickup.phase = Math.random() * Math.PI * 2;
+      if (pickup.timer > 0) continue;
+      // Do not respawn a crate underneath a waiting kart.
+      const occupied = this.karts.some(
+        (kart) =>
+          kart.alive &&
+          Math.abs(kart.y - pickup.y) < 2.2 &&
+          Math.hypot(kart.x - pickup.x, kart.z - pickup.z) < 2.8,
+      );
+      if (occupied) {
+        pickup.timer = 0.5;
+        continue;
       }
+      pickup.active = true;
+      pickup.visual.group.visible = true;
+      pickup.visual.group.position.y = pickup.y;
+      pickup.phase = Math.random() * Math.PI * 2;
     }
   }
 
@@ -2440,6 +3038,7 @@ export class GameEngine {
         // keeps remote karts from teleporting across the arena.
         kart.x = damp(kart.x, kart.netX, 22, dt);
         kart.z = damp(kart.z, kart.netZ, 22, dt);
+        kart.y = damp(kart.y, kart.netY, 22, dt);
         kart.yaw = dampAngle(kart.yaw, kart.netYaw, 22, dt);
       }
       const visual = kart.visual;
@@ -2480,27 +3079,35 @@ export class GameEngine {
         flame.scale.set(boosting ? 1.25 : 0.75, length, boosting ? 1.25 : 0.75);
       }
 
-      const shielded = kart.shieldTime > 0 || kart.invuln > 0;
-      if (shielded) {
+      const stars = kart.shieldTime > 0;
+      const spawnShield = kart.invuln > 0 && !stars;
+      if (stars || spawnShield) {
         visual.shield.visible = true;
         visual.shieldWire.visible = true;
         const pulse = 0.7 + Math.sin(this.elapsed * 6) * 0.2;
-        const spawnShield = kart.invuln > 0 && kart.shieldTime <= 0;
-        const shieldColor = spawnShield ? kart.color : "#2fd4c8";
+        const shieldColor = stars ? WEAPONS.invincibility.css : kart.color;
         (visual.shield.material as THREE.MeshBasicMaterial).color.set(shieldColor);
         (visual.shieldWire.material as THREE.MeshBasicMaterial).color.set(shieldColor);
-        (visual.shield.material as THREE.MeshBasicMaterial).opacity = spawnShield
-          ? 0.035 + pulse * 0.035
-          : 0.07 + pulse * 0.06;
-        (visual.shieldWire.material as THREE.MeshBasicMaterial).opacity = spawnShield
-          ? 0.08 + pulse * 0.06
-          : 0.1 + pulse * 0.08;
-        visual.shield.rotation.y += dt * 0.6;
-        visual.shieldWire.rotation.y -= dt * 0.35;
+        (visual.shield.material as THREE.MeshBasicMaterial).opacity = stars
+          ? 0.1 + pulse * 0.08
+          : 0.035 + pulse * 0.035;
+        (visual.shieldWire.material as THREE.MeshBasicMaterial).opacity = stars
+          ? 0.16 + pulse * 0.1
+          : 0.08 + pulse * 0.06;
+        visual.shield.rotation.y += dt * (stars ? 2.1 : 0.6);
+        visual.shieldWire.rotation.y -= dt * (stars ? 1.4 : 0.35);
         visual.shieldWire.rotation.x += dt * 0.2;
       } else {
         visual.shield.visible = false;
         visual.shieldWire.visible = false;
+      }
+
+      if (kart.spikeTime > 0) {
+        visual.spikes.visible = true;
+        visual.spikes.rotation.y += dt * 5.2;
+        visual.spikes.position.y = 0.9 + Math.sin(this.elapsed * 9) * 0.08;
+      } else {
+        visual.spikes.visible = false;
       }
 
       const glowMaterial = visual.boostGlow.material as THREE.MeshBasicMaterial;
@@ -2508,19 +3115,11 @@ export class GameEngine {
       const glowScale = 1 + Math.sin(this.elapsed * 18) * 0.08 + (boosting ? 0.25 : 0);
       visual.boostGlow.scale.set(glowScale, glowScale, 1);
 
-      const target =
-        this.role === "local" || kart.id === this.localPlayerId
-          ? this.findAimTarget(kart)
-          : null;
-      kart.lockId = target?.id ?? null;
-      let aimYaw = kart.yaw;
-      if (target) {
-        aimYaw = Math.atan2(target.x - kart.x, target.z - kart.z);
-      }
-      const relative = clamp(wrapAngle(aimYaw - kart.yaw), -0.9, 0.9);
-      visual.turret.rotation.y = damp(visual.turret.rotation.y, relative, 12, dt);
+      // Turrets are decorative now: only the Machine Gun tracks targets, and
+      // it does so in flight rather than with a lock-on reticle.
+      visual.turret.rotation.y = damp(visual.turret.rotation.y, 0, 12, dt);
 
-      if (kart.invuln > 0 && Math.sin(this.elapsed * 30) > 0) {
+      if ((kart.invuln > 0 || stars) && Math.sin(this.elapsed * 30) > 0) {
         visual.tag.visible = false;
       } else {
         visual.tag.visible = !kart.isPlayer;
@@ -2533,19 +3132,42 @@ export class GameEngine {
 
     for (const pickup of this.pickups) {
       if (!pickup.active) continue;
-      pickup.visual.group.rotation.y += dt * 0.2;
-      pickup.visual.group.position.y = Math.sin(this.elapsed * 1.6 + pickup.phase) * 0.05;
-      const bob = Math.sin(this.elapsed * 2 + pickup.phase) * 0.16;
-      pickup.visual.icon.position.y = 2.5 + bob;
-      pickup.visual.icon.rotation.y += dt * 1.4;
-      pickup.visual.ring.rotation.z += dt * 0.8;
-      pickup.visual.column.rotation.y += dt * 0.4;
-      const pulse = 0.65 + Math.sin(this.elapsed * 3 + pickup.phase) * 0.16;
+      const bob = Math.sin(this.elapsed * 2 + pickup.phase) * 0.18;
+      pickup.visual.crate.position.y = 1.6 + bob;
+      pickup.visual.crate.rotation.y += dt * 0.75;
+      pickup.visual.halo.position.y = 1.65 + bob * 0.55;
+      pickup.visual.halo.rotation.z += dt * 0.7;
+      pickup.visual.ring.rotation.z += dt * 0.4;
+      const ringScale = 1 + Math.sin(this.elapsed * 2.6 + pickup.phase) * 0.07;
+      pickup.visual.ring.scale.set(ringScale, ringScale, 1);
+      pickup.visual.column.rotation.y += dt * 0.5;
+      const pulse = 0.58 + Math.sin(this.elapsed * 3 + pickup.phase) * 0.18;
       (pickup.visual.ring.material as THREE.MeshBasicMaterial).opacity = pulse;
+      (pickup.visual.halo.material as THREE.MeshBasicMaterial).opacity = pulse * 0.8;
+      (pickup.visual.glow.material as THREE.SpriteMaterial).opacity = 0.32 + pulse * 0.22;
+      (pickup.visual.column.material as THREE.MeshBasicMaterial).opacity = 0.04 + pulse * 0.05;
     }
 
-    for (const mine of this.mines) {
-      mine.mesh.rotation.y += dt * 0.6;
+    for (const trap of this.traps) {
+      if (trap.kind === "mine") {
+        trap.mesh.rotation.y += dt * 0.6;
+        continue;
+      }
+      if (!trap.pickup) continue;
+      const bob = Math.sin(this.elapsed * 2 + trap.phase) * 0.18;
+      trap.pickup.crate.position.y = 1.6 + bob;
+      trap.pickup.crate.rotation.y += dt * 0.75;
+      trap.pickup.halo.position.y = 1.65 + bob * 0.55;
+      trap.pickup.halo.rotation.z += dt * 0.7;
+      trap.pickup.ring.rotation.z += dt * 0.4;
+      const ringScale = 1 + Math.sin(this.elapsed * 2.6 + trap.phase) * 0.07;
+      trap.pickup.ring.scale.set(ringScale, ringScale, 1);
+      trap.pickup.column.rotation.y += dt * 0.5;
+      const pulse = 0.58 + Math.sin(this.elapsed * 3 + trap.phase) * 0.18;
+      (trap.pickup.ring.material as THREE.MeshBasicMaterial).opacity = pulse;
+      (trap.pickup.halo.material as THREE.MeshBasicMaterial).opacity = pulse * 0.8;
+      (trap.pickup.glow.material as THREE.SpriteMaterial).opacity = 0.32 + pulse * 0.22;
+      (trap.pickup.column.material as THREE.MeshBasicMaterial).opacity = 0.04 + pulse * 0.05;
     }
 
     if (this.shockwaves.length > 0) {
@@ -2597,7 +3219,8 @@ export class GameEngine {
 
   private computeCameraTarget(): { position: THREE.Vector3; look: THREE.Vector3 } {
     const player = this.player;
-    const half = this.arenaMap.size / 2;
+    const halfX = this.arenaMap.size / 2;
+    const halfZ = this.arenaMap.depth / 2;
     const focus = new THREE.Vector3(player.x, player.y + 1.2, player.z);
 
     if (!player.alive) {
@@ -2618,20 +3241,101 @@ export class GameEngine {
       focus.y + 5.6,
       focus.z - forwardZ * distance,
     );
-    const limit = half + 3.6;
-    position.x = clamp(position.x, -limit, limit);
-    position.z = clamp(position.z, -limit, limit);
+    // Keep the camera inside the arena walls. When the player is backed against
+    // a wall the camera would otherwise sit outside and the wall would hide the
+    // kart; lifting it keeps the view over the chassis instead.
+    const limitX = halfX - 0.7;
+    const limitZ = halfZ - 0.7;
+    position.x = clamp(position.x, -limitX, limitX);
+    position.z = clamp(position.z, -limitZ, limitZ);
+    const horizontalDistance = Math.hypot(position.x - focus.x, position.z - focus.z);
+    position.y += Math.max(0, distance - horizontalDistance) * 0.55;
     position.y = Math.max(position.y, 6.4);
-    position.y = clamp(position.y, 2.6, 16);
+    position.y = clamp(position.y, 2.6, 18);
+
+    // Tall crate stacks can sit between the chase camera and the kart. Pull the
+    // camera in front of the nearest blocker rather than rendering its back.
+    const blockedAt = this.cameraOcclusionT(focus, position);
+    if (blockedAt !== null) {
+      const t = Math.max(0.14, blockedAt - 0.06);
+      position.x = focus.x + (position.x - focus.x) * t;
+      position.z = focus.z + (position.z - focus.z) * t;
+      position.y = Math.max(position.y, focus.y + 3.6);
+    }
 
     const look = new THREE.Vector3(
       focus.x + forwardX * 4.4,
       focus.y + 0.4,
       focus.z + forwardZ * 4.4,
     );
-    look.x = clamp(look.x, -half + 1, half - 1);
-    look.z = clamp(look.z, -half + 1, half - 1);
+    look.x = clamp(look.x, -halfX + 1, halfX - 1);
+    look.z = clamp(look.z, -halfZ + 1, halfZ - 1);
     return { position, look };
+  }
+
+  /**
+   * Entry point of the focus-to-camera segment into the nearest tall prop.
+   * Returns null when the view is clear.
+   */
+  private cameraOcclusionT(
+    focus: THREE.Vector3,
+    camera: THREE.Vector3,
+  ): number | null {
+    let nearest: number | null = null;
+    const padding = 0.35;
+    for (const obstacle of this.arenaMap.obstacles) {
+      if (!OBSTACLE_RULES[obstacle.kind].solid) continue;
+      const base = obstacle.base ?? 0;
+      const top = base + obstacle.h;
+      if (top < 2.6) continue;
+
+      const rot = obstacle.rot ?? 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const fx = focus.x - obstacle.x;
+      const fz = focus.z - obstacle.z;
+      const cx = camera.x - obstacle.x;
+      const cz = camera.z - obstacle.z;
+      const localFx = fx * cos - fz * sin;
+      const localFz = fx * sin + fz * cos;
+      const localCx = cx * cos - cz * sin;
+      const localCz = cx * sin + cz * cos;
+      const dx = localCx - localFx;
+      const dz = localCz - localFz;
+
+      let tMin = 0;
+      let tMax = 1;
+      let hit = true;
+      const axes: Array<[number, number, number, number]> = [
+        [localFx, dx, -obstacle.hx - padding, obstacle.hx + padding],
+        [localFz, dz, -obstacle.hz - padding, obstacle.hz + padding],
+      ];
+      for (const [origin, delta, min, max] of axes) {
+        if (Math.abs(delta) < 0.000001) {
+          if (origin < min || origin > max) {
+            hit = false;
+            break;
+          }
+        } else {
+          let t1 = (min - origin) / delta;
+          let t2 = (max - origin) / delta;
+          if (t1 > t2) {
+            [t1, t2] = [t2, t1];
+          }
+          tMin = Math.max(tMin, t1);
+          tMax = Math.min(tMax, t2);
+          if (tMin > tMax) {
+            hit = false;
+            break;
+          }
+        }
+      }
+      if (!hit || tMin <= 0.02 || tMin >= 1) continue;
+      const yAt = focus.y + (camera.y - focus.y) * tMin;
+      if (yAt < base - 0.2 || yAt > top + 0.3) continue;
+      if (nearest === null || tMin < nearest) nearest = tMin;
+    }
+    return nearest;
   }
 
   private snapCamera() {
@@ -2658,8 +3362,9 @@ export class GameEngine {
       shield: kart.shieldTime,
       boost: kart.boostTime,
       slow: kart.slowTime,
+      spike: kart.spikeTime,
       weapon: kart.weapon,
-      ammo: kart.weapon === "pulse" ? 0 : kart.ammo,
+      ammo: kart.ammo,
       kills: kart.kills,
       deaths: kart.deaths,
       alive: kart.alive,
@@ -2667,7 +3372,6 @@ export class GameEngine {
       speed: Math.abs(kart.speed),
       drifting: kart.drifting,
       driftCharge: kart.driftCharge,
-      locked: kart.lockId === kart.id ? false : Boolean(kart.lockId),
     }));
 
     const pickups: PickupSnapshot[] = this.pickups.map((pickup) => ({
@@ -2687,7 +3391,6 @@ export class GameEngine {
       killTarget: this.options.killTarget,
       feed: [...this.feed],
       muted: this.muted,
-      aimTargetId: this.player.lockId,
       matchSeconds:
         this.role === "online-guest" ? this.netMatchSeconds : this.elapsed,
       shots: this.player.shots,

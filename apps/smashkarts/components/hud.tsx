@@ -5,10 +5,10 @@ import { WEAPONS } from "@/game/constants";
 import type { GameEngine } from "@/game/engine";
 import { MAPS } from "@/game/maps";
 import type { GameStore } from "@/game/store";
-import type { WeaponId } from "@/game/types";
+import type { WeaponSlot } from "@/game/types";
 import { useFullscreen } from "@/lib/fullscreen";
-import { Minimap } from "./minimap";
 import { TouchControls } from "./touch-controls";
+import { WeaponCircle } from "./weapon-circle";
 import { WeaponGlyph } from "./weapon-glyph";
 
 interface HudProps {
@@ -46,34 +46,33 @@ export function Hud({
   const fullscreen = useFullscreen();
   const [toast, setToast] = useState<Toast | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const previousWeapon = useRef<WeaponId | null>(null);
+  const previousWeapon = useRef<WeaponSlot | null>(null);
   const toastKey = useRef(0);
   const wasPaused = useRef(false);
 
   const player = snapshot.karts.find((kart) => kart.id === snapshot.playerId) ?? null;
   const map = MAPS[snapshot.mapId];
-  const weapon = player?.weapon ?? null;
-  const ammo = player?.ammo ?? 0;
+  const weapon = player?.weapon ?? "none";
+  const weaponSpec = weapon === "none" ? null : WEAPONS[weapon];
   const standings = [...snapshot.karts].sort(
     (a, b) => b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name),
   );
   const winner = snapshot.winner;
 
   useEffect(() => {
-    if (!weapon) {
+    if (!weaponSpec) {
       return;
     }
     if (previousWeapon.current && previousWeapon.current !== weapon) {
-      const spec = WEAPONS[weapon];
       toastKey.current += 1;
       setToast({
         key: toastKey.current,
-        text: weapon === "pulse" ? "Pulse cannon online" : `${spec.name} · ${ammo} rounds`,
-        color: spec.css,
+        text: `${weaponSpec.name} · ${weaponSpec.ammoLabel}`,
+        color: weaponSpec.css,
       });
     }
     previousWeapon.current = weapon;
-  }, [weapon, ammo]);
+  }, [weapon, weaponSpec]);
 
   useEffect(() => {
     if (!toast) {
@@ -114,6 +113,19 @@ export function Hud({
       engineRef.current?.resume();
     }
   }, [online, snapshot.phase, engineRef]);
+
+  const fireStart = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+    engine.pulseFire();
+    engine.setTouchFire(true);
+  }, [engineRef]);
+
+  const fireEnd = useCallback(() => {
+    engineRef.current?.setTouchFire(false);
+  }, [engineRef]);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -197,14 +209,14 @@ export function Hud({
           <div className="hud-weapon">
             <span
               className="hud-weapon-icon"
-              style={{ color: WEAPONS[player.weapon].css }}
+              style={{ color: weaponSpec?.css ?? "#7d7d72" }}
               aria-hidden="true"
             >
               <WeaponGlyph weapon={player.weapon} className="h-4 w-4" />
             </span>
-            <span className="hud-weapon-name">{WEAPONS[player.weapon].name}</span>
+            <span className="hud-weapon-name">{weaponSpec?.name ?? "Empty"}</span>
             <span className="hud-weapon-ammo tabular-nums">
-              {player.weapon === "pulse" ? "∞" : player.ammo}
+              {weaponSpec ? player.ammo : "—"}
             </span>
           </div>
         </div>
@@ -244,20 +256,15 @@ export function Hud({
         <span className="hud-clock-goal">first to {snapshot.killTarget}</span>
       </div>
 
-      <div className="hud-minimap absolute">
-        <div className="hud-panel h-[108px] w-[108px] p-1 sm:h-[148px] sm:w-[148px]">
-          <Minimap snapshot={snapshot} />
-        </div>
-        <div className="hud-label mt-1 text-right">{map.name}</div>
-      </div>
+      <WeaponCircle
+        weapon={player.weapon}
+        ammo={player.ammo}
+        disabled={!player.alive || snapshot.phase !== "playing"}
+        onPressStart={fireStart}
+        onPressEnd={fireEnd}
+      />
 
-      {snapshot.phase === "playing" ? (
-        <TouchControls
-          engineRef={engineRef}
-          weapon={player.weapon}
-          ammo={player.ammo}
-        />
-      ) : null}
+      {snapshot.phase === "playing" ? <TouchControls engineRef={engineRef} /> : null}
 
       {!player.alive && snapshot.phase === "playing" ? (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -422,30 +429,36 @@ export function Hud({
                   </div>
                   <div>
                     <dt>Weapon</dt>
-                    <dd>{WEAPONS[player.weapon].name}</dd>
+                    <dd>{weaponSpec?.name ?? "Empty slot"}</dd>
                   </div>
                   <div>
                     <dt>Ammo</dt>
-                    <dd className="tabular-nums">
-                      {player.weapon === "pulse" ? "∞" : player.ammo}
-                    </dd>
+                    <dd className="tabular-nums">{weaponSpec ? player.ammo : "—"}</dd>
                   </div>
                 </dl>
-                {player.shield > 0 || player.boost > 0 || player.slow > 0 ? (
+                {player.shield > 0 ||
+                player.spike > 0 ||
+                player.boost > 0 ||
+                player.slow > 0 ? (
                   <div className="hud-menu-mods">
                     {player.shield > 0 ? (
                       <span className="hud-mod hud-mod-shield">
-                        Shield {Math.ceil(player.shield)}s
+                        Stars {Math.ceil(player.shield)}s
+                      </span>
+                    ) : null}
+                    {player.spike > 0 ? (
+                      <span className="hud-mod hud-mod-spike">
+                        Spikey {Math.ceil(player.spike)}s
                       </span>
                     ) : null}
                     {player.boost > 0 ? (
                       <span className="hud-mod hud-mod-boost">
-                        Overdrive {Math.ceil(player.boost)}s
+                        Boost {Math.ceil(player.boost)}s
                       </span>
                     ) : null}
                     {player.slow > 0 ? (
                       <span className="hud-mod hud-mod-slow">
-                        Shocked {Math.ceil(player.slow)}s
+                        Frozen {Math.ceil(player.slow)}s
                       </span>
                     ) : null}
                   </div>
@@ -523,7 +536,7 @@ export function Hud({
                   </div>
                   <div>
                     <dt>Fire</dt>
-                    <dd>Space / fire button</dd>
+                    <dd>Space / weapon circle</dd>
                   </div>
                   <div>
                     <dt>Pause</dt>

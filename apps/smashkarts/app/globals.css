@@ -1260,9 +1260,161 @@ html:fullscreen body {
 
 /* ---------- responsive HUD & touch controls ---------- */
 
-.hud-minimap {
-  right: calc(8px + env(safe-area-inset-right, 0px));
-  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+/* ---------- weapon circle (replaces the minimap) ---------- */
+
+.hud-weapon-circle-wrap {
+  position: absolute;
+  right: calc(10px + env(safe-area-inset-right, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.weapon-circle {
+  --weapon-color: var(--warning);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(104px, 15vw, 148px);
+  height: clamp(104px, 15vw, 148px);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--weapon-color);
+  background: radial-gradient(
+    circle at 50% 34%,
+    rgba(255, 255, 255, 0.16),
+    rgba(11, 11, 10, 0.95) 68%
+  );
+  box-shadow: 0 0 0 3px rgba(11, 11, 10, 0.92), 0 0 0 5px var(--weapon-color),
+    0 18px 40px rgba(0, 0, 0, 0.58), inset 0 0 30px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 90ms ease, filter 90ms ease;
+  isolation: isolate;
+}
+
+.weapon-circle::before {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border: 2px dashed currentColor;
+  border-radius: inherit;
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+.weapon-circle:hover {
+  filter: brightness(1.12);
+}
+
+.weapon-circle:active,
+.weapon-circle[data-firing="true"] {
+  transform: scale(0.94);
+  filter: brightness(1.28);
+}
+
+.weapon-circle:disabled {
+  cursor: default;
+  filter: saturate(0.35) brightness(0.72);
+}
+
+.weapon-circle.is-empty {
+  --weapon-color: #6f6f65;
+}
+
+.weapon-circle-ring {
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 62%,
+    var(--weapon-color) 76%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  animation: weapon-circle-spin 4.5s linear infinite;
+  pointer-events: none;
+}
+
+.weapon-circle-core {
+  display: grid;
+  place-items: center;
+  width: 60%;
+  height: 60%;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.62);
+}
+
+.weapon-circle-glyph {
+  width: 72%;
+  height: 72%;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
+}
+
+.weapon-circle-ammo {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-display), Impact, "Arial Black", sans-serif;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.weapon-circle-rarity {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(242, 236, 221, 0.68);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.weapon-circle-name {
+  max-width: 16ch;
+  overflow: hidden;
+  color: var(--bone);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+@keyframes weapon-circle-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (min-width: 640px) {
@@ -1287,9 +1439,9 @@ html:fullscreen body {
     display: inline;
   }
 
-  .hud-minimap {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  .hud-weapon-circle-wrap {
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1342,8 +1494,7 @@ html:fullscreen body {
   pointer-events: none;
 }
 
-.touch-stick,
-.touch-fire {
+.touch-stick {
   pointer-events: auto;
   touch-action: none;
   -webkit-user-select: none;
@@ -1406,58 +1557,6 @@ html:fullscreen body {
   color: rgba(242, 236, 221, 0.5);
 }
 
-.touch-fire {
-  position: absolute;
-  right: calc(16px + env(safe-area-inset-right, 0px));
-  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(82px, 24vw, 108px);
-  height: clamp(82px, 24vw, 108px);
-  padding: 0;
-  border-radius: 999px;
-  border: 3px solid currentColor;
-  background: radial-gradient(
-    circle at 50% 32%,
-    rgba(255, 255, 255, 0.18),
-    rgba(11, 11, 10, 0.92) 64%
-  );
-  box-shadow: 0 0 0 7px rgba(11, 11, 10, 0.35), 0 0 26px currentColor,
-    inset 0 0 24px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  transition: transform 90ms ease, filter 90ms ease;
-}
-
-.touch-fire:active,
-.touch-fire.is-firing {
-  transform: scale(0.93);
-  filter: brightness(1.25);
-}
-
-.touch-fire svg {
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
-}
-
-.touch-fire-ammo {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  min-width: 27px;
-  height: 27px;
-  padding: 0 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 2px solid var(--ink);
-  background: var(--bone);
-  color: var(--ink);
-  font-family: var(--font-display), Impact, "Arial Black", sans-serif;
-  font-size: 13px;
-  line-height: 1;
-}
-
 @media (pointer: coarse), (max-width: 767px) {
   .touch-controls {
     display: block;
@@ -1467,43 +1566,22 @@ html:fullscreen body {
   .hud-keyhints {
     display: none;
   }
-
-  .hud-minimap {
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    bottom: calc(clamp(82px, 24vw, 108px) + 30px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .hud-minimap .hud-panel {
-    width: clamp(92px, 24vw, 132px);
-    height: auto;
-    aspect-ratio: 1;
-  }
-
-  .hud-minimap .hud-label {
-    font-size: 9px;
-  }
-}
-
-@media (max-height: 620px) {
-  .hud-minimap .hud-panel {
-    width: 116px;
-    height: 116px;
-  }
 }
 
 @media (max-height: 560px) and (pointer: coarse) {
-  .hud-minimap {
-    display: none;
-  }
-
   .touch-stick {
     width: 104px;
     height: 104px;
   }
 
-  .touch-fire {
-    width: 80px;
-    height: 80px;
+  .hud-weapon-circle-wrap {
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .weapon-circle {
+    width: 92px;
+    height: 92px;
   }
 
   .hud-player-panel {
@@ -1529,8 +1607,10 @@ html:fullscreen body {
 
 @media (prefers-reduced-motion: reduce) {
   .touch-stick-knob,
-  .touch-fire {
+  .weapon-circle,
+  .weapon-circle-ring {
     transition: none;
+    animation: none;
   }
 }
 

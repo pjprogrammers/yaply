@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Smash Karts — a browser kart arena",
   description:
-    "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, six weapons, and up to seven bots. Drift, fire, repeat.",
+    "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, eleven weapons, and up to seven bots. Drift, fire, repeat.",
   applicationName: "Smash Karts",
   appleWebApp: {
     capable: true,
@@ -30,14 +30,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Smash Karts",
     description:
-      "Free-for-all kart combat in your browser. Three arenas, six weapons, one rule: keep moving.",
+      "Free-for-all kart combat in your browser. Three arenas, eleven weapons, one rule: keep moving.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Smash Karts",
     description:
-      "Free-for-all kart combat in your browser. Three arenas, six weapons, one rule: keep moving.",
+      "Free-for-all kart combat in your browser. Three arenas, eleven weapons, one rule: keep moving.",
   },
 };
 

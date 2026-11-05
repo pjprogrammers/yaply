@@ -1,8 +1,17 @@
-import type { SmashInput, SmashMatchSnapshot } from "@yaply/shared/types";
+import type { SmashInput, SmashMatchSnapshot, SmashWeaponId } from "@yaply/shared/types";
 
 export type MapId = "foundry" | "scrapyard" | "rooftop";
 
-export type WeaponId = "pulse" | "missile" | "mine" | "shield" | "turbo" | "shock";
+export type WeaponId = SmashWeaponId;
+export type WeaponSlot = WeaponId | "none";
+export type ProjectileKind =
+  | "tracer"
+  | "bullet"
+  | "rocket"
+  | "cannonball"
+  | "nuke"
+  | "grenuke"
+  | "snowball";
 
 export type EngineMode = "local" | "online-host" | "online-guest";
 
@@ -38,6 +47,29 @@ export interface ObstacleDef {
   color?: number;
   /** Vertical offset for props stacked on a platform. */
   base?: number;
+  /** Heading of the box's local +X axis in the X/Z plane. */
+  rot?: number;
+}
+
+export type HazardKind = "lava" | "sludge" | "void";
+
+export interface HazardDef {
+  x: number;
+  z: number;
+  kind: HazardKind;
+  /** Circle radius. When set, hx/hz are ignored. */
+  radius?: number;
+  /** Rectangular half-extents, used when radius is absent. */
+  hx?: number;
+  hz?: number;
+  /** Vertical offset for hazards placed on a raised surface. */
+  base?: number;
+}
+
+export interface MapRoute {
+  name: string;
+  kind: "main" | "secondary";
+  waypoints: Array<[number, number]>;
 }
 
 export type PlatformKind = "steel" | "wreck" | "roof";
@@ -115,16 +147,22 @@ export interface MapDef {
   name: string;
   tagline: string;
   description: string;
+  /** Arena width along X. */
   size: number;
+  /** Arena depth along Z. Square arenas reuse `size`. */
+  depth: number;
   theme: MapTheme;
   obstacles: ObstacleDef[];
   platforms: PlatformDef[];
   ramps: RampDef[];
+  hazards: HazardDef[];
   scenery: SceneryDef[];
   lights: LightDef[];
   boostPads: BoostPadDef[];
   spawns: Array<[number, number]>;
+  /** Flattened route points used as a fallback for simple AI paths. */
   waypoints: Array<[number, number]>;
+  routes: MapRoute[];
   pickups: Array<[number, number]>;
 }
 
@@ -178,7 +216,8 @@ export interface KartSnapshot {
   shield: number;
   boost: number;
   slow: number;
-  weapon: WeaponId;
+  spike: number;
+  weapon: WeaponSlot;
   ammo: number;
   kills: number;
   deaths: number;
@@ -187,7 +226,6 @@ export interface KartSnapshot {
   speed: number;
   drifting: boolean;
   driftCharge: number;
-  locked: boolean;
 }
 
 export interface PickupSnapshot {
@@ -216,7 +254,6 @@ export interface GameSnapshot {
   winner: { id: string; name: string; color: string; kills: number } | null;
   feed: FeedEntry[];
   muted: boolean;
-  aimTargetId: string | null;
   matchSeconds: number;
   shots: number;
   hits: number;
@@ -231,6 +268,10 @@ export interface WeaponSpec {
   cooldown: number;
   color: number;
   css: string;
+  rarity: "Common" | "Uncommon" | "Rare" | "Very rare";
+  ammoLabel: string;
+  /** Hold-to-fire weapons keep shooting while the trigger is down. */
+  hold: boolean;
 }
 
 export interface BotBrain {
@@ -239,6 +280,8 @@ export interface BotBrain {
   fireIn: number;
   jitter: number;
   waypoint: number;
+  route: number;
+  routePoint: number;
   wander: boolean;
   skill: number;
 }

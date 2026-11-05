@@ -14,7 +14,6 @@ export function createInitialSnapshot(mapId: MapId, killTarget: number, muted: b
     winner: null,
     feed: [],
     muted,
-    aimTargetId: null,
     matchSeconds: 0,
     shots: 0,
     hits: 0,

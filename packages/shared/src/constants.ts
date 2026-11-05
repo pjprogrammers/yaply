@@ -63,12 +63,17 @@ export const SMASH_DURATION_MIN_SECONDS = 60;
 export const SMASH_DURATION_MAX_SECONDS = 1800;
 export const SMASH_MAP_IDS: SmashMapId[] = ["foundry", "scrapyard", "rooftop"];
 export const SMASH_WEAPON_IDS: SmashWeaponId[] = [
-  "pulse",
-  "missile",
-  "mine",
-  "shield",
-  "turbo",
-  "shock",
+  "machinegun",
+  "bullets",
+  "rockets",
+  "cannonballs",
+  "nuke",
+  "grenuke",
+  "snowball",
+  "mines",
+  "spikey",
+  "invincibility",
+  "fakebox",
 ];
 
 export function isSmashMapId(value: unknown): value is SmashMapId {

@@ -10,6 +10,7 @@ export interface KartVisual {
   flames: THREE.Mesh[];
   shield: THREE.Mesh;
   shieldWire: THREE.Mesh;
+  spikes: THREE.Group;
   turret: THREE.Group;
   tag: THREE.Sprite;
   healthBar: THREE.Sprite;
@@ -290,6 +291,27 @@ export function buildKart(name: string, colorHex: string, accentHex: string): Ka
   shieldWire.visible = false;
   group.add(shieldWire);
 
+  // Spikey-Go-Round: four orbiting spiked balls that spin around the kart.
+  const spikes = new THREE.Group();
+  spikes.position.y = 0.9;
+  spikes.visible = false;
+  const spikeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2c2438,
+    roughness: 0.38,
+    metalness: 0.72,
+    emissive: 0x8b5cf6,
+    emissiveIntensity: 0.45,
+    flatShading: true,
+  });
+  for (let index = 0; index < 4; index += 1) {
+    const angle = (index / 4) * Math.PI * 2;
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), spikeMaterial);
+    ball.position.set(Math.cos(angle) * 2.45, Math.sin(index * 1.7) * 0.16, Math.sin(angle) * 2.45);
+    ball.castShadow = true;
+    spikes.add(ball);
+  }
+  group.add(spikes);
+
   const tagTexture = createNameTexture(name, colorHex);
   const tag = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -341,6 +363,7 @@ export function buildKart(name: string, colorHex: string, accentHex: string): Ka
     flames,
     shield,
     shieldWire,
+    spikes,
     turret,
     tag,
     healthBar,

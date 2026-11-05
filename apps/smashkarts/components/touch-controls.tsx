@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
-import { WEAPONS } from "@/game/constants";
 import type { GameEngine } from "@/game/engine";
-import type { WeaponId } from "@/game/types";
-import { WeaponGlyph } from "./weapon-glyph";
 
 interface TouchControlsProps {
   engineRef: { current: GameEngine | null };
-  weapon: WeaponId;
-  ammo: number;
 }
 
 /** Ignore tiny accidental drags so the kart does not creep in a straight line. */
@@ -24,28 +19,23 @@ function curve(value: number): number {
 }
 
 /**
- * On-screen driving controls for touch devices: an analog stick on the left
- * and a circular fire button on the right that shows the current weapon.
- * Both use pointer capture so they keep working when a thumb slides off.
+ * On-screen movement stick for touch devices. Firing lives in the weapon
+ * circle on the right side of the HUD so the same control works with a mouse,
+ * a tap or a thumb.
  */
-export function TouchControls({ engineRef, weapon, ammo }: TouchControlsProps) {
+export function TouchControls({ engineRef }: TouchControlsProps) {
   const stickRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
-  const fireRef = useRef<HTMLButtonElement>(null);
   const movePointer = useRef<number | null>(null);
-  const firePointer = useRef<number | null>(null);
-  const spec = WEAPONS[weapon];
 
   useEffect(() => {
     const engine = engineRef.current;
     const reset = () => {
       movePointer.current = null;
-      firePointer.current = null;
       if (knobRef.current) {
         knobRef.current.style.transform = "";
       }
       stickRef.current?.classList.remove("is-active");
-      fireRef.current?.classList.remove("is-firing");
       engine?.clearTouchInput();
     };
     const onVisibility = () => {
@@ -121,30 +111,6 @@ export function TouchControls({ engineRef, weapon, ammo }: TouchControlsProps) {
     releaseMove();
   };
 
-  const releaseFire = () => {
-    firePointer.current = null;
-    engineRef.current?.setTouchFire(false);
-  };
-
-  const onFireDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (firePointer.current !== null) {
-      return;
-    }
-    event.preventDefault();
-    firePointer.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.currentTarget.classList.add("is-firing");
-    engineRef.current?.setTouchFire(true);
-  };
-
-  const onFireEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (firePointer.current !== event.pointerId) {
-      return;
-    }
-    event.currentTarget.classList.remove("is-firing");
-    releaseFire();
-  };
-
   return (
     <div className="touch-controls">
       <div
@@ -164,27 +130,6 @@ export function TouchControls({ engineRef, weapon, ammo }: TouchControlsProps) {
           Move
         </span>
       </div>
-
-      <button
-        ref={fireRef}
-        type="button"
-        className="touch-fire"
-        style={{ color: spec.css }}
-        aria-label={`Fire ${spec.name}`}
-        onPointerDown={onFireDown}
-        onPointerUp={onFireEnd}
-        onPointerCancel={onFireEnd}
-        onLostPointerCapture={onFireEnd}
-        onContextMenu={(event) => event.preventDefault()}
-      >
-        <WeaponGlyph weapon={weapon} className="h-10 w-10" />
-        <span className="touch-fire-ammo" aria-hidden="true">
-          {weapon === "pulse" ? "∞" : ammo}
-        </span>
-        <span className="sr-only">
-          Current weapon: {spec.name}. {weapon === "pulse" ? "Unlimited ammo." : `${ammo} rounds.`}
-        </span>
-      </button>
     </div>
   );
 }

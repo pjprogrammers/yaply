@@ -10,6 +10,7 @@ import {
   hexToCss,
 } from "./assets";
 import type {
+  HazardDef,
   MapDef,
   ObstacleDef,
   PlatformDef,
@@ -92,7 +93,8 @@ function buildSky(map: MapDef): THREE.Group {
 
 function buildWalls(map: MapDef): THREE.Group {
   const group = new THREE.Group();
-  const half = map.size / 2;
+  const halfX = map.size / 2;
+  const halfZ = map.depth / 2;
   const thickness = 1.6;
   const height = map.theme.wallHeight;
   const wallMaterial = new THREE.MeshStandardMaterial({
@@ -111,10 +113,10 @@ function buildWalls(map: MapDef): THREE.Group {
   });
 
   const sides: Array<[number, number, number, number]> = [
-    [0, -half - thickness / 2, map.size + thickness * 2, thickness],
-    [0, half + thickness / 2, map.size + thickness * 2, thickness],
-    [-half - thickness / 2, 0, thickness, map.size + thickness * 2],
-    [half + thickness / 2, 0, thickness, map.size + thickness * 2],
+    [0, -halfZ - thickness / 2, map.size + thickness * 2, thickness],
+    [0, halfZ + thickness / 2, map.size + thickness * 2, thickness],
+    [-halfX - thickness / 2, 0, thickness, map.depth + thickness * 2],
+    [halfX + thickness / 2, 0, thickness, map.depth + thickness * 2],
   ];
   for (const [x, z, w, d] of sides) {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), wallMaterial);
@@ -136,14 +138,14 @@ function buildWalls(map: MapDef): THREE.Group {
 
   if (map.id === "foundry") {
     const buttressGeo = new THREE.BoxGeometry(0.8, height + 0.6, 1.4);
-    for (let i = -half + 10; i <= half - 10; i += 12) {
+    for (let i = -halfX + 10; i <= halfX - 10; i += 12) {
       for (const side of [-1, 1]) {
         const a = new THREE.Mesh(buttressGeo, wallMaterial);
-        a.position.set(i, (height + 0.6) / 2, side * (half + 0.4));
+        a.position.set(i, (height + 0.6) / 2, side * (halfZ + 0.4));
         group.add(a);
         const b = new THREE.Mesh(buttressGeo, wallMaterial);
         b.rotation.y = Math.PI / 2;
-        b.position.set(side * (half + 0.4), (height + 0.6) / 2, i);
+        b.position.set(side * (halfX + 0.4), (height + 0.6) / 2, i);
         group.add(b);
       }
     }
@@ -152,13 +154,17 @@ function buildWalls(map: MapDef): THREE.Group {
   if (map.id === "scrapyard") {
     const postGeo = new THREE.BoxGeometry(0.35, height + 0.5, 0.35);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 0.9 });
-    for (let i = -half + 4; i <= half - 4; i += 8) {
+    for (let i = -halfX + 4; i <= halfX - 4; i += 8) {
       for (const side of [-1, 1]) {
         const post = new THREE.Mesh(postGeo, postMat);
-        post.position.set(i, (height + 0.5) / 2, side * (half + 0.35));
+        post.position.set(i, (height + 0.5) / 2, side * (halfZ + 0.35));
         group.add(post);
+      }
+    }
+    for (let i = -halfZ + 4; i <= halfZ - 4; i += 8) {
+      for (const side of [-1, 1]) {
         const post2 = new THREE.Mesh(postGeo, postMat);
-        post2.position.set(side * (half + 0.35), (height + 0.5) / 2, i);
+        post2.position.set(side * (halfX + 0.35), (height + 0.5) / 2, i);
         group.add(post2);
       }
     }
@@ -166,13 +172,17 @@ function buildWalls(map: MapDef): THREE.Group {
 
   if (map.id === "rooftop") {
     const lightMat = new THREE.MeshBasicMaterial({ color: 0xff3d81 });
-    for (let i = -half + 6; i <= half - 6; i += 14) {
+    for (let i = -halfX + 6; i <= halfX - 6; i += 14) {
       for (const side of [-1, 1]) {
         const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.08), lightMat);
-        lamp.position.set(i, 0.35, side * (half + 0.2));
+        lamp.position.set(i, 0.35, side * (halfZ + 0.2));
         group.add(lamp);
+      }
+    }
+    for (let i = -halfZ + 6; i <= halfZ - 6; i += 14) {
+      for (const side of [-1, 1]) {
         const lamp2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.6), lightMat);
-        lamp2.position.set(side * (half + 0.2), 0.35, i);
+        lamp2.position.set(side * (halfX + 0.2), 0.35, i);
         group.add(lamp2);
       }
     }
@@ -184,6 +194,7 @@ function buildWalls(map: MapDef): THREE.Group {
 function buildObstacle(def: ObstacleDef, map: MapDef): THREE.Group {
   const group = new THREE.Group();
   group.position.set(def.x, def.base ?? 0, def.z);
+  group.rotation.y = def.rot ?? 0;
   const w = def.hx * 2;
   const d = def.hz * 2;
   const h = def.h;
@@ -632,6 +643,89 @@ function buildScenery(def: SceneryDef): THREE.Group {
   return group;
 }
 
+function buildHazards(
+  map: MapDef,
+  animated: Array<(time: number, dt: number) => void>,
+): THREE.Group {
+  const group = new THREE.Group();
+  if (map.hazards.length === 0) return group;
+
+  const palette = {
+    lava: { base: 0xff5a1f, edge: 0xffb347, glow: 0xff3d00 },
+    sludge: { base: 0x8fd14a, edge: 0xc8ff7a, glow: 0x4f8a1f },
+    void: { base: 0x120a20, edge: 0xff3d81, glow: 0x1a0b2e },
+  } as const;
+
+  for (const hazard of map.hazards) {
+    const colors = palette[hazard.kind];
+    const y = (hazard.base ?? 0) + 0.025;
+    const texture = createHazardTexture(colors.edge);
+    texture.repeat.set(
+      hazard.radius ? Math.max(1, hazard.radius / 3) : Math.max(1, (hazard.hx ?? 4) / 3),
+      hazard.radius ? Math.max(1, hazard.radius / 3) : Math.max(1, (hazard.hz ?? 4) / 3),
+    );
+
+    const geometry = hazard.radius
+      ? new THREE.CircleGeometry(hazard.radius, 48)
+      : new THREE.PlaneGeometry((hazard.hx ?? 0) * 2, (hazard.hz ?? 0) * 2);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      color: colors.base,
+      transparent: true,
+      opacity: hazard.kind === "void" ? 0.94 : 0.88,
+      blending: hazard.kind === "void" ? THREE.NormalBlending : THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const surface = new THREE.Mesh(geometry, material);
+    surface.rotation.x = -Math.PI / 2;
+    surface.position.set(hazard.x, y, hazard.z);
+    surface.renderOrder = 1;
+    group.add(surface);
+
+    // A bright rim makes the lethal boundary legible from the kart camera.
+    const rimGeometry = hazard.radius
+      ? new THREE.RingGeometry(hazard.radius * 0.94, hazard.radius, 48)
+      : new THREE.RingGeometry(1, 1.1, 4);
+    const rimMaterial = new THREE.MeshBasicMaterial({
+      color: colors.edge,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.rotation.x = -Math.PI / 2;
+    if (hazard.radius) {
+      rim.position.set(hazard.x, y + 0.012, hazard.z);
+    } else {
+      const hx = hazard.hx ?? 1;
+      const hz = hazard.hz ?? 1;
+      rim.scale.set(hx, hz, 1);
+      rim.position.set(hazard.x, y + 0.012, hazard.z);
+    }
+    rim.renderOrder = 2;
+    group.add(rim);
+
+    if (hazard.kind !== "void") {
+      const light = new THREE.PointLight(colors.glow, 55, (hazard.radius ?? 8) * 3.2, 2);
+      light.position.set(hazard.x, y + 1.4, hazard.z);
+      group.add(light);
+    }
+
+    const phase = Math.random() * Math.PI * 2;
+    animated.push((time) => {
+      texture.offset.x = time * 0.035;
+      texture.offset.y = time * 0.021;
+      material.opacity =
+        (hazard.kind === "void" ? 0.9 : 0.82) + Math.sin(time * 1.7 + phase) * 0.08;
+    });
+  }
+
+  return group;
+}
+
 function buildSkyline(map: MapDef): THREE.Group {
   const group = new THREE.Group();
   if (map.id !== "rooftop") {
@@ -678,7 +772,7 @@ function buildSkyline(map: MapDef): THREE.Group {
   group.add(cityFloor);
 
   const towerBase = new THREE.Mesh(
-    new THREE.BoxGeometry(map.size + 12, 6, map.size + 12),
+    new THREE.BoxGeometry(map.size + 12, 6, map.depth + 12),
     new THREE.MeshStandardMaterial({ color: 0x0e0e14, roughness: 0.95 }),
   );
   towerBase.position.y = -3.1;
@@ -698,7 +792,7 @@ function buildMounds(map: MapDef): THREE.Group {
   });
   for (let i = 0; i < 18; i += 1) {
     const angle = (i / 18) * Math.PI * 2;
-    const radius = map.size * 0.85 + (i % 3) * 18;
+    const radius = Math.max(map.size, map.depth) * 0.85 + (i % 3) * 18;
     const mound = new THREE.Mesh(new THREE.SphereGeometry(12 + (i % 4) * 6, 10, 6), material);
     mound.scale.y = 0.24;
     mound.position.set(Math.cos(angle) * radius, -1.5, Math.sin(angle) * radius);
@@ -884,7 +978,10 @@ export function buildArena(map: MapDef): ArenaWorld {
   group.add(buildSky(map));
 
   const outerGround = new THREE.Mesh(
-    new THREE.PlaneGeometry(map.size * 5, map.size * 5),
+    new THREE.PlaneGeometry(
+      Math.max(map.size, map.depth) * 5,
+      Math.max(map.size, map.depth) * 5,
+    ),
     new THREE.MeshStandardMaterial({
       color: new THREE.Color(map.theme.ground).multiplyScalar(0.55),
       roughness: 1,
@@ -898,8 +995,9 @@ export function buildArena(map: MapDef): ArenaWorld {
   }
 
   const groundTexture = createGroundTexture(map.theme);
+  groundTexture.repeat.set(map.size / 7, map.depth / 7);
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(map.size, map.size),
+    new THREE.PlaneGeometry(map.size, map.depth),
     new THREE.MeshStandardMaterial({
       map: groundTexture,
       color: 0xffffff,
@@ -921,6 +1019,7 @@ export function buildArena(map: MapDef): ArenaWorld {
   group.add(buildWalls(map));
   group.add(buildMounds(map));
   group.add(buildSkyline(map));
+  group.add(buildHazards(map, animated));
 
   for (const obstacle of map.obstacles) {
     const mesh = buildObstacle(obstacle, map);
@@ -1020,8 +1119,8 @@ export function buildArena(map: MapDef): ArenaWorld {
     }
   });
 
-  // Warm ground bounce for the foundry furnace, cyan wash for the roof.
-  const wash = new THREE.PointLight(map.theme.accent, map.id === "rooftop" ? 240 : 130, map.size * 0.6, 2);
+  // Warm ground bounce for the foundry slag, cyan wash for the roof.
+  const wash = new THREE.PointLight(map.theme.accent, map.id === "rooftop" ? 240 : 130, Math.max(map.size, map.depth) * 0.6, 2);
   wash.position.set(0, 3, 0);
   group.add(wash);
 
