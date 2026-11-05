@@ -6,7 +6,16 @@ import type { GameEngine } from "@/game/engine";
 import { MAPS } from "@/game/maps";
 import type { GameStore } from "@/game/store";
 import type { WeaponSlot } from "@/game/types";
+import { formatTime, ordinal } from "@/lib/format";
 import { useFullscreen } from "@/lib/fullscreen";
+import { useTouchCapability } from "@/lib/media";
+import {
+  readControlScheme,
+  writeControlScheme,
+  type ControlScheme,
+} from "@/lib/settings";
+import { MatchFeed } from "./match-feed";
+import { MatchLeaderboard } from "./match-leaderboard";
 import { TouchControls } from "./touch-controls";
 import { WeaponCircle } from "./weapon-circle";
 import { WeaponGlyph } from "./weapon-glyph";
@@ -27,12 +36,6 @@ interface Toast {
   color: string;
 }
 
-function formatTime(seconds: number): string {
-  const safe = Math.max(0, Math.ceil(seconds));
-  const minutes = Math.floor(safe / 60);
-  return `${minutes}:${String(safe % 60).padStart(2, "0")}`;
-}
-
 export function Hud({
   store,
   engineRef,
@@ -46,11 +49,14 @@ export function Hud({
   const fullscreen = useFullscreen();
   const [toast, setToast] = useState<Toast | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [controlScheme, setControlScheme] = useState<ControlScheme>(() => readControlScheme());
+  const touch = useTouchCapability();
   const previousWeapon = useRef<WeaponSlot | null>(null);
   const toastKey = useRef(0);
   const wasPaused = useRef(false);
 
   const player = snapshot.karts.find((kart) => kart.id === snapshot.playerId) ?? null;
+  const playerAlive = player?.alive ?? false;
   const map = MAPS[snapshot.mapId];
   const weapon = player?.weapon ?? "none";
   const weaponSpec = weapon === "none" ? null : WEAPONS[weapon];
@@ -127,23 +133,57 @@ export function Hud({
     engineRef.current?.setTouchFire(false);
   }, [engineRef]);
 
+  // The menu is a hard input boundary. Online matches keep simulating, but a
+  // thumb resting on the stick must not keep driving while the drawer is open.
   useEffect(() => {
-    if (!menuOpen) {
+    const engine = engineRef.current;
+    if (!engine) {
       return;
     }
+    engine.setInputEnabled(!menuOpen);
+    if (menuOpen) {
+      engine.clearTouchInput();
+    }
+    return () => {
+      engine.setInputEnabled(true);
+    };
+  }, [menuOpen, engineRef]);
+
+  // Death and match end release every touch control so a held pedal or stick
+  // cannot survive the respawn/rematch boundary.
+  useEffect(() => {
+    if (!playerAlive) {
+      engineRef.current?.clearTouchInput();
+    }
+  }, [playerAlive, engineRef]);
+
+  const changeControlScheme = useCallback(
+    (scheme: ControlScheme) => {
+      setControlScheme(scheme);
+      writeControlScheme(scheme);
+      engineRef.current?.clearTouchInput();
+    },
+    [engineRef],
+  );
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
+      if (event.key !== "Escape" || snapshot.phase === "over") {
         return;
       }
       event.preventDefault();
       event.stopPropagation();
-      closeMenu();
+      if (menuOpen) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
     };
-    // Capture so the arena's Esc-to-pause handler does not immediately
-    // re-pause the race after the drawer resumes it.
+    // Capture so the drawer and the pause state change in one action, and a
+    // second Esc resumes instead of immediately re-opening the menu.
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [menuOpen, closeMenu]);
+  }, [menuOpen, closeMenu, openMenu, snapshot.phase]);
 
   if (snapshot.phase === "booting" || !player) {
     return (
@@ -168,7 +208,11 @@ export function Hud({
       : "Race menu";
 
   return (
-    <div className="hud-root select-none">
+    <div
+      className="hud-root select-none"
+      data-controls={controlScheme}
+      data-touch={touch ? "true" : "false"}
+    >
       {player.hp <= 32 && player.alive ? (
         <div
           className="pointer-events-none absolute inset-0"
@@ -177,94 +221,108 @@ export function Hud({
       ) : null}
 
       <div className="hud-top">
-        <div className="hud-panel hud-player-panel">
-          <div className="hud-player-id">
-            <span
-              className="hud-player-dot"
-              style={{ backgroundColor: player.color }}
-              aria-hidden="true"
-            />
-            <span className="hud-player-name">{player.name}</span>
-            <span className="hud-player-you">you</span>
+        <div className="hud-top-left">
+          <div className="hud-panel hud-clock">
+            <span className="display hud-clock-time tabular-nums">
+              {formatTime(snapshot.timeLeft)}
+            </span>
+            <span className="hud-clock-goal">first to {snapshot.killTarget}</span>
           </div>
 
-          <div
-            className="hud-health"
-            role="progressbar"
-            aria-label="Hull health"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.max(0, Math.round(player.hp))}
-          >
-            <span
-              className="hud-health-fill"
-              style={{
-                width: `${Math.max(0, Math.min(100, player.hp))}%`,
-                backgroundColor: hullColor,
-              }}
-            />
-            <span className="hud-health-text">{Math.max(0, Math.round(player.hp))}</span>
-          </div>
+          <div className="hud-panel hud-player-panel">
+            <div className="hud-player-id">
+              <span
+                className="hud-player-dot"
+                style={{ backgroundColor: player.color }}
+                aria-hidden="true"
+              />
+              <span className="hud-player-name">{player.name}</span>
+              <span className="hud-player-you">you</span>
+            </div>
 
-          <div className="hud-weapon">
-            <span
-              className="hud-weapon-icon"
-              style={{ color: weaponSpec?.css ?? "#7d7d72" }}
-              aria-hidden="true"
+            <div
+              className="hud-health"
+              role="progressbar"
+              aria-label="Hull health"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.max(0, Math.round(player.hp))}
             >
-              <WeaponGlyph weapon={player.weapon} className="h-4 w-4" />
-            </span>
-            <span className="hud-weapon-name">{weaponSpec?.name ?? "Empty"}</span>
-            <span className="hud-weapon-ammo tabular-nums">
-              {weaponSpec ? player.ammo : "—"}
-            </span>
+              <span
+                className="hud-health-fill"
+                style={{
+                  width: `${Math.max(0, Math.min(100, player.hp))}%`,
+                  backgroundColor: hullColor,
+                }}
+              />
+              <span className="hud-health-text">{Math.max(0, Math.round(player.hp))}</span>
+            </div>
+
+            <div className="hud-weapon">
+              <span
+                className="hud-weapon-icon"
+                style={{ color: weaponSpec?.css ?? "#7d7d72" }}
+                aria-hidden="true"
+              >
+                <WeaponGlyph weapon={player.weapon} className="h-4 w-4" />
+              </span>
+              <span className="hud-weapon-name">{weaponSpec?.name ?? "Empty"}</span>
+              <span className="hud-weapon-ammo tabular-nums">
+                {weaponSpec ? player.ammo : "—"}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="hud-actions">
-          {fullscreen.supported ? (
+        <div className="hud-top-right">
+          <div className="hud-actions">
+            {fullscreen.supported ? (
+              <button
+                type="button"
+                className="hud-icon-button"
+                data-fullscreen-control
+                onClick={() => void fullscreen.toggle()}
+                aria-label={fullscreen.active ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-pressed={fullscreen.active}
+                title={fullscreen.active ? "Exit fullscreen" : "Fullscreen"}
+              >
+                <FullscreenIcon active={fullscreen.active} />
+              </button>
+            ) : null}
             <button
               type="button"
-              className="hud-icon-button"
-              data-fullscreen-control
-              onClick={() => void fullscreen.toggle()}
-              aria-label={fullscreen.active ? "Exit fullscreen" : "Enter fullscreen"}
-              aria-pressed={fullscreen.active}
-              title={fullscreen.active ? "Exit fullscreen" : "Fullscreen"}
+              className="hud-icon-button hud-menu-toggle"
+              onClick={openMenu}
+              aria-label="Open game menu"
+              aria-expanded={menuOpen}
+              aria-controls="hud-game-menu"
             >
-              <FullscreenIcon active={fullscreen.active} />
+              <MenuIcon />
+              <span className="hud-menu-text">Menu</span>
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="hud-icon-button hud-menu-toggle"
-            onClick={openMenu}
-            aria-label="Open game menu"
-            aria-expanded={menuOpen}
-            aria-controls="hud-game-menu"
-          >
-            <MenuIcon />
-            <span className="hud-menu-text">Menu</span>
-          </button>
+          </div>
+
+          <MatchLeaderboard standings={standings} playerId={player.id} />
         </div>
       </div>
 
-      <div className="hud-panel hud-clock">
-        <span className="display hud-clock-time tabular-nums">
-          {formatTime(snapshot.timeLeft)}
-        </span>
-        <span className="hud-clock-goal">first to {snapshot.killTarget}</span>
-      </div>
+      <MatchFeed entries={snapshot.feed} now={snapshot.matchSeconds} />
 
       <WeaponCircle
         weapon={player.weapon}
         ammo={player.ammo}
-        disabled={!player.alive || snapshot.phase !== "playing"}
+        disabled={!player.alive || snapshot.phase !== "playing" || menuOpen}
         onPressStart={fireStart}
         onPressEnd={fireEnd}
       />
 
-      {snapshot.phase === "playing" ? <TouchControls engineRef={engineRef} /> : null}
+      {touch && snapshot.phase === "playing" && !menuOpen ? (
+        <TouchControls
+          engineRef={engineRef}
+          scheme={controlScheme}
+          disabled={!player.alive}
+        />
+      ) : null}
 
       {!player.alive && snapshot.phase === "playing" ? (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -525,6 +583,47 @@ export function Hud({
                 </section>
               ) : null}
 
+              <section className="hud-menu-section" aria-labelledby="hud-menu-touch">
+                <h3 id="hud-menu-touch" className="hud-menu-section-title">
+                  Touch controls
+                </h3>
+                <div className="hud-scheme" role="group" aria-label="Touch control layout">
+                  <button
+                    type="button"
+                    className={`hud-scheme-button${controlScheme === "joystick" ? " is-active" : ""}`}
+                    aria-pressed={controlScheme === "joystick"}
+                    onClick={() => changeControlScheme("joystick")}
+                  >
+                    <span className="hud-scheme-glyph" aria-hidden="true">
+                      ◎
+                    </span>
+                    <span>
+                      <strong>Joystick</strong>
+                      <small>360° steer and throttle</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`hud-scheme-button${controlScheme === "pedals" ? " is-active" : ""}`}
+                    aria-pressed={controlScheme === "pedals"}
+                    onClick={() => changeControlScheme("pedals")}
+                  >
+                    <span className="hud-scheme-glyph" aria-hidden="true">
+                      ◀▶
+                    </span>
+                    <span>
+                      <strong>Pedals</strong>
+                      <small>Steer, accelerate, reverse</small>
+                    </span>
+                  </button>
+                </div>
+                <p className="hud-menu-note">
+                  {touch
+                    ? "The selected layout appears on touch screens. Firing stays on the weapon circle."
+                    : "Touch controls appear automatically on phones and tablets. Desktop keeps WASD, arrows, Space and gamepad support."}
+                </p>
+              </section>
+
               <section className="hud-menu-section" aria-labelledby="hud-menu-controls">
                 <h3 id="hud-menu-controls" className="hud-menu-section-title">
                   Controls
@@ -532,11 +631,11 @@ export function Hud({
                 <dl className="hud-menu-controls">
                   <div>
                     <dt>Drive</dt>
-                    <dd>WASD / arrows / left stick</dd>
+                    <dd>WASD / arrows / left stick / touch</dd>
                   </div>
                   <div>
                     <dt>Fire</dt>
-                    <dd>Space / weapon circle</dd>
+                    <dd>Space / weapon circle / gamepad A</dd>
                   </div>
                   <div>
                     <dt>Pause</dt>
@@ -667,17 +766,6 @@ export function Hud({
       ) : null}
     </div>
   );
-}
-
-function ordinal(value: number): string {
-  const remainder = value % 100;
-  if (remainder >= 11 && remainder <= 13) {
-    return `${value}th`;
-  }
-  if (value % 10 === 1) return `${value}st`;
-  if (value % 10 === 2) return `${value}nd`;
-  if (value % 10 === 3) return `${value}rd`;
-  return `${value}th`;
 }
 
 function SoundIcon({ muted }: { muted: boolean }) {

@@ -3,6 +3,7 @@ import { buildArena, groundHeightAt, type ArenaWorld } from "./world";
 import { buildKart, disposeObject, type KartVisual } from "./kart-mesh";
 import { buildPickup, type PickupVisual } from "./pickup-mesh";
 import { GameAudio } from "./audio";
+import { GameInput, isNewerInputSequence } from "./input";
 import { ParticleField } from "./particles";
 import { createSparkTexture, createSmokeTexture, cssToHex, paintHealthBar } from "./assets";
 import { BOT_COLORS, BOT_NAMES, KART, OBSTACLE_RULES, PICKUP_POOL, WEAPONS } from "./constants";
@@ -220,19 +221,15 @@ export class GameEngine {
   private muted: boolean;
   private readonly cameraLook = new THREE.Vector3();
   private readonly resizeObserver: ResizeObserver;
-
-  private readonly keys = new Set<string>();
-  private keyFire = false;
-  private firePulse = 0;
-  private touchSteer = 0;
-  private touchThrottle = 0;
-  private touchFire = false;
+  private readonly input: GameInput;
 
   private readonly role: EngineMode;
   private readonly localPlayerId: string;
   private readonly round: number;
   private readonly onlineRoster = new Map<string, OnlinePlayer>();
   private readonly remoteInputs = new Map<string, VehicleInput>();
+  private readonly remoteInputSeq = new Map<string, number>();
+  private inputSequence = Date.now();
   private lastInputSent = 0;
   private lastSentInput: SmashInput | null = null;
   private lastSnapshotSent = 0;
@@ -255,9 +252,17 @@ export class GameEngine {
     this.muted = store.getSnapshot().muted;
     this.timeLeft = options.duration;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
+    // Phones and small tablets get the same arena with a lighter render path:
+    // no MSAA or shadow pass, a capped pixel ratio and fewer particles.
+    const lowPower =
+      window.matchMedia("(pointer: coarse)").matches ||
+      Math.min(window.innerWidth, window.innerHeight) < 768;
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !lowPower,
+      powerPreference: "high-performance",
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPower ? 1.5 : 2));
+    this.renderer.shadowMap.enabled = !lowPower;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.24;
@@ -280,10 +285,21 @@ export class GameEngine {
     this.sparkTexture = createSparkTexture();
     this.smokeTexture = createSmokeTexture();
     this.pickupGlowTexture = createSparkTexture();
-    this.sparks = new ParticleField(this.scene, this.sparkTexture, THREE.AdditiveBlending, 520);
-    this.smoke = new ParticleField(this.scene, this.smokeTexture, THREE.NormalBlending, 380);
+    this.sparks = new ParticleField(
+      this.scene,
+      this.sparkTexture,
+      THREE.AdditiveBlending,
+      lowPower ? 320 : 520,
+    );
+    this.smoke = new ParticleField(
+      this.scene,
+      this.smokeTexture,
+      THREE.NormalBlending,
+      lowPower ? 220 : 380,
+    );
 
     this.audio = new GameAudio(this.muted);
+    this.input = new GameInput({ onActivity: () => this.audio.unlock() });
 
     this.buildKarts();
     this.buildPickups();
@@ -378,17 +394,17 @@ export class GameEngine {
    * and `throttle` is +1 for forward, both in the -1..1 range.
    */
   setTouchMovement(steer: number, throttle: number) {
-    this.touchSteer = clamp(steer, -1, 1);
-    this.touchThrottle = clamp(throttle, -1, 1);
-    this.audio.unlock();
+    this.input.setStick(steer, throttle);
+  }
+
+  /** Screen-space movement from the optional steering/throttle pedals. */
+  setTouchPedals(steer: number, throttle: number) {
+    this.input.setPedals(steer, throttle);
   }
 
   /** Held state of the on-screen weapon circle. */
   setTouchFire(firing: boolean) {
-    this.touchFire = firing;
-    if (firing) {
-      this.audio.unlock();
-    }
+    this.input.setFire(firing);
   }
 
   /**
@@ -396,23 +412,22 @@ export class GameEngine {
    * starts and ends between two animation frames.
    */
   pulseFire() {
-    this.firePulse = Math.max(this.firePulse, 0.08);
-    this.audio.unlock();
+    this.input.pulseFire();
   }
 
   /** Releases the on-screen controls, e.g. when the HUD unmounts. */
   clearTouchInput() {
-    this.touchSteer = 0;
-    this.touchThrottle = 0;
-    this.touchFire = false;
-    this.firePulse = 0;
+    this.input.clearTouch();
+  }
+
+  /** Lets the HUD freeze driving while its menu drawer is open. */
+  setInputEnabled(enabled: boolean) {
+    this.input.setEnabled(enabled);
   }
 
   /** Drops every held control. Used on pause, blur, tab hide and match end. */
   private clearInput() {
-    this.keys.clear();
-    this.keyFire = false;
-    this.clearTouchInput();
+    this.input.clear();
   }
 
   dispose() {
@@ -458,73 +473,19 @@ export class GameEngine {
   }
 
   private setupInput() {
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    window.addEventListener("blur", this.onBlur);
+    this.input.attach();
     // Touch and mouse fire live on the HUD controls, not the canvas, so taps
     // used to look around or interact with the page never fire a weapon.
     this.renderer.domElement.addEventListener("contextmenu", this.preventContext);
   }
 
   private removeInput() {
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    window.removeEventListener("blur", this.onBlur);
+    this.input.detach();
     this.renderer.domElement.removeEventListener("contextmenu", this.preventContext);
   }
 
   private preventContext = (event: Event) => {
     event.preventDefault();
-  };
-
-  private onBlur = () => {
-    this.clearInput();
-  };
-
-  private onKeyDown = (event: KeyboardEvent) => {
-    const target = event.target as HTMLElement | null;
-    // Never eat keystrokes meant for a text field layered over the canvas.
-    if (
-      target &&
-      (target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable)
-    ) {
-      return;
-    }
-
-    const code = event.code;
-    // Arrows and Space scroll the page by default. Prevent that before the
-    // repeat guard so holding a key down does not start scrolling.
-    if (
-      code === "ArrowUp" ||
-      code === "ArrowDown" ||
-      code === "ArrowLeft" ||
-      code === "ArrowRight" ||
-      code === "Space"
-    ) {
-      event.preventDefault();
-    }
-    if (event.repeat) {
-      return;
-    }
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return;
-    }
-
-    this.keys.add(code);
-    if (code === "Space") {
-      this.keyFire = true;
-      this.pulseFire();
-    }
-    this.audio.unlock();
-  };
-
-  private onKeyUp = (event: KeyboardEvent) => {
-    this.keys.delete(event.code);
-    if (event.code === "Space") {
-      this.keyFire = false;
-    }
   };
 
   private buildKarts() {
@@ -754,7 +715,7 @@ export class GameEngine {
     const raw = (now - this.lastFrame) / 1000;
     this.lastFrame = now;
     const dt = clamp(raw, 0, 0.05);
-    this.firePulse = Math.max(0, this.firePulse - dt);
+    this.input.sample(dt);
 
     this.frames += 1;
     this.fpsTimer += raw;
@@ -841,27 +802,18 @@ export class GameEngine {
       this.player.input.fire = false;
       return;
     }
-    const up = this.keys.has("KeyW") || this.keys.has("ArrowUp");
-    const down = this.keys.has("KeyS") || this.keys.has("ArrowDown");
-    const left = this.keys.has("KeyA") || this.keys.has("ArrowLeft");
-    const right = this.keys.has("KeyD") || this.keys.has("ArrowRight");
-    const keyboardThrottle = (up ? 1 : 0) - (down ? 1 : 0);
-    const keyboardSteer = (right ? 1 : 0) - (left ? 1 : 0);
-
-    this.player.input.throttle = clamp(
-      keyboardThrottle + this.touchThrottle,
-      -1,
-      1,
-    );
-    // Joystick and keyboard are both screen-space: +1 means right. The kart
-    // simulation uses the opposite sign (positive steer turns left in world
-    // space), so invert exactly once here. Bots keep their world-space input.
-    this.player.input.steer = -clamp(keyboardSteer + this.touchSteer, -1, 1);
+    const controls = this.input.read();
+    this.player.input.throttle = controls.throttle;
+    // Joystick, pedals, gamepad and keyboard are all screen-space: +1 means
+    // right. The kart simulation uses the opposite sign (positive steer turns
+    // left in world space), so invert exactly once here. Bots keep their
+    // world-space input.
+    this.player.input.steer = -controls.steer;
     // Drift is automatic: a hard turn at speed charges the mini-turbo, so the
     // whole game needs only movement and fire.
     this.player.input.drift =
       Math.abs(this.player.input.steer) > 0.55 && Math.abs(this.player.speed) > 7;
-    this.player.input.fire = this.keyFire || this.touchFire || this.firePulse > 0;
+    this.player.input.fire = controls.fire;
   }
 
   private sendGuestInput(now: number) {
@@ -886,8 +838,10 @@ export class GameEngine {
     // keep a 50 ms heartbeat so the host cannot hold stale controls.
     if (!changed && now - this.lastInputSent < 50) return;
     this.lastInputSent = now;
-    this.lastSentInput = input;
-    this.options.onInput(input);
+    this.inputSequence += 1;
+    const packet: SmashInput = { ...input, seq: this.inputSequence };
+    this.lastSentInput = packet;
+    this.options.onInput(packet);
   }
 
   /** Applies a guest's controls to its kart on the authoritative host. */
@@ -895,6 +849,11 @@ export class GameEngine {
     if (this.role !== "online-host" || playerId === this.localPlayerId) return;
     const kart = this.karts.find((entry) => entry.id === playerId);
     if (!kart) return;
+    const previousSeq = this.remoteInputSeq.get(playerId);
+    if (!isNewerInputSequence(previousSeq, input.seq)) return;
+    if (input.seq !== undefined) {
+      this.remoteInputSeq.set(playerId, input.seq);
+    }
     const next: VehicleInput = {
       throttle: input.throttle,
       steer: input.steer,
@@ -964,6 +923,8 @@ export class GameEngine {
       if (next.has(kart.id)) continue;
       kart.visual.group.removeFromParent();
       disposeObject(kart.visual.group);
+      this.remoteInputs.delete(kart.id);
+      this.remoteInputSeq.delete(kart.id);
       this.karts.splice(index, 1);
     }
 
@@ -2645,6 +2606,7 @@ export class GameEngine {
       victim: victim.name,
       weapon,
       self,
+      at: this.elapsed,
     });
     if (this.feed.length > 6) {
       this.feed.length = 6;

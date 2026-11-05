@@ -135,6 +135,11 @@ export type Ranking = {
 
 /** Controls a Smash Karts guest sends to the authoritative host. */
 export type SmashInput = {
+  /**
+   * Monotonic client sequence. The host drops duplicate or out-of-order
+   * packets. Optional so older clients remain compatible during rollout.
+   */
+  seq?: number;
   throttle: number;
   steer: number;
   drift: boolean;
@@ -197,6 +202,8 @@ export type SmashFeedEntry = {
   victim: string;
   weapon: SmashWeaponId;
   self: boolean;
+  /** Match time in seconds; optional for older hosts. */
+  at?: number;
 };
 
 export type SmashWinner = {

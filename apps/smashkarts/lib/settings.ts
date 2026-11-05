@@ -32,6 +32,9 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
 
 const STORAGE_KEY = "smashkarts:settings";
 const MUTE_KEY = "smashkarts:muted";
+const CONTROLS_KEY = "smashkarts:controls";
+
+export type ControlScheme = "joystick" | "pedals";
 
 function isMapId(value: unknown): value is MapId {
   return typeof value === "string" && value in MAPS;
@@ -108,5 +111,27 @@ export function savePaint(color: string) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, color }));
   } catch {
     // ignore
+  }
+}
+
+export function readControlScheme(): ControlScheme {
+  if (typeof window === "undefined") {
+    return "joystick";
+  }
+  try {
+    return window.localStorage.getItem(CONTROLS_KEY) === "pedals" ? "pedals" : "joystick";
+  } catch {
+    return "joystick";
+  }
+}
+
+export function writeControlScheme(scheme: ControlScheme) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(CONTROLS_KEY, scheme);
+  } catch {
+    // private browsing can reject writes; the game still runs
   }
 }

@@ -1,135 +1,247 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { GameEngine } from "@/game/engine";
+import type { ControlScheme } from "@/lib/settings";
+import { VirtualJoystick } from "./virtual-joystick";
 
 interface TouchControlsProps {
   engineRef: { current: GameEngine | null };
+  scheme: ControlScheme;
+  disabled?: boolean;
 }
 
-/** Ignore tiny accidental drags so the kart does not creep in a straight line. */
-const DEADZONE = 0.16;
+type PedalKey = "left" | "right" | "forward" | "reverse";
 
-function curve(value: number): number {
-  const magnitude = Math.abs(value);
-  if (magnitude <= DEADZONE) {
-    return 0;
-  }
-  return (Math.sign(value) * (magnitude - DEADZONE)) / (1 - DEADZONE);
+interface PedalState {
+  left: boolean;
+  right: boolean;
+  forward: boolean;
+  reverse: boolean;
 }
+
+const EMPTY_PEDALS: PedalState = {
+  left: false,
+  right: false,
+  forward: false,
+  reverse: false,
+};
 
 /**
- * On-screen movement stick for touch devices. Firing lives in the weapon
- * circle on the right side of the HUD so the same control works with a mouse,
- * a tap or a thumb.
+ * Touch movement layer. Joystick mode sends a normalized 360-degree vector;
+ * pedal mode sends the same normalized steer/throttle pair from four
+ * independent hold buttons. Firing stays in the weapon circle.
  */
-export function TouchControls({ engineRef }: TouchControlsProps) {
-  const stickRef = useRef<HTMLDivElement>(null);
-  const knobRef = useRef<HTMLDivElement>(null);
-  const movePointer = useRef<number | null>(null);
+export function TouchControls({ engineRef, scheme, disabled = false }: TouchControlsProps) {
+  const setStick = useCallback(
+    (steer: number, throttle: number) => {
+      engineRef.current?.setTouchMovement(steer, throttle);
+    },
+    [engineRef],
+  );
 
-  useEffect(() => {
-    const engine = engineRef.current;
-    const reset = () => {
-      movePointer.current = null;
-      if (knobRef.current) {
-        knobRef.current.style.transform = "";
-      }
-      stickRef.current?.classList.remove("is-active");
-      engine?.clearTouchInput();
-    };
-    const onVisibility = () => {
-      if (document.hidden) {
-        reset();
-      }
-    };
-    window.addEventListener("blur", reset);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("blur", reset);
-      document.removeEventListener("visibilitychange", onVisibility);
-      engine?.clearTouchInput();
-    };
+  useEffect(
+    () => () => {
+      engineRef.current?.clearTouchInput();
+    },
+    [engineRef],
+  );
+
+  return (
+    <div
+      className={`touch-controls touch-controls-${scheme}`}
+      data-disabled={disabled ? "true" : "false"}
+      aria-hidden={disabled ? "true" : undefined}
+    >
+      {scheme === "joystick" ? (
+        <VirtualJoystick disabled={disabled} onChange={setStick} />
+      ) : (
+        <PedalControls engineRef={engineRef} disabled={disabled} />
+      )}
+    </div>
+  );
+}
+
+function PedalControls({
+  engineRef,
+  disabled,
+}: {
+  engineRef: { current: GameEngine | null };
+  disabled: boolean;
+}) {
+  const held = useRef<PedalState>({ ...EMPTY_PEDALS });
+
+  const sync = useCallback(() => {
+    const state = held.current;
+    const steer = (state.right ? 1 : 0) - (state.left ? 1 : 0);
+    const throttle = (state.forward ? 1 : 0) - (state.reverse ? 1 : 0);
+    engineRef.current?.setTouchPedals(steer, throttle);
   }, [engineRef]);
 
-  const track = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const stick = stickRef.current;
-    const knob = knobRef.current;
-    if (!stick || !knob) {
-      return;
-    }
-    const rect = stick.getBoundingClientRect();
-    const radius = rect.width / 2;
-    const limit = radius * 0.62;
-    let dx = event.clientX - rect.left - radius;
-    let dy = event.clientY - rect.top - radius;
-    const distance = Math.hypot(dx, dy);
-    if (distance > limit) {
-      dx = (dx / distance) * limit;
-      dy = (dy / distance) * limit;
-    }
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
-    engineRef.current?.setTouchMovement(curve(dx / limit), curve(-dy / limit));
-  };
+  const setPedal = useCallback(
+    (key: PedalKey, pressed: boolean) => {
+      held.current = { ...held.current, [key]: pressed };
+      sync();
+    },
+    [sync],
+  );
 
-  const releaseMove = () => {
-    movePointer.current = null;
-    if (knobRef.current) {
-      knobRef.current.style.transform = "";
-    }
-    stickRef.current?.classList.remove("is-active");
-    engineRef.current?.setTouchMovement(0, 0);
-  };
+  const releaseAll = useCallback(() => {
+    held.current = { ...EMPTY_PEDALS };
+    sync();
+  }, [sync]);
 
-  const onMoveDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (movePointer.current !== null) {
+  const holdLeft = useCallback((pressed: boolean) => setPedal("left", pressed), [setPedal]);
+  const holdRight = useCallback((pressed: boolean) => setPedal("right", pressed), [setPedal]);
+  const holdForward = useCallback(
+    (pressed: boolean) => setPedal("forward", pressed),
+    [setPedal],
+  );
+  const holdReverse = useCallback(
+    (pressed: boolean) => setPedal("reverse", pressed),
+    [setPedal],
+  );
+
+  useEffect(() => {
+    if (disabled) {
+      releaseAll();
+    }
+  }, [disabled, releaseAll]);
+
+  useEffect(
+    () => () => {
+      releaseAll();
+    },
+    [releaseAll],
+  );
+
+  return (
+    <div className="touch-pedals" aria-label="Pedal controls">
+      <div className="pedal-cluster pedal-cluster-steer">
+        <HoldPedal
+          label="Steer left"
+          glyph="◀"
+          disabled={disabled}
+          onHold={holdLeft}
+          className="pedal-button pedal-button-steer"
+        />
+        <HoldPedal
+          label="Steer right"
+          glyph="▶"
+          disabled={disabled}
+          onHold={holdRight}
+          className="pedal-button pedal-button-steer"
+        />
+      </div>
+      <div className="pedal-cluster pedal-cluster-throttle">
+        <HoldPedal
+          label="Reverse"
+          glyph="▼"
+          disabled={disabled}
+          onHold={holdReverse}
+          className="pedal-button pedal-button-reverse"
+        />
+        <HoldPedal
+          label="Accelerate"
+          glyph="▲"
+          disabled={disabled}
+          onHold={holdForward}
+          className="pedal-button pedal-button-forward"
+        />
+      </div>
+    </div>
+  );
+}
+
+function HoldPedal({
+  label,
+  glyph,
+  disabled,
+  onHold,
+  className,
+}: {
+  label: string;
+  glyph: string;
+  disabled: boolean;
+  onHold: (pressed: boolean) => void;
+  className: string;
+}) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const activePointer = useRef<number | null>(null);
+
+  const release = useCallback(() => {
+    const button = buttonRef.current;
+    const pointer = activePointer.current;
+    activePointer.current = null;
+    button?.removeAttribute("data-held");
+    if (button && pointer !== null && button.hasPointerCapture(pointer)) {
+      button.releasePointerCapture(pointer);
+    }
+    onHold(false);
+  }, [onHold]);
+
+  useEffect(() => {
+    if (disabled) {
+      release();
+    }
+  }, [disabled, release]);
+
+  useEffect(() => {
+    const onBlur = () => release();
+    const onVisibility = () => {
+      if (document.hidden) {
+        release();
+      }
+    };
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (activePointer.current !== null) {
+        activePointer.current = null;
+        onHold(false);
+      }
+    };
+  }, [onHold, release]);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (disabled || activePointer.current !== null) {
       return;
     }
     event.preventDefault();
-    const stick = stickRef.current;
-    if (!stick) {
-      return;
-    }
-    movePointer.current = event.pointerId;
-    stick.setPointerCapture(event.pointerId);
-    stick.classList.add("is-active");
-    track(event);
+    activePointer.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.setAttribute("data-held", "true");
+    onHold(true);
   };
 
-  const onMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (movePointer.current !== event.pointerId) {
+  const onPointerEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (activePointer.current !== event.pointerId) {
       return;
     }
-    event.preventDefault();
-    track(event);
-  };
-
-  const onMoveEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (movePointer.current !== event.pointerId) {
-      return;
-    }
-    releaseMove();
+    release();
   };
 
   return (
-    <div className="touch-controls">
-      <div
-        ref={stickRef}
-        className="touch-stick"
-        role="group"
-        aria-label="Movement joystick"
-        onPointerDown={onMoveDown}
-        onPointerMove={onMove}
-        onPointerUp={onMoveEnd}
-        onPointerCancel={onMoveEnd}
-        onLostPointerCapture={onMoveEnd}
-      >
-        <span className="touch-stick-ring" aria-hidden="true" />
-        <span className="touch-stick-knob" ref={knobRef} aria-hidden="true" />
-        <span className="touch-stick-label" aria-hidden="true">
-          Move
-        </span>
-      </div>
-    </div>
+    <button
+      ref={buttonRef}
+      type="button"
+      className={className}
+      disabled={disabled}
+      aria-label={label}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+      onLostPointerCapture={release}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <span aria-hidden="true">{glyph}</span>
+    </button>
   );
 }

@@ -241,6 +241,8 @@ export interface FeedEntry {
   victim: string;
   weapon: WeaponId;
   self: boolean;
+  /** Match time in seconds when the kill happened. */
+  at?: number;
 }
 
 export interface GameSnapshot {

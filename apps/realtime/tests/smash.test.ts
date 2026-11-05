@@ -135,7 +135,7 @@ describe("Smash Karts online rooms", () => {
     const { sockets, playerIds } = await createAndJoin("smashkarts", ["Alice", "Bob"]);
     await sockets[0].message({ type: "room.start" });
 
-    const input = { throttle: 1, steer: -0.4, drift: true, fire: false };
+    const input = { seq: 41, throttle: 1, steer: -0.4, drift: true, fire: false };
     await sockets[1].message({ type: "smash.input", input });
 
     const relayed = sockets[0].last("smash.input");

@@ -52,6 +52,23 @@ export function WeaponCircle({
     }
   }, [disabled, onPressEnd]);
 
+  // A browser can cancel or steal the pointer without ever firing pointerup.
+  // Release the trigger on blur and tab hide so the weapon cannot stay stuck.
+  useEffect(() => {
+    const onBlur = () => release();
+    const onVisibility = () => {
+      if (document.hidden) {
+        release();
+      }
+    };
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [release]);
+
   useEffect(
     () => () => {
       if (activePointer.current !== null) {
@@ -63,7 +80,7 @@ export function WeaponCircle({
   );
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (disabled || !spec) {
+    if (disabled || !spec || activePointer.current !== null) {
       return;
     }
     event.preventDefault();
@@ -94,10 +111,15 @@ export function WeaponCircle({
         type="button"
         className={`weapon-circle${spec ? "" : " is-empty"}`}
         style={style}
+        data-fire-control
+        data-hold={spec?.hold ? "true" : "false"}
+        aria-keyshortcuts="Space"
         disabled={disabled || !spec}
         aria-label={
           spec
-            ? `Fire ${spec.name}. ${ammo} ${spec.ammo === 1 ? "use" : "rounds"} left.`
+            ? `Fire ${spec.name}. ${ammo} ${spec.ammo === 1 ? "use" : "rounds"} left. ${
+                spec.hold ? "Hold to keep firing." : "Tap to fire."
+              }`
             : "No weapon equipped. Drive through a mystery crate."
         }
         onPointerDown={handlePointerDown}
@@ -119,6 +141,9 @@ export function WeaponCircle({
       </button>
       <span className="weapon-circle-name">
         {spec ? spec.name : "Mystery crate"}
+      </span>
+      <span className="weapon-circle-mode">
+        {spec ? (spec.hold ? "Hold to fire" : "Tap to fire") : "Find a crate"}
       </span>
     </div>
   );

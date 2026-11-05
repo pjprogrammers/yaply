@@ -63,6 +63,8 @@ export const GameSettingsSchema = z
 
 export const SmashInputSchema = z
   .object({
+    /** Optional for compatibility with clients from before input sequencing. */
+    seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
     throttle: z.number().min(-1).max(1),
     steer: z.number().min(-1).max(1),
     drift: z.boolean(),
@@ -180,6 +182,7 @@ export const SmashMatchSnapshotSchema = z
             victim: z.string().min(1).max(32),
             weapon: SmashWeaponSchema,
             self: z.boolean(),
+            at: z.number().min(0).max(1_000_000).optional(),
           })
           .strict(),
       )

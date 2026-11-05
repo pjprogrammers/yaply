@@ -959,19 +959,71 @@ html:fullscreen body {
   letter-spacing: -0.02em;
 }
 
-/* Compact in-race HUD: identity, hull, weapon, clock and the menu button.
-   Everything else lives in the drawer. */
+/* ---------- responsive in-race HUD ---------- */
 
+.hud-root {
+  --hud-pad: clamp(10px, 2vmin, 20px);
+  --hud-gap: clamp(6px, 1.2vmin, 12px);
+  --stick-size: clamp(120px, 20vmin, 150px);
+  --weapon-size: clamp(68px, 12vmin, 92px);
+  --pedal-size: clamp(64px, 16vmin, 84px);
+}
+
+/* Top edge: clock and player stack on the left, actions and standings on the
+   right. The centre stays clear for the kill feed and the driving line. */
 .hud-top {
   position: absolute;
   inset: 0 0 auto;
+  z-index: 18;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  padding-top: calc(8px + env(safe-area-inset-top, 0px));
-  padding-left: calc(8px + env(safe-area-inset-left, 0px));
-  padding-right: calc(8px + env(safe-area-inset-right, 0px));
+  gap: var(--hud-gap);
+  padding-top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px));
+  padding-right: calc(var(--hud-pad) + env(safe-area-inset-right, 0px));
+  padding-left: calc(var(--hud-pad) + env(safe-area-inset-left, 0px));
+}
+
+.hud-top-left,
+.hud-top-right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-gap);
+  min-width: 0;
+}
+
+.hud-top-left {
+  align-items: flex-start;
+}
+
+.hud-top-right {
+  align-items: flex-end;
+}
+
+.hud-clock {
+  min-width: 96px;
+  padding: 5px 13px 6px;
+  background: rgba(11, 11, 10, 0.92);
+  border-color: rgba(242, 236, 221, 0.26);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+}
+
+.hud-clock-time {
+  display: block;
+  font-size: clamp(24px, 3.2vmin, 34px);
+  line-height: 0.9;
+}
+
+.hud-clock-goal {
+  display: block;
+  margin-top: 2px;
+  color: var(--ash);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .hud-player-panel {
@@ -1119,41 +1171,233 @@ html:fullscreen body {
   display: none;
 }
 
-.hud-clock {
-  position: absolute;
-  top: calc(8px + env(safe-area-inset-top, 0px));
-  left: 50%;
-  min-width: 92px;
-  padding: 5px 14px 6px;
-  transform: translateX(-50%);
-  text-align: center;
-  background: rgba(11, 11, 10, 0.92);
-  border-color: rgba(242, 236, 221, 0.26);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+.hud-root[data-touch="true"] .hud-menu-text {
+  display: none;
 }
 
-.hud-clock-time {
-  display: block;
-  font-size: clamp(23px, 3.2vw, 32px);
-  line-height: 0.9;
+/* Expandable standings. Desktop keeps the panel open; touch layouts collapse
+   it to a one-line place/kill readout that expands on tap. */
+.hud-leaderboard {
+  width: min(250px, 32vw);
+  overflow: hidden;
+  background: rgba(11, 11, 10, 0.9);
+  border: 2px solid rgba(242, 236, 221, 0.24);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
 }
 
-.hud-clock-goal {
-  display: block;
-  margin-top: 2px;
-  color: var(--ash);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  line-height: 1.1;
+.hud-leaderboard-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--bone);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hud-leaderboard.is-desktop .hud-leaderboard-toggle {
+  cursor: default;
+}
+
+.hud-leaderboard-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.hud-leaderboard-live {
+  overflow: hidden;
+  color: var(--bone);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.hud-leaderboard-self {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: none;
+}
+
+.hud-leaderboard-place {
+  font-family: var(--font-display), Impact, "Arial Black", sans-serif;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.hud-leaderboard-kills {
+  color: var(--ash);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.hud-leaderboard-kills span {
+  color: var(--warning);
+}
+
+.hud-leaderboard-chevron {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--ash);
+  transition: transform 140ms ease;
+}
+
+.hud-leaderboard.is-open .hud-leaderboard-chevron {
+  transform: rotate(180deg);
+}
+
+.hud-leaderboard.is-desktop .hud-leaderboard-chevron {
+  display: none;
+}
+
+.hud-leaderboard-body {
+  display: none;
+  max-height: min(42vh, 300px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid rgba(242, 236, 221, 0.14);
+}
+
+.hud-leaderboard.is-open .hud-leaderboard-body {
+  display: block;
+}
+
+.hud-leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 6px 6px;
+  list-style: none;
+}
+
+.hud-leaderboard-row {
+  display: grid;
+  grid-template-columns: 17px 10px minmax(0, 1fr) 24px 24px;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 3px;
+  border-top: 1px solid rgba(51, 51, 45, 0.55);
+  font-size: 11px;
+}
+
+.hud-leaderboard-row:first-child {
+  border-top: 0;
+}
+
+.hud-leaderboard-row.is-player {
+  color: var(--warning);
+  background: rgba(255, 194, 51, 0.08);
+}
+
+.hud-leaderboard-rank,
+.hud-leaderboard-w,
+.hud-leaderboard-d {
+  color: var(--ash);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-leaderboard-row.is-player .hud-leaderboard-rank,
+.hud-leaderboard-row.is-player .hud-leaderboard-w {
+  color: var(--warning);
+}
+
+.hud-leaderboard-dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.hud-leaderboard-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.hud-leaderboard-out {
+  color: var(--ash);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.hud-leaderboard-w,
+.hud-leaderboard-d {
+  text-align: right;
+}
+
+/* Top-centre kill notifications. The full six-entry feed stays in the menu. */
+.hud-kill-feed {
+  position: absolute;
+  top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(420px, 34vw);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.hud-kill-feed-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 9px;
+  overflow: hidden;
+  background: rgba(11, 11, 10, 0.84);
+  border-left: 3px solid var(--signal);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.34);
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: nowrap;
+  animation: hud-feed-in 160ms ease-out;
+}
+
+.hud-kill-feed-killer {
+  overflow: hidden;
+  max-width: 13ch;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
+.hud-kill-feed-glyph {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--warning);
+}
+
+.hud-kill-feed-victim {
+  overflow: hidden;
+  max-width: 13ch;
+  color: var(--ash);
+  text-overflow: ellipsis;
 }
 
 .hud-toast {
   position: absolute;
   left: 50%;
-  top: calc(78px + env(safe-area-inset-top, 0px));
+  top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px) + 88px);
+  z-index: 19;
   transform: translateX(-50%);
   border: 2px solid currentColor;
   background: rgba(11, 11, 10, 0.94);
@@ -1164,6 +1408,367 @@ html:fullscreen body {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
   pointer-events: none;
 }
+
+@keyframes hud-feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- weapon circle (replaces the minimap) ---------- */
+
+.hud-weapon-circle-wrap {
+  position: absolute;
+  right: calc(var(--hud-pad) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--hud-pad) + env(safe-area-inset-bottom, 0px));
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+/* In pedal mode the fire control sits above the throttle cluster. */
+.hud-root[data-touch="true"][data-controls="pedals"] .hud-weapon-circle-wrap {
+  bottom: calc(
+    var(--hud-pad) + env(safe-area-inset-bottom, 0px) + var(--pedal-size) + 20px
+  );
+}
+
+.weapon-circle {
+  --weapon-color: var(--warning);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--weapon-size);
+  height: var(--weapon-size);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--weapon-color);
+  background: radial-gradient(
+    circle at 50% 34%,
+    rgba(255, 255, 255, 0.16),
+    rgba(11, 11, 10, 0.95) 68%
+  );
+  box-shadow: 0 0 0 3px rgba(11, 11, 10, 0.92), 0 0 0 5px var(--weapon-color),
+    0 18px 40px rgba(0, 0, 0, 0.58), inset 0 0 30px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 90ms ease, filter 90ms ease;
+  isolation: isolate;
+}
+
+.weapon-circle::before {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border: 2px dashed currentColor;
+  border-radius: inherit;
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+.weapon-circle:hover {
+  filter: brightness(1.12);
+}
+
+.weapon-circle:active,
+.weapon-circle[data-firing="true"] {
+  transform: scale(0.94);
+  filter: brightness(1.28);
+}
+
+.weapon-circle:disabled {
+  cursor: default;
+  filter: saturate(0.35) brightness(0.72);
+}
+
+.weapon-circle.is-empty {
+  --weapon-color: #6f6f65;
+}
+
+.weapon-circle-ring {
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 62%,
+    var(--weapon-color) 76%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  animation: weapon-circle-spin 4.5s linear infinite;
+  pointer-events: none;
+}
+
+.weapon-circle-core {
+  display: grid;
+  place-items: center;
+  width: 60%;
+  height: 60%;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.62);
+}
+
+.weapon-circle-glyph {
+  width: 72%;
+  height: 72%;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
+}
+
+.weapon-circle-ammo {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 5px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-display), Impact, "Arial Black", sans-serif;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.weapon-circle-rarity {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(242, 236, 221, 0.68);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.weapon-circle-name {
+  max-width: 16ch;
+  overflow: hidden;
+  color: var(--bone);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+.weapon-circle-mode {
+  display: none;
+  color: var(--ash);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+.hud-root[data-touch="true"] .weapon-circle-mode {
+  display: block;
+}
+
+@keyframes weapon-circle-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- touch controls ---------- */
+
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.touch-controls[data-disabled="true"] {
+  opacity: 0.45;
+}
+
+.virtual-stick {
+  position: absolute;
+  left: calc(var(--hud-pad) + env(safe-area-inset-left, 0px));
+  bottom: calc(var(--hud-pad) + env(safe-area-inset-bottom, 0px));
+  width: var(--stick-size);
+  height: var(--stick-size);
+  border-radius: 999px;
+  border: 2px solid rgba(242, 236, 221, 0.28);
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(242, 236, 221, 0.16),
+    rgba(11, 11, 10, 0.55) 58%,
+    rgba(11, 11, 10, 0.78)
+  );
+  box-shadow: inset 0 0 0 8px rgba(11, 11, 10, 0.24), 0 12px 28px rgba(0, 0, 0, 0.4);
+  opacity: 0.78;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 120ms ease, border-color 120ms ease;
+}
+
+.virtual-stick.is-active {
+  opacity: 0.96;
+  border-color: rgba(255, 194, 51, 0.55);
+}
+
+.virtual-stick[data-disabled="true"] {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.virtual-stick-ring {
+  position: absolute;
+  inset: 15%;
+  border: 1px dashed rgba(242, 236, 221, 0.18);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.virtual-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44%;
+  height: 44%;
+  margin: -22% 0 0 -22%;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 194, 51, 0.9);
+  background: radial-gradient(circle at 50% 32%, #4b4a41, var(--plate) 68%);
+  box-shadow: 0 0 0 6px rgba(255, 194, 51, 0.09), 0 8px 18px rgba(0, 0, 0, 0.5);
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+
+.virtual-stick.is-active .virtual-stick-knob {
+  transition: none;
+}
+
+.virtual-stick-heading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--warning);
+  box-shadow: 0 0 12px rgba(255, 194, 51, 0.8);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 90ms ease;
+  pointer-events: none;
+}
+
+.virtual-stick-label {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  transform: translateX(-50%);
+  color: rgba(242, 236, 221, 0.5);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* Pedal layout: steering on the left, throttle/reverse on the right. Every
+   pedal tracks its own pointer, so steering and accelerating are independent. */
+.touch-pedals {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pedal-cluster {
+  position: absolute;
+  bottom: calc(var(--hud-pad) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: clamp(8px, 1.4vmin, 14px);
+  pointer-events: none;
+}
+
+.pedal-cluster-steer {
+  left: calc(var(--hud-pad) + env(safe-area-inset-left, 0px));
+}
+
+.pedal-cluster-throttle {
+  right: calc(var(--hud-pad) + env(safe-area-inset-right, 0px));
+}
+
+.pedal-button {
+  display: grid;
+  place-items: center;
+  width: var(--pedal-size);
+  height: var(--pedal-size);
+  padding: 0;
+  border: 2px solid rgba(242, 236, 221, 0.3);
+  border-radius: 22%;
+  background: linear-gradient(180deg, rgba(29, 29, 26, 0.94), rgba(11, 11, 10, 0.9));
+  color: var(--bone);
+  box-shadow: inset 0 0 0 5px rgba(11, 11, 10, 0.28), 0 10px 24px rgba(0, 0, 0, 0.42);
+  font-size: clamp(20px, 5vmin, 30px);
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 70ms ease, border-color 90ms ease, background 90ms ease;
+}
+
+.pedal-button-forward {
+  border-color: rgba(255, 194, 51, 0.52);
+  color: var(--warning);
+}
+
+.pedal-button-reverse {
+  color: var(--ash);
+}
+
+.pedal-button[data-held="true"] {
+  transform: scale(0.94);
+  border-color: var(--bone);
+  background: linear-gradient(180deg, rgba(255, 194, 51, 0.24), rgba(11, 11, 10, 0.94));
+}
+
+.pedal-button:disabled {
+  opacity: 0.4;
+}
+
+/* ---------- shared match widgets ---------- */
 
 .kill-feed {
   display: flex;
@@ -1258,197 +1863,27 @@ html:fullscreen body {
   margin-top: 22px;
 }
 
-/* ---------- responsive HUD & touch controls ---------- */
+/* ---------- responsive breakpoints ---------- */
 
-/* ---------- weapon circle (replaces the minimap) ---------- */
-
-.hud-weapon-circle-wrap {
-  position: absolute;
-  right: calc(10px + env(safe-area-inset-right, 0px));
-  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  z-index: 16;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  pointer-events: none;
-}
-
-.weapon-circle {
-  --weapon-color: var(--warning);
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: clamp(104px, 15vw, 148px);
-  height: clamp(104px, 15vw, 148px);
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  color: var(--weapon-color);
-  background: radial-gradient(
-    circle at 50% 34%,
-    rgba(255, 255, 255, 0.16),
-    rgba(11, 11, 10, 0.95) 68%
-  );
-  box-shadow: 0 0 0 3px rgba(11, 11, 10, 0.92), 0 0 0 5px var(--weapon-color),
-    0 18px 40px rgba(0, 0, 0, 0.58), inset 0 0 30px rgba(0, 0, 0, 0.7);
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 90ms ease, filter 90ms ease;
-  isolation: isolate;
-}
-
-.weapon-circle::before {
-  content: "";
-  position: absolute;
-  inset: 7%;
-  border: 2px dashed currentColor;
-  border-radius: inherit;
-  opacity: 0.32;
-  pointer-events: none;
-}
-
-.weapon-circle:hover {
-  filter: brightness(1.12);
-}
-
-.weapon-circle:active,
-.weapon-circle[data-firing="true"] {
-  transform: scale(0.94);
-  filter: brightness(1.28);
-}
-
-.weapon-circle:disabled {
-  cursor: default;
-  filter: saturate(0.35) brightness(0.72);
-}
-
-.weapon-circle.is-empty {
-  --weapon-color: #6f6f65;
-}
-
-.weapon-circle-ring {
-  position: absolute;
-  inset: -6px;
-  z-index: -1;
-  border-radius: inherit;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0 62%,
-    var(--weapon-color) 76%,
-    transparent 100%
-  );
-  opacity: 0.55;
-  animation: weapon-circle-spin 4.5s linear infinite;
-  pointer-events: none;
-}
-
-.weapon-circle-core {
-  display: grid;
-  place-items: center;
-  width: 60%;
-  height: 60%;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.62);
-}
-
-.weapon-circle-glyph {
-  width: 72%;
-  height: 72%;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
-}
-
-.weapon-circle-ammo {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 6px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--bone);
-  color: var(--ink);
-  font-family: var(--font-display), Impact, "Arial Black", sans-serif;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.weapon-circle-rarity {
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(242, 236, 221, 0.68);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.weapon-circle-name {
-  max-width: 16ch;
-  overflow: hidden;
-  color: var(--bone);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-  text-align: center;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  white-space: nowrap;
-}
-
-@keyframes weapon-circle-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (min-width: 640px) {
-  .hud-top {
-    gap: 14px;
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+@media (max-width: 767px) {
+  .hud-root {
+    --hud-pad: clamp(8px, 2vmin, 14px);
+    --stick-size: clamp(120px, 20vmin, 140px);
+    --weapon-size: clamp(68px, 12vmin, 84px);
+    --pedal-size: clamp(64px, 16vmin, 80px);
   }
 
-  .hud-clock {
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    min-width: 104px;
-    padding: 6px 18px 7px;
-  }
-
-  .hud-toast {
-    top: calc(88px + env(safe-area-inset-top, 0px));
-  }
-
-  .hud-menu-text {
-    display: inline;
-  }
-
-  .hud-weapon-circle-wrap {
-    right: calc(14px + env(safe-area-inset-right, 0px));
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-@media (max-width: 639px) {
   .hud-player-panel {
-    width: min(248px, 38vw);
+    width: min(220px, 44vw);
     padding: 6px 8px 7px;
+  }
+
+  .hud-leaderboard {
+    width: min(208px, 44vw);
+  }
+
+  .hud-kill-feed {
+    width: min(300px, 34vw);
   }
 
   .hud-clock {
@@ -1457,7 +1892,7 @@ html:fullscreen body {
   }
 
   .hud-clock-time {
-    font-size: 23px;
+    font-size: 22px;
   }
 
   .hud-clock-goal {
@@ -1484,112 +1919,80 @@ html:fullscreen body {
   .hud-weapon-ammo {
     font-size: 16px;
   }
-}
 
-.touch-controls {
-  position: absolute;
-  inset: 0;
-  z-index: 15;
-  display: none;
-  pointer-events: none;
-}
-
-.touch-stick {
-  pointer-events: auto;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.touch-stick {
-  position: absolute;
-  left: calc(16px + env(safe-area-inset-left, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  width: clamp(112px, 30vw, 138px);
-  height: clamp(112px, 30vw, 138px);
-  border-radius: 999px;
-  border: 2px solid rgba(242, 236, 221, 0.28);
-  background: radial-gradient(
-    circle at 50% 42%,
-    rgba(242, 236, 221, 0.16),
-    rgba(11, 11, 10, 0.55) 58%,
-    rgba(11, 11, 10, 0.78)
-  );
-  box-shadow: inset 0 0 0 8px rgba(11, 11, 10, 0.24), 0 12px 28px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
-}
-
-.touch-stick-ring {
-  position: absolute;
-  inset: 15%;
-  border: 1px dashed rgba(242, 236, 221, 0.18);
-  border-radius: 999px;
-}
-
-.touch-stick-knob {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 44%;
-  height: 44%;
-  margin: -22% 0 0 -22%;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 194, 51, 0.9);
-  background: radial-gradient(circle at 50% 32%, #4b4a41, var(--plate) 68%);
-  box-shadow: 0 0 0 6px rgba(255, 194, 51, 0.09), 0 8px 18px rgba(0, 0, 0, 0.5);
-  transition: transform 70ms linear;
-}
-
-.touch-stick.is-active .touch-stick-knob {
-  transition: none;
-}
-
-.touch-stick-label {
-  position: absolute;
-  left: 50%;
-  bottom: 7px;
-  transform: translateX(-50%);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(242, 236, 221, 0.5);
-}
-
-@media (pointer: coarse), (max-width: 767px) {
-  .touch-controls {
-    display: block;
+  .hud-icon-button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0 9px;
   }
 
-  .hud-drive,
-  .hud-keyhints {
+  .hud-menu-text {
     display: none;
   }
 }
 
-@media (max-height: 560px) and (pointer: coarse) {
-  .touch-stick {
-    width: 104px;
-    height: 104px;
+@media (min-width: 720px) {
+  .hud-menu-text {
+    display: inline;
   }
+}
 
-  .hud-weapon-circle-wrap {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .weapon-circle {
-    width: 92px;
-    height: 92px;
+/* Tablet-sized touch screens get larger targets and more breathing room.
+   The min-height check keeps a landscape phone (844x390) on mobile sizes. */
+@media (any-pointer: coarse) and (min-width: 768px) and (min-height: 600px) {
+  .hud-root {
+    --hud-pad: clamp(14px, 2vmin, 22px);
+    --stick-size: clamp(140px, 20vmin, 160px);
+    --weapon-size: clamp(84px, 12vmin, 100px);
+    --pedal-size: clamp(72px, 16vmin, 92px);
   }
 
   .hud-player-panel {
-    width: min(230px, 36vw);
+    width: min(300px, 34vw);
+  }
+
+  .hud-leaderboard {
+    width: min(290px, 30vw);
+  }
+
+  .hud-kill-feed {
+    width: min(420px, 36vw);
+  }
+
+  .hud-clock-time {
+    font-size: clamp(28px, 3.2vmin, 34px);
+  }
+
+  .hud-leaderboard-row {
+    min-height: 27px;
+    font-size: 12px;
+  }
+}
+
+/* Desktop keeps the full keyboard HUD and the full-size fire control. */
+@media (pointer: fine) and (min-width: 1024px) {
+  .hud-root {
+    --hud-pad: clamp(14px, 1.6vmin, 24px);
+    --weapon-size: clamp(104px, 10vmin, 132px);
+  }
+
+  .hud-leaderboard {
+    width: min(260px, 24vw);
+  }
+}
+
+/* Short landscape phones: trim secondary labels before they crowd the track. */
+@media (max-height: 500px) {
+  .hud-player-panel {
+    width: min(230px, 38vw);
+  }
+
+  .hud-leaderboard {
+    width: min(220px, 34vw);
   }
 
   .hud-clock {
-    padding: 4px 9px;
+    padding: 3px 9px 4px;
   }
 
   .hud-clock-time {
@@ -1597,21 +2000,107 @@ html:fullscreen body {
   }
 
   .hud-clock-goal {
-    font-size: 8px;
+    display: none;
+  }
+
+  .weapon-circle-mode {
+    display: none !important;
+  }
+
+  .hud-kill-feed-row:nth-child(n + 3) {
+    display: none;
   }
 
   .hud-toast {
-    top: calc(68px + env(safe-area-inset-top, 0px));
+    top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px) + 64px);
+  }
+}
+
+@media (max-height: 380px) {
+  .hud-root {
+    --stick-size: 108px;
+    --weapon-size: 64px;
+    --pedal-size: 60px;
+  }
+
+  .hud-player-panel {
+    width: min(190px, 42vw);
+  }
+
+  .hud-leaderboard {
+    width: min(180px, 42vw);
+  }
+
+  .hud-kill-feed {
+    width: min(250px, 30vw);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .touch-stick-knob,
+  .virtual-stick-knob,
+  .virtual-stick-heading,
   .weapon-circle,
-  .weapon-circle-ring {
+  .weapon-circle-ring,
+  .hud-kill-feed-row,
+  .hud-leaderboard-chevron {
     transition: none;
     animation: none;
   }
+}
+
+/* Touch layout picker in the game menu. */
+.hud-scheme {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hud-scheme-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  background: var(--ink);
+  color: var(--bone);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.hud-scheme-button:hover {
+  border-color: var(--bone);
+}
+
+.hud-scheme-button.is-active {
+  border-color: var(--warning);
+  background: rgba(255, 194, 51, 0.1);
+}
+
+.hud-scheme-glyph {
+  flex: none;
+  color: var(--warning);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hud-scheme-button strong,
+.hud-scheme-button small {
+  display: block;
+}
+
+.hud-scheme-button strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hud-scheme-button small {
+  margin-top: 2px;
+  color: var(--ash);
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 /* ---------- game menu drawer ---------- */
