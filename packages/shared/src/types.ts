@@ -14,7 +14,29 @@ export type ChainTheme = "dark" | "light" | "neon";
 export type ChainGridStyle = "2d" | "3d";
 export type CpuDifficulty = "easy" | "medium" | "hard";
 
-export type SmashMapId = "foundry" | "scrapyard" | "rooftop";
+export type SmashMapId =
+  | "quarry-clash"
+  | "hollow-graveyard"
+  | "ironkeep-fort"
+  | "magma-crossing"
+  | "drift-island"
+  | "velocity-park"
+  | "frost-circuit"
+  | "orbital-arena"
+  | "apex-speedway"
+  | "glacier-slide"
+  | "skyfall"
+  | "pinball-core"
+  | "sky-showdown"
+  | "celestial-temples"
+  | "sky-tunnels"
+  | "cloudbreak"
+  | "neon-district"
+  | "circuit-underground"
+  | "reactor-core"
+  | "hyperlane-2099"
+  | "holo-arena"
+  | "chrome-port";
 export type SmashWeaponId =
   | "machinegun"
   | "bullets"

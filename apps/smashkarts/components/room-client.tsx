@@ -19,7 +19,7 @@ import {
 import { useGameRoom } from "@yaply/shared/react";
 import type { ConnectionStatus } from "@yaply/shared/client";
 import type { GameEngine } from "@/game/engine";
-import { MAP_LIST } from "@/game/maps";
+import { DEFAULT_MAP, MAP_LIST } from "@/game/maps";
 import { DURATION_OPTIONS, KILL_OPTIONS } from "@/lib/settings";
 import {
   REALTIME_URL,
@@ -75,7 +75,7 @@ function readHostSettings(params: URLSearchParams): GameSettings {
       2,
       SMASH_MAX_PLAYERS,
     ),
-    mapId: isSmashMapId(map) ? map : "foundry",
+    mapId: isSmashMapId(map) ? map : DEFAULT_MAP,
     killTarget: numberParam(
       params.get("kill"),
       DEFAULT_GAME_SETTINGS.killTarget ?? 20,
@@ -414,7 +414,7 @@ function ConnectedRoom({
           role={isHost ? "online-host" : "online-guest"}
           localPlayerId={playerId}
           round={snapshot.roundNumber}
-          mapId={roomSettings.mapId ?? "foundry"}
+          mapId={roomSettings.mapId ?? DEFAULT_MAP}
           killTarget={roomSettings.killTarget ?? 20}
           duration={roomSettings.durationSeconds ?? 300}
           players={roomPlayers}

@@ -37,13 +37,21 @@ export const BOT_COLORS = [
 ] as const;
 
 export const KART = {
-  /** Matches the 2.1 x 3.5 chassis built in kart-mesh.ts. */
-  width: 2.1,
-  length: 3.5,
-  radius: 1.45,
+  /** maps.md reference chassis: 3.2 long, 2.0 wide, 1.5 tall. */
+  width: 2.0,
+  length: 3.2,
+  height: 1.5,
+  wheelbase: 2.0,
+  wheelRadius: 0.4,
+  groundClearance: 0.25,
+  mass: 180,
+  centreOfMass: 0.65,
+  /** Collision radius. Slightly larger than half the width so karts never
+   * visually overlap during a side impact. */
+  radius: 1.2,
   /** A rise above this is a wall, not a drivable step. Kept above the
-   * per-frame climb of a boosted kart on the steepest 26-degree ramp. */
-  stepHeight: 0.9,
+   * per-frame climb of a boosted kart on a 25-degree ramp at 60 Hz. */
+  stepHeight: 0.62,
   maxSpeed: 23,
   boostSpeed: 33,
   accel: 30,
@@ -80,6 +88,11 @@ export const OBSTACLE_RULES: Record<
   furnace: { solid: true, climbable: false, blocksProjectiles: true },
   // Waist-high planters stop karts but shots clear the foliage.
   planter: { solid: true, climbable: false, blocksProjectiles: false },
+  rock: { solid: true, climbable: false, blocksProjectiles: true },
+  container: { solid: true, climbable: false, blocksProjectiles: true },
+  bumper: { solid: true, climbable: false, blocksProjectiles: true },
+  log: { solid: true, climbable: true, blocksProjectiles: false },
+  crystal: { solid: true, climbable: false, blocksProjectiles: true },
 };
 
 /**

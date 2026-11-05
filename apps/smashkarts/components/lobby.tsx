@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { KART_COLORS } from "@/game/constants";
 import { MAP_LIST } from "@/game/maps";
+import { MapPreview } from "@/components/map-preview";
 import { MAIN_URL } from "@/lib/config";
 import {
   BOT_OPTIONS,
@@ -172,7 +173,7 @@ export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps
                     onClick={() => setMapId(map.id)}
                   >
                     <span className="map-choice-thumb">
-                      <img src={`/media/${map.id}.jpg`} alt="" width={132} height={88} loading="lazy" />
+                      <MapPreview map={map} detail="thumb" className="map-preview" />
                     </span>
                     <span>
                       <strong>{map.name}</strong>
@@ -268,12 +269,7 @@ export function Lobby({ initial, onStart, onCreateRoom, onJoinRoom }: LobbyProps
 
           <div className="lobby-preview">
             <div className="lobby-preview-image">
-              <img
-                src={`/media/${selected.id}.jpg`}
-                alt={`Preview of the ${selected.name} arena.`}
-                width={1280}
-                height={720}
-              />
+              <MapPreview map={selected} className="map-preview" />
               <span className="hero-caption">{selected.tagline}</span>
             </div>
             <div className="lobby-preview-body">

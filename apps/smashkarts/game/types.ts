@@ -1,6 +1,46 @@
 import type { SmashInput, SmashMatchSnapshot, SmashWeaponId } from "@yaply/shared/types";
 
-export type MapId = "foundry" | "scrapyard" | "rooftop";
+/**
+ * The 22 production arenas from the maps.md blueprint. IDs are stable because
+ * they are the only map data synchronised over the wire: every client rebuilds
+ * the exact same collision geometry from the same deterministic definition.
+ */
+export type MapId =
+  | "quarry-clash"
+  | "hollow-graveyard"
+  | "ironkeep-fort"
+  | "magma-crossing"
+  | "drift-island"
+  | "velocity-park"
+  | "frost-circuit"
+  | "orbital-arena"
+  | "apex-speedway"
+  | "glacier-slide"
+  | "skyfall"
+  | "pinball-core"
+  | "sky-showdown"
+  | "celestial-temples"
+  | "sky-tunnels"
+  | "cloudbreak"
+  | "neon-district"
+  | "circuit-underground"
+  | "reactor-core"
+  | "hyperlane-2099"
+  | "holo-arena"
+  | "chrome-port";
+
+export type ArenaClass = "compact" | "standard" | "large" | "racing" | "vertical" | "sky";
+
+export type SurfaceKind =
+  | "asphalt"
+  | "concrete"
+  | "dirt"
+  | "sand"
+  | "snow"
+  | "ice"
+  | "metal"
+  | "wet"
+  | "futuristic";
 
 export type WeaponId = SmashWeaponId;
 export type WeaponSlot = WeaponId | "none";
@@ -15,6 +55,12 @@ export type ProjectileKind =
 
 export type EngineMode = "local" | "online-host" | "online-guest";
 
+/**
+ * Collision categories from maps.md. Solid and climbable objects block karts;
+ * decorative objects never do, even when their visual mesh is large.
+ */
+export type ObstacleCategory = "solid" | "climbable" | "decorative";
+
 export type ObstacleKind =
   | "crate"
   | "concrete"
@@ -24,7 +70,12 @@ export type ObstacleKind =
   | "wreck"
   | "barrier"
   | "furnace"
-  | "planter";
+  | "planter"
+  | "rock"
+  | "container"
+  | "bumper"
+  | "log"
+  | "crystal";
 
 export type SceneryKind =
   | "lamp"
@@ -35,7 +86,20 @@ export type SceneryKind =
   | "barrel"
   | "fan"
   | "stack"
-  | "skyline";
+  | "skyline"
+  | "headstone"
+  | "pine"
+  | "palm"
+  | "snowman"
+  | "torii"
+  | "flag"
+  | "hologram"
+  | "antenna"
+  | "tunnelCeiling"
+  | "reactor";
+
+/** Deterministic ambient particle scheme from maps.md section 16. */
+export type WeatherKind = "rain" | "snow" | "ash" | "sparks";
 
 export interface ObstacleDef {
   x: number;
@@ -49,9 +113,18 @@ export interface ObstacleDef {
   base?: number;
   /** Heading of the box's local +X axis in the X/Z plane. */
   rot?: number;
+  /**
+   * Explicit gameplay classification. When omitted it derives from the kind.
+   * `decorative` objects are excluded from kart and projectile collision.
+   */
+  category?: ObstacleCategory;
+  /** Climbs allowed for `climbable` objects; stored in degrees. */
+  climbDegrees?: number;
+  /** Surface the object presents when driven over. */
+  surface?: SurfaceKind;
 }
 
-export type HazardKind = "lava" | "sludge" | "void";
+export type HazardKind = "lava" | "sludge" | "void" | "water";
 
 export interface HazardDef {
   x: number;
@@ -70,9 +143,11 @@ export interface MapRoute {
   name: string;
   kind: "main" | "secondary";
   waypoints: Array<[number, number]>;
+  /** Closed loops wrap from the last waypoint back to the first. */
+  closed: boolean;
 }
 
-export type PlatformKind = "steel" | "wreck" | "roof";
+export type PlatformKind = "steel" | "wreck" | "roof" | "bridge" | "temple" | "hologram";
 
 export interface PlatformDef {
   x: number;
@@ -82,6 +157,15 @@ export interface PlatformDef {
   height: number;
   kind: PlatformKind;
   color?: number;
+  /** Heading of the deck's local +X axis in the X/Z plane. */
+  rot?: number;
+  /** Driving surface of the deck. */
+  surface?: SurfaceKind;
+  /**
+   * Underside height. Bridges have clearance below them, so a kart can drive
+   * through the gap instead of being blocked by an invisible column.
+   */
+  clearance?: number;
 }
 
 export interface RampDef {
@@ -96,6 +180,9 @@ export interface RampDef {
   dir: 1 | -1;
   kind: PlatformKind;
   color?: number;
+  /** Vertical profile. `quarter` is the classic skate-park transition. */
+  profile?: "linear" | "smooth" | "quarter";
+  surface?: SurfaceKind;
 }
 
 export interface SceneryDef {
@@ -106,6 +193,11 @@ export interface SceneryDef {
   rot?: number;
   color?: number;
   text?: string;
+  /** Structural scenery (tunnel shells) spans these half-extents. */
+  hx?: number;
+  hz?: number;
+  /** Structural height, measured from `y`. */
+  height?: number;
 }
 
 export interface LightDef {
@@ -130,7 +222,7 @@ export interface MapTheme {
   fogNear: number;
   fogFar: number;
   ground: number;
-  groundStyle: "concrete" | "sand" | "asphalt";
+  groundStyle: "concrete" | "sand" | "asphalt" | "snow" | "metal" | "grass";
   sun: number;
   sunIntensity: number;
   sunPosition: [number, number, number];
@@ -142,16 +234,82 @@ export interface MapTheme {
   wallHeight: number;
 }
 
+/** A smooth elevation feature. Heights come from a Gaussian or plateau. */
+export interface TerrainFeature {
+  kind: "mound" | "depression" | "plateau";
+  x: number;
+  z: number;
+  /** Signed peak height. Negative values sink the terrain. */
+  height: number;
+  /** Horizontal spread along X and Z. */
+  radiusX: number;
+  radiusZ: number;
+  /** Fraction of the radius that stays flat (plateaus only). */
+  flat?: number;
+  /** Heading of the elliptical footprint. */
+  rot?: number;
+  surface?: SurfaceKind;
+}
+
+export interface TerrainDef {
+  features: TerrainFeature[];
+  /** Low-amplitude deterministic undulation, in units. */
+  undulation?: number;
+  /** Dominant surface where no feature or road overrides it. */
+  surface: SurfaceKind;
+  /** Deterministic phase for undulation. */
+  seed?: number;
+}
+
+export interface RoadDef {
+  name: string;
+  kind: "main" | "secondary" | "connector";
+  /**
+   * Catmull-Rom control points. A third component is an explicit elevation;
+   * omitted elevations follow the terrain beneath the centreline.
+   */
+  points: Array<[number, number] | [number, number, number]>;
+  width: number;
+  surface: SurfaceKind;
+  closed?: boolean;
+  /** Signed cross-slope, radians. Positive banks the left edge upward. */
+  banking?: number;
+  /** Height above the sampled terrain. */
+  lift?: number;
+}
+
+export interface ArenaTargets {
+  footprintMin: number;
+  footprintMax: number;
+  hazardMin: number;
+  hazardMax: number;
+  openCombatMin: number;
+}
+
 export interface MapDef {
   id: MapId;
   name: string;
   tagline: string;
   description: string;
+  arenaClass: ArenaClass;
   /** Arena width along X. */
   size: number;
   /** Arena depth along Z. Square arenas reuse `size`. */
   depth: number;
+  /** Optional preview image. Defaults fall back to a themed CSS preview. */
+  preview?: string;
+  /**
+   * Multiplier applied to tyre grip. Slick arenas use a lower value so the
+   * kart keeps lateral momentum through a corner.
+   */
+  grip?: number;
+  /** Deterministic seed used for the map's procedural details. */
+  seed: number;
+  /** Ambient weather; purely visual and never affects collision. */
+  weather?: WeatherKind;
   theme: MapTheme;
+  terrain: TerrainDef;
+  roads: RoadDef[];
   obstacles: ObstacleDef[];
   platforms: PlatformDef[];
   ramps: RampDef[];
@@ -164,6 +322,7 @@ export interface MapDef {
   waypoints: Array<[number, number]>;
   routes: MapRoute[];
   pickups: Array<[number, number]>;
+  targets: ArenaTargets;
 }
 
 export interface OnlinePlayer {

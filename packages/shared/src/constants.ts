@@ -50,7 +50,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   confirmMoves: false,
   vsCpu: false,
   cpuDifficulty: "medium",
-  mapId: "foundry",
+  mapId: "quarry-clash",
   killTarget: 20,
   durationSeconds: 300,
 };
@@ -61,7 +61,30 @@ export const SMASH_KILL_TARGET_MIN = 5;
 export const SMASH_KILL_TARGET_MAX = 100;
 export const SMASH_DURATION_MIN_SECONDS = 60;
 export const SMASH_DURATION_MAX_SECONDS = 1800;
-export const SMASH_MAP_IDS: SmashMapId[] = ["foundry", "scrapyard", "rooftop"];
+export const SMASH_MAP_IDS: SmashMapId[] = [
+  "quarry-clash",
+  "hollow-graveyard",
+  "ironkeep-fort",
+  "magma-crossing",
+  "drift-island",
+  "velocity-park",
+  "frost-circuit",
+  "orbital-arena",
+  "apex-speedway",
+  "glacier-slide",
+  "skyfall",
+  "pinball-core",
+  "sky-showdown",
+  "celestial-temples",
+  "sky-tunnels",
+  "cloudbreak",
+  "neon-district",
+  "circuit-underground",
+  "reactor-core",
+  "hyperlane-2099",
+  "holo-arena",
+  "chrome-port",
+];
 export const SMASH_WEAPON_IDS: SmashWeaponId[] = [
   "machinegun",
   "bullets",

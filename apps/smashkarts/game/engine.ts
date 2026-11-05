@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { buildArena, groundHeightAt, type ArenaWorld } from "./world";
+import { groundSurfaceAt, sampleTerrain } from "./terrain";
+import { lateralGripFactor, surfaceSpec } from "./surfaces";
 import { buildKart, disposeObject, type KartVisual } from "./kart-mesh";
 import { buildPickup, type PickupVisual } from "./pickup-mesh";
 import { GameAudio } from "./audio";
@@ -76,6 +78,8 @@ interface KartActor {
   driftCharge: number;
   wheelSpin: number;
   bodyRoll: number;
+  /** Visual-only suspension travel in arena units, damped to zero. */
+  suspension: number;
   ai: BotBrain | null;
 }
 
@@ -609,6 +613,7 @@ export class GameEngine {
       driftCharge: 0,
       wheelSpin: 0,
       bodyRoll: 0,
+      suspension: 0,
       ai,
     };
   }
@@ -697,6 +702,7 @@ export class GameEngine {
     kart.alive = true;
     kart.drifting = false;
     kart.driftCharge = 0;
+    kart.suspension = 0;
     kart.visual.group.visible = true;
     kart.visual.group.position.set(x, kart.y, z);
     kart.visual.group.rotation.y = kart.yaw;
@@ -777,6 +783,9 @@ export class GameEngine {
       this.updateTimers(kart, dt);
       this.driveKart(kart, dt);
       this.resolveWorldCollision(kart);
+      if (kart.y < -14) {
+        this.damageKart(kart, 1000, kart.id, "nuke");
+      }
       this.checkHazards(kart);
       this.collectPickups(kart);
       this.tryFire(kart);
@@ -1296,13 +1305,31 @@ export class GameEngine {
     const boosting = kart.boostTime > 0;
     const slowed = kart.slowTime > 0;
     const maxSpeed = (boosting ? KART.boostSpeed : KART.maxSpeed) * (slowed ? 0.62 : 1);
-    const accel = KART.accel * (boosting ? 1.6 : 1) * (slowed ? 0.55 : 1);
+
+    // Surface and slope sample at the kart's current contact point. The
+    // physics timestep is fixed, so every coefficient below is frame-rate safe.
+    const sample = sampleTerrain(this.arenaMap, kart.x, kart.z, kart.y + 0.6);
+    const spec = surfaceSpec(sample.surface);
+    const mapGrip = this.arenaMap.grip ?? 1;
+    const accel =
+      KART.accel *
+      spec.traction *
+      mapGrip *
+      (boosting ? 1.6 : 1) *
+      (slowed ? 0.55 : 1);
 
     const steer = Math.abs(input.steer) > 0.05 ? input.steer : 0;
     const speedRatio = clamp(Math.abs(kart.speed) / 9, 0, 1);
-    const reverseFactor = kart.speed < -0.5 ? -1 : 1;
-    const turnRate = KART.steer * (boosting ? 1.08 : 1) * (kart.drifting ? 1.28 : 1);
-    kart.yaw = wrapAngle(kart.yaw + steer * turnRate * speedRatio * reverseFactor * dt);
+    const reverseSign = kart.speed < -0.5 ? -1 : 1;
+
+    // Bicycle model: R = L / tan(delta), yaw rate = v / R. Steering angle
+    // shrinks with speed, and the low-speed floor keeps parked karts steerable.
+    const steerAngle = steer * (0.2 + 0.14 * (1 - speedRatio));
+    const turnSpeed = Math.max(Math.abs(kart.speed), 2.6);
+    const rawYawRate = (turnSpeed / KART.wheelbase) * Math.tan(steerAngle);
+    const yawLimit = KART.steer * Math.max(0.18, speedRatio);
+    const yawRate = Math.sign(steerAngle) * Math.min(Math.abs(rawYawRate), yawLimit);
+    kart.yaw = wrapAngle(kart.yaw + yawRate * reverseSign * (kart.drifting ? 1.14 : 1) * dt);
 
     const wantsDrift =
       input.drift && Math.abs(steer) > 0.15 && Math.abs(kart.speed) > 7 && kart.alive;
@@ -1327,17 +1354,47 @@ export class GameEngine {
     let forwardSpeed = kart.vx * forwardX + kart.vz * forwardZ;
     let lateralSpeed = kart.vx * rightX + kart.vz * rightZ;
 
+    const ahead = groundHeightAt(
+      this.arenaMap,
+      kart.x + forwardX * 0.9,
+      kart.z + forwardZ * 0.9,
+      kart.y + 0.8,
+    );
+    const behind = groundHeightAt(
+      this.arenaMap,
+      kart.x - forwardX * 0.9,
+      kart.z - forwardZ * 0.9,
+      kart.y + 0.8,
+    );
+    const slope = (ahead - behind) / 1.8;
+    const slopeAngle = Math.atan(slope);
+    // F_parallel = mg sin(theta). A small deadzone keeps flat arenas from
+    // creeping, while real ramps and mounds pull the kart downhill.
+    const gravityAlong = -9.81 * Math.sin(slopeAngle);
+    const slopeCreep = Math.sign(gravityAlong) * Math.max(0, Math.abs(gravityAlong) - 0.55);
+    forwardSpeed += slopeCreep * dt;
+
     if (input.throttle > 0) {
-      forwardSpeed += accel * input.throttle * dt;
+      // F_drive <= mu N: on an incline the available acceleration falls off as
+      // tan(theta) approaches the surface friction coefficient.
+      const requiredTraction = Math.max(0, Math.tan(slopeAngle));
+      const tractionLimit =
+        requiredTraction > 0.001
+          ? clamp((spec.traction * mapGrip) / requiredTraction, 0.08, 1)
+          : 1;
+      forwardSpeed += accel * tractionLimit * input.throttle * dt;
     } else if (input.throttle < 0) {
       const decel = forwardSpeed > 1 ? KART.brake : accel * 0.7;
       forwardSpeed -= decel * Math.abs(input.throttle) * dt;
     }
 
-    forwardSpeed -= forwardSpeed * KART.drag * dt;
+    forwardSpeed -= forwardSpeed * KART.drag * spec.rolling * dt;
     forwardSpeed = clamp(forwardSpeed, -KART.reverseMax, maxSpeed);
 
-    const grip = kart.drifting ? KART.driftGrip : KART.grip;
+    const grip =
+      (kart.drifting ? KART.driftGrip : KART.grip) *
+      lateralGripFactor(sample.surface) *
+      mapGrip;
     lateralSpeed *= Math.max(0, 1 - grip * dt);
     if (kart.drifting) {
       lateralSpeed -= steer * Math.abs(forwardSpeed) * 0.24 * dt;
@@ -1346,6 +1403,7 @@ export class GameEngine {
     kart.vx = forwardX * forwardSpeed + rightX * lateralSpeed;
     kart.vz = forwardZ * forwardSpeed + rightZ * lateralSpeed;
     kart.speed = forwardSpeed;
+    kart.suspension = damp(kart.suspension, kart.grounded ? 0 : -0.04, 8, dt);
 
     const previousX = kart.x;
     const previousZ = kart.z;
@@ -1354,6 +1412,7 @@ export class GameEngine {
 
     // Ramps and platform decks are continuous surfaces. A rise larger than a
     // step is a side wall: refuse the move instead of teleporting the kart up.
+    const previousGround = groundHeightAt(this.arenaMap, previousX, previousZ, kart.y + 0.6);
     const ground = groundHeightAt(this.arenaMap, kart.x, kart.z, kart.y + 0.5);
     const rise = ground - kart.y;
     if (rise > KART.stepHeight) {
@@ -1361,21 +1420,34 @@ export class GameEngine {
       kart.z = previousZ;
       kart.vx *= 0.15;
       kart.vz *= 0.15;
-    } else if (kart.grounded && kart.vy <= 0 && rise > -0.7) {
+    } else if (kart.grounded && rise < -0.12 && kart.vy > 4) {
+      // The ramp just fell away beneath the wheels: keep the vertical velocity
+      // the climb generated and let projectile motion carry the kart.
+      kart.grounded = false;
+    } else if (kart.grounded && rise > -1.1) {
+      const climbRate = (ground - previousGround) / Math.max(0.001, dt);
+      kart.vy = clamp(climbRate, 0, 16);
       kart.y = ground;
-      kart.vy = 0;
     } else {
+      kart.grounded = false;
+    }
+
+    if (!kart.grounded) {
       kart.vy -= 32 * dt;
       kart.y += kart.vy * dt;
       if (kart.y <= ground) {
-        if (!kart.grounded && kart.vy < -5) {
-          this.smoke.burst(kart.x, ground + 0.2, kart.z, 0x6b6357, 5, 2.2, 0.9, 0.4, 1);
+        if (kart.vy < -5) {
+          const impact = clamp(-kart.vy / 24, 0, 1);
+          kart.suspension = -0.08 - impact * 0.24;
+          kart.vx *= 1 - 0.22 * impact;
+          kart.vz *= 1 - 0.22 * impact;
+          if (kart.vy < -9) {
+            this.smoke.burst(kart.x, ground + 0.2, kart.z, 0x6b6357, 6, 2.4, 0.9, 0.4, 1);
+          }
         }
         kart.y = ground;
         kart.vy = 0;
         kart.grounded = true;
-      } else {
-        kart.grounded = false;
       }
     }
 
@@ -1386,7 +1458,7 @@ export class GameEngine {
       const rearZ = kart.z - forwardZ * 1.2;
       this.sparks.spawn({
         x: rearX - rightX * steer * 0.8,
-        y: 0.2,
+        y: kart.y + 0.2,
         z: rearZ - rightZ * steer * 0.8,
         vx: -kart.vx * 0.2 + (Math.random() - 0.5) * 3,
         vy: 1.5 + Math.random() * 2,
@@ -1402,10 +1474,12 @@ export class GameEngine {
 
   /** Launch pads give a short burst with a per-kart cooldown. */
   private checkBoostPads(kart: KartActor) {
-    if (kart.boostPadCooldown > 0 || kart.y > 0.8) {
+    if (kart.boostPadCooldown > 0) {
       return;
     }
     for (const pad of this.arenaMap.boostPads) {
+      const padY = groundHeightAt(this.arenaMap, pad.x, pad.z, kart.y + 0.5);
+      if (Math.abs(kart.y - padY) > 1.2) continue;
       const dx = kart.x - pad.x;
       const dz = kart.z - pad.z;
       if (dx * dx + dz * dz > 3.1 * 3.1) {
@@ -1439,8 +1513,23 @@ export class GameEngine {
       if (kart.vz < 0) kart.vz *= -0.28;
     }
 
-    const solids = [
-      ...this.arenaMap.obstacles.map((obstacle) => ({
+    const solids: Array<{
+      x: number;
+      z: number;
+      hx: number;
+      hz: number;
+      rot: number;
+      bottom: number;
+      top: number;
+    }> = [];
+    for (const obstacle of this.arenaMap.obstacles) {
+      const rules = OBSTACLE_RULES[obstacle.kind];
+      const category =
+        obstacle.category ?? (rules.climbable ? "climbable" : rules.solid ? "solid" : "decorative");
+      // Visual-only scenery and intentionally climbable props never act as
+      // vertical walls; the height field already exposes their top surface.
+      if (category !== "solid") continue;
+      solids.push({
         x: obstacle.x,
         z: obstacle.z,
         hx: obstacle.hx,
@@ -1448,21 +1537,24 @@ export class GameEngine {
         rot: obstacle.rot ?? 0,
         bottom: obstacle.base ?? 0,
         top: (obstacle.base ?? 0) + obstacle.h,
-      })),
-      ...this.arenaMap.platforms.map((platform) => ({
+      });
+    }
+    for (const platform of this.arenaMap.platforms) {
+      solids.push({
         x: platform.x,
         z: platform.z,
         hx: platform.hx,
         hz: platform.hz,
-        rot: 0,
-        bottom: 0,
+        rot: platform.rot ?? 0,
+        // Bridge decks leave a genuine drive-under gap below the slab.
+        bottom: platform.kind === "bridge" ? (platform.clearance ?? 0) : 0,
         top: platform.height,
-      })),
-    ];
+      });
+    }
 
     for (const solid of solids) {
       // A kart above the surface has already climbed it; one far below a
-      // raised prop is protected by the deck it stands on.
+      // raised prop or bridge deck drives through the gap.
       if (kart.y >= solid.top - 0.45 || kart.y < solid.bottom - 0.6) {
         continue;
       }
@@ -1536,7 +1628,7 @@ export class GameEngine {
 
   /** Lava, sludge and open vents eliminate a kart that drives into them. */
   private checkHazards(kart: KartActor) {
-    if (!kart.alive || kart.y > 2) return;
+    if (!kart.alive) return;
     if (!pointInHazard(this.arenaMap, kart.x, kart.z)) return;
     const hazard = this.arenaMap.hazards.find((entry) => {
       if (entry.radius !== undefined) {
@@ -1547,8 +1639,19 @@ export class GameEngine {
         Math.abs(kart.z - entry.z) <= (entry.hz ?? 0)
       );
     });
+    // A kart standing on a deck above a hazard is safe; only contact with the
+    // hazard surface counts.
+    const floor =
+      hazard?.base ?? (hazard ? groundHeightAt(this.arenaMap, hazard.x, hazard.z, kart.y) : kart.y);
+    if (kart.y > floor + 1.4) return;
     const color =
-      hazard?.kind === "sludge" ? 0x8fd14a : hazard?.kind === "void" ? 0xff3d81 : 0xff6a2b;
+      hazard?.kind === "sludge"
+        ? 0x8fd14a
+        : hazard?.kind === "void"
+          ? 0xff3d81
+          : hazard?.kind === "water"
+            ? 0x7dd3fc
+            : 0xff6a2b;
     this.sparks.burst(kart.x, kart.y + 0.7, kart.z, color, 22, 9, 0.7, 0.5, 4);
     this.damageKart(kart, 1000, kart.id, "nuke");
   }
@@ -2793,6 +2896,10 @@ export class GameEngine {
       return true;
     }
     for (const obstacle of this.arenaMap.obstacles) {
+      const rules = OBSTACLE_RULES[obstacle.kind];
+      const category =
+        obstacle.category ?? (rules.climbable ? "climbable" : rules.solid ? "solid" : "decorative");
+      if (category !== "solid") continue;
       const rot = obstacle.rot ?? 0;
       const cos = Math.cos(rot);
       const sin = Math.sin(rot);
@@ -2808,11 +2915,17 @@ export class GameEngine {
       }
     }
     for (const platform of this.arenaMap.platforms) {
+      if (platform.kind === "bridge" && (platform.clearance ?? 0) > KART.stepHeight) continue;
+      const rot = platform.rot ?? 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const dx = x - platform.x;
+      const dz = z - platform.z;
+      const localX = dx * cos - dz * sin;
+      const localZ = dx * sin + dz * cos;
       if (
-        x > platform.x - platform.hx - padding &&
-        x < platform.x + platform.hx + padding &&
-        z > platform.z - platform.hz - padding &&
-        z < platform.z + platform.hz + padding
+        Math.abs(localX) < platform.hx + padding &&
+        Math.abs(localZ) < platform.hz + padding
       ) {
         return true;
       }
@@ -3009,7 +3122,41 @@ export class GameEngine {
         continue;
       }
       visual.group.visible = true;
-      visual.group.position.set(kart.x, kart.y, kart.z);
+      const forwardX = Math.sin(kart.yaw);
+      const forwardZ = Math.cos(kart.yaw);
+      const rightX = Math.cos(kart.yaw);
+      const rightZ = -Math.sin(kart.yaw);
+      const probe = 1.1;
+      const ahead = groundHeightAt(
+        this.arenaMap,
+        kart.x + forwardX * probe,
+        kart.z + forwardZ * probe,
+        kart.y + 0.6,
+      );
+      const behind = groundHeightAt(
+        this.arenaMap,
+        kart.x - forwardX * probe,
+        kart.z - forwardZ * probe,
+        kart.y + 0.6,
+      );
+      const right = groundHeightAt(
+        this.arenaMap,
+        kart.x + rightX * probe,
+        kart.z + rightZ * probe,
+        kart.y + 0.6,
+      );
+      const left = groundHeightAt(
+        this.arenaMap,
+        kart.x - rightX * probe,
+        kart.z - rightZ * probe,
+        kart.y + 0.6,
+      );
+      const targetPitch = kart.grounded ? -Math.atan2(ahead - behind, probe * 2) : 0;
+      const targetRoll = kart.grounded ? Math.atan2(right - left, probe * 2) : 0;
+      visual.group.rotation.order = "YXZ";
+      visual.group.rotation.x = damp(visual.group.rotation.x, clamp(targetPitch, -0.5, 0.5), 10, dt);
+      visual.group.rotation.z = damp(visual.group.rotation.z, clamp(targetRoll, -0.4, 0.4), 10, dt);
+      visual.group.position.set(kart.x, kart.y + kart.suspension, kart.z);
       visual.group.rotation.y = kart.yaw;
       paintHealthBar(visual.healthTexture, clamp(kart.hp / KART.hp, 0, 1));
 
@@ -3024,8 +3171,8 @@ export class GameEngine {
 
       // Positive steer is a left turn, so lean the body toward the outside of
       // the corner (local -X) instead of into it.
-      const targetRoll = kart.input.steer * 0.085 * clamp(speedRatio, 0, 1);
-      kart.bodyRoll = damp(kart.bodyRoll, targetRoll, 8, dt);
+      const targetBodyRoll = kart.input.steer * 0.085 * clamp(speedRatio, 0, 1);
+      kart.bodyRoll = damp(kart.bodyRoll, targetBodyRoll, 8, dt);
       visual.body.rotation.z = kart.bodyRoll;
       visual.body.rotation.x = damp(visual.body.rotation.x, -0.015 * speedRatio, 6, dt);
 

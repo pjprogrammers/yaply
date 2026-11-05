@@ -1,5 +1,5 @@
 import { KART_COLORS } from "@/game/constants";
-import { MAPS } from "@/game/maps";
+import { DEFAULT_MAP, MAPS } from "@/game/maps";
 import type { MapId } from "@/game/types";
 
 export interface PlayerSettings {
@@ -24,7 +24,7 @@ export const DURATION_OPTIONS = [
 export const DEFAULT_SETTINGS: PlayerSettings = {
   name: "Driver",
   color: KART_COLORS[0].hex,
-  mapId: "foundry",
+  mapId: DEFAULT_MAP,
   botCount: 5,
   killTarget: 20,
   duration: 300,
@@ -37,7 +37,7 @@ const CONTROLS_KEY = "smashkarts:controls";
 export type ControlScheme = "joystick" | "pedals";
 
 function isMapId(value: unknown): value is MapId {
-  return typeof value === "string" && value in MAPS;
+  return typeof value === "string" && Object.hasOwn(MAPS, value);
 }
 
 function isKnownColor(value: unknown): value is string {

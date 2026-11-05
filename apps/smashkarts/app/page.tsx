@@ -3,6 +3,7 @@ import { ARENA_RULES, WEAPONS } from "@/game/constants";
 import { MAP_LIST } from "@/game/maps";
 import type { WeaponId } from "@/game/types";
 import { ColorLab } from "@/components/color-lab";
+import { MapPreview } from "@/components/map-preview";
 import { Reveal } from "@/components/reveal";
 import { WeaponGlyph } from "@/components/weapon-glyph";
 
@@ -115,13 +116,7 @@ export default function Home() {
               delay={60}
             >
               <div className="arena-media">
-                <img
-                  src={`/media/${map.id}.jpg`}
-                  alt={`A kart fight in the ${map.name} arena.`}
-                  width={1280}
-                  height={720}
-                  loading="lazy"
-                />
+                <MapPreview map={map} className="map-preview" />
                 <span className="arena-caption">{map.tagline}</span>
               </div>
               <div className="arena-info">

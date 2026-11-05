@@ -26,6 +26,31 @@ export const GameKindSchema = z.enum(["skribbl", "chain", "smashkarts"]);
 
 export const WordLanguageSchema = z.enum(["en", "tl", "ja", "ko"]);
 
+export const SmashMapSchema = z.enum([
+  "quarry-clash",
+  "hollow-graveyard",
+  "ironkeep-fort",
+  "magma-crossing",
+  "drift-island",
+  "velocity-park",
+  "frost-circuit",
+  "orbital-arena",
+  "apex-speedway",
+  "glacier-slide",
+  "skyfall",
+  "pinball-core",
+  "sky-showdown",
+  "celestial-temples",
+  "sky-tunnels",
+  "cloudbreak",
+  "neon-district",
+  "circuit-underground",
+  "reactor-core",
+  "hyperlane-2099",
+  "holo-arena",
+  "chrome-port",
+]);
+
 export const ProtocolVersionSchema = z.number().int().optional();
 
 export const PointSchema = z
@@ -55,7 +80,7 @@ export const GameSettingsSchema = z
     confirmMoves: z.boolean().optional(),
     vsCpu: z.boolean().optional(),
     cpuDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
-    mapId: z.enum(["foundry", "scrapyard", "rooftop"]).optional(),
+    mapId: SmashMapSchema.optional(),
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
   })
@@ -129,7 +154,7 @@ export const SmashMatchSnapshotSchema = z
   .object({
     phase: z.enum(["playing", "over"]),
     round: z.number().int().min(0).max(1_000_000),
-    mapId: z.enum(["foundry", "scrapyard", "rooftop"]),
+    mapId: SmashMapSchema,
     timeLeft: z.number().finite().min(0).max(3600),
     killTarget: z.number().int().min(1).max(1000),
     matchSeconds: z.number().finite().min(0).max(86_400),
@@ -345,7 +370,7 @@ export const RoomSnapshotSchema = z.object({
     confirmMoves: z.boolean().optional(),
     vsCpu: z.boolean().optional(),
     cpuDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
-    mapId: z.enum(["foundry", "scrapyard", "rooftop"]).optional(),
+    mapId: SmashMapSchema.optional(),
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
   }),
