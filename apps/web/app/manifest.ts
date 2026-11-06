@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/",
+    id: "/?app=yaply",
     name: "Yaply",
     short_name: "Yaply",
     description:
@@ -10,7 +10,9 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
     orientation: "any",
+    prefer_related_applications: false,
     background_color: "#1423b8",
     theme_color: "#1423b8",
     lang: "en",

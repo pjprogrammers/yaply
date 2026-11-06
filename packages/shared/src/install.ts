@@ -200,13 +200,13 @@ export function getInstallGuides(
         steps: [
           "Open this page in your browser.",
           "Tap the browser menu (⋮).",
-          `Choose Install app or Add to Home screen.`,
-          `Tap Install to add ${appName}.`,
+          "Choose Install app. If you only see Add to Home screen, the browser is offering a shortcut instead.",
+          `Confirm Install to add ${appName}.`,
         ],
         note:
           browser === "firefox"
-            ? "Firefox for Android adds a shortcut rather than a full app. Use Chrome or Edge for the app experience."
-            : "If an install icon appears in the address bar, tap that instead of opening the menu.",
+            ? "Firefox for Android adds a shortcut, which may keep browser branding in Recent Apps. Use Chrome, Edge or Samsung Internet for a full Android app install."
+            : "Chrome, Edge and Samsung Internet register a proper Android app (WebAPK) when Google Play services support it. A plain shortcut is not the same thing.",
       },
       {
         id: "ios",
@@ -247,9 +247,11 @@ export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) return;
 
   const register = () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // A blocked or unavailable service worker should never break the app.
-    });
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .catch(() => {
+        // A blocked or unavailable service worker should never break the app.
+      });
   };
 
   if (document.readyState === "complete") register();

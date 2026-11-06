@@ -2,16 +2,17 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/",
+    id: "/?app=smashkarts",
     name: "Yaply Smash Karts",
     short_name: "Smash Karts",
     description:
       "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, eleven weapons, and up to seven bots.",
-    start_url: "/",
+    start_url: "/play",
     scope: "/",
-    display: "fullscreen",
+    display: "standalone",
     display_override: ["fullscreen", "standalone"],
     orientation: "any",
+    prefer_related_applications: false,
     background_color: "#0b0b0a",
     theme_color: "#0b0b0a",
     lang: "en",

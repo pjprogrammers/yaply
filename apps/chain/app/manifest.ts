@@ -2,16 +2,17 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/",
+    id: "/?app=chain-reaction",
     name: "Yaply Chain Reaction",
-    short_name: "Chain",
+    short_name: "Chain Reaction",
     description:
       "A turn-based board game for 2–8 players. Stack orbs past their critical mass and watch the chain flip the table.",
     start_url: "/",
     scope: "/",
-    display: "fullscreen",
+    display: "standalone",
     display_override: ["fullscreen", "standalone"],
     orientation: "any",
+    prefer_related_applications: false,
     background_color: "#06090e",
     theme_color: "#06090e",
     lang: "en",

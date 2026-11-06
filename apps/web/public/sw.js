@@ -1,8 +1,8 @@
-const CACHE = "yaply-web-v1";
+// Bump this version whenever the precached shell or app icons change.
+const CACHE = "yaply-web-v2";
 const PRECACHE = [
   "/",
   "/install",
-  "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
   "/icon-maskable-512.png",
