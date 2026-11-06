@@ -61,7 +61,7 @@ export function DrawingCanvas({
     }
 
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.fillStyle = "#ffffff";
+    context.fillStyle = "#fbf7ee";
     context.fillRect(0, 0, cssWidth, cssHeight);
     context.lineCap = "round";
     context.lineJoin = "round";

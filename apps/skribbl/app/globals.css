@@ -3,26 +3,31 @@
 @tailwind utilities;
 
 :root {
-  --ground: #000000;
-  --surface: #111111;
-  --surface-2: #1a1a1a;
-  --raised: #2a2a2a;
-  --border: #1a1a1a;
-  --rule: #161616;
-  --control: #444444;
-  --text: #ffffff;
-  --muted: #b4b4b4;
-  --faint: #949494;
+  --ground: #0a0a09;
+  --surface: #141412;
+  --surface-2: #1c1b18;
+  --raised: #2a2823;
+  --border: #292620;
+  --rule: #211f1a;
+  --control: #5c5548;
+  --text: #f4eee0;
+  --muted: #b8b1a2;
+  --faint: #8f8778;
   --accent: #f2b33d;
-  --accent-soft: rgba(242, 179, 61, 0.12);
+  --accent-soft: rgba(242, 179, 61, 0.14);
   --positive: #3fc07a;
-  --negative: #e5566f;
+  --negative: #ef6b6b;
+  --paper: #f4eee0;
+  --paper-deep: #e8dfcc;
+  --ink: #0a0a09;
+  --muted-ink: #5c5548;
   --radius-card: 20px;
   --radius-panel: 14px;
   --radius-control: 999px;
   --gap: 16px;
   --pad: 20px;
   --font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-sketch), "Inter", system-ui, sans-serif;
 }
 
 * {
@@ -87,30 +92,6 @@ a {
   background: var(--ground);
 }
 
-/* The room keeps the classic blue arcade backdrop while the cards stay dark. */
-.app-shell--room {
-  --ground: #071c2f;
-  --surface: #0d1f31;
-  --surface-2: #142a3f;
-  --raised: #1d3a53;
-  --border: #173149;
-  --rule: #102538;
-  --control: #3a5d78;
-  background-color: var(--ground);
-  background-image:
-    radial-gradient(circle at 16% 8%, rgba(72, 158, 255, 0.18), transparent 42%),
-    radial-gradient(circle at 84% 92%, rgba(72, 158, 255, 0.12), transparent 46%),
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: auto, auto, 32px 32px, 32px 32px;
-  background-attachment: fixed;
-}
-
-.app-shell--room .topbar {
-  background: rgba(7, 28, 47, 0.9);
-  backdrop-filter: blur(14px);
-}
-
 .topbar {
   height: 56px;
   display: flex;
@@ -118,24 +99,26 @@ a {
   justify-content: space-between;
   gap: 16px;
   padding: 0 24px;
-  border-bottom: 1px solid var(--border);
-  background: var(--ground);
+  border-bottom: 1px solid rgba(244, 238, 224, 0.12);
+  background: rgba(10, 10, 9, 0.92);
+  backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
   z-index: 20;
 }
 
 .brand-sub {
-  color: var(--faint);
-  font-weight: 400;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
@@ -204,6 +187,22 @@ p {
   margin: 0;
 }
 
+/* The homepage's hand-drawn display face carries every app heading. */
+.home-title,
+.room-title,
+.section-title,
+.card-title,
+.result-card h2,
+.overlay-title,
+.round-word,
+.join-gate-card h1,
+.error-card h1,
+.help-section h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .home-title {
   font-size: 28px;
   line-height: 1.12;
@@ -212,7 +211,7 @@ p {
 }
 
 .room-title {
-  font-size: 20px;
+  font-size: 24px;
   line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -233,9 +232,11 @@ p {
 }
 
 .eyebrow {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--eyebrow, var(--accent));
   margin-bottom: 8px;
 }
 
@@ -254,10 +255,35 @@ p {
 
 /* Cards */
 
+/* Paper surfaces borrow the homepage preview sheet: warm cream, ink type and
+   yellow controls. Local tokens keep every nested shared component readable. */
+.card,
+.join-gate-card,
+.error-card,
+.loading-card,
+.modal-card {
+  --surface: var(--paper);
+  --surface-2: var(--paper-deep);
+  --raised: #d9cbb2;
+  --border: #d8cbb4;
+  --rule: #d8cbb4;
+  --control: #b6a98f;
+  --text: var(--ink);
+  --muted: var(--muted-ink);
+  --faint: #7b7364;
+  --accent-soft: rgba(242, 179, 61, 0.3);
+  --positive: #1f7a4c;
+  --negative: #b3362b;
+  --eyebrow: #8a5a00;
+  background: var(--paper);
+  color: var(--ink);
+}
+
 .card {
   background: var(--surface);
   border-radius: var(--radius-card);
   padding: var(--pad);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .card--flush {
@@ -476,34 +502,35 @@ p {
 }
 
 .btn--primary {
-  background: var(--text);
-  color: var(--ground);
+  background: var(--accent);
+  color: var(--ink);
   font-weight: 600;
 }
 
 .btn--primary:hover {
-  background: #e6e6e6;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .btn--ghost {
   background: transparent;
-  border: 1px solid var(--raised);
-  color: var(--muted);
+  border: 1px solid rgba(244, 238, 224, 0.32);
+  color: var(--text);
 }
 
 .btn--ghost:hover {
-  background: var(--surface-2);
+  background: rgba(244, 238, 224, 0.08);
   color: var(--text);
 }
 
 .btn--danger {
   background: transparent;
-  border: 1px solid #2c1a20;
+  border: 1px solid rgba(239, 107, 107, 0.4);
   color: var(--negative);
 }
 
 .btn--danger:hover {
-  background: #2c1a20;
+  background: rgba(239, 107, 107, 0.12);
 }
 
 .btn--lg {
@@ -558,11 +585,11 @@ p {
   padding: 0 14px;
   border: 1px solid var(--raised);
   border-radius: 12px;
-  background: #0b0b0b;
+  background: #0b0b08;
   color: var(--text);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input::placeholder {
@@ -574,7 +601,12 @@ p {
 }
 
 .input:focus {
-  border-color: var(--muted);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 179, 61, 0.2);
+}
+
+.input:focus-visible {
+  outline: none;
 }
 
 .input--code {
@@ -595,7 +627,7 @@ p {
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #0b0b0b;
+  background: var(--surface-2);
 }
 
 .seg button {
@@ -616,8 +648,9 @@ p {
 }
 
 .seg button[aria-pressed="true"] {
-  background: var(--raised);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .seg button:disabled {
@@ -634,6 +667,118 @@ p {
 
 .setting-row .seg button {
   padding: 0 10px;
+}
+
+/* Paper-surface controls -------------------------------------------------- */
+
+.card .btn,
+.join-gate-card .btn,
+.error-card .btn,
+.modal-card .btn {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.card .btn:hover,
+.join-gate-card .btn:hover,
+.error-card .btn:hover,
+.modal-card .btn:hover {
+  background: #2a2620;
+  color: var(--paper);
+}
+
+.card .btn--primary,
+.join-gate-card .btn--primary,
+.error-card .btn--primary,
+.modal-card .btn--primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.card .btn--primary:hover,
+.join-gate-card .btn--primary:hover,
+.error-card .btn--primary:hover,
+.modal-card .btn--primary:hover {
+  background: #fff8e9;
+  color: var(--ink);
+}
+
+.card .btn--ghost,
+.join-gate-card .btn--ghost,
+.error-card .btn--ghost,
+.modal-card .btn--ghost {
+  background: transparent;
+  border-color: rgba(10, 10, 9, 0.32);
+  color: var(--ink);
+}
+
+.card .btn--ghost:hover,
+.join-gate-card .btn--ghost:hover,
+.error-card .btn--ghost:hover,
+.modal-card .btn--ghost:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.card .input,
+.join-gate-card .input,
+.error-card .input,
+.modal-card .input {
+  background: #fbf7ee;
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+.card .input::placeholder,
+.join-gate-card .input::placeholder,
+.error-card .input::placeholder,
+.modal-card .input::placeholder {
+  color: #8a8273;
+}
+
+.card .input:hover,
+.join-gate-card .input:hover,
+.error-card .input:hover,
+.modal-card .input:hover {
+  border-color: var(--control);
+}
+
+.card .input:focus,
+.join-gate-card .input:focus,
+.error-card .input:focus,
+.modal-card .input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 179, 61, 0.3);
+}
+
+.card .page-head > .pill {
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.card .banner {
+  background: var(--paper-deep);
+  color: var(--muted-ink);
+}
+
+.card .player-name-box--me {
+  background: #f6e2b6;
+}
+
+.card .player-name-box--host .player-rank {
+  color: #8a5a00;
+}
+
+.card .player-name-box--drawing {
+  box-shadow: inset 3px 0 0 var(--ink);
 }
 
 /* Pills, tags, status */
@@ -745,11 +890,11 @@ p {
 }
 
 .player:hover {
-  background: #161616;
+  background: var(--surface-2);
 }
 
 .player--me {
-  background: #161616;
+  background: var(--surface-2);
 }
 
 .player--turn {
@@ -852,7 +997,8 @@ p {
 .fact-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  background: var(--surface);
+  background: var(--accent);
+  color: var(--ink);
   border-radius: var(--radius-card);
   overflow: hidden;
   margin-top: var(--gap);
@@ -860,7 +1006,7 @@ p {
 
 .fact {
   padding: 18px 20px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid rgba(10, 10, 9, 0.16);
   min-width: 0;
 }
 
@@ -870,7 +1016,7 @@ p {
 
 .fact-label {
   font-size: 12px;
-  color: var(--faint);
+  color: var(--muted-ink);
   margin-bottom: 4px;
 }
 
@@ -879,6 +1025,7 @@ p {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 /* Preview */
@@ -1286,8 +1433,9 @@ p {
 }
 
 .banner--warn {
-  background: #1a1410;
+  background: var(--accent-soft);
   color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(242, 179, 61, 0.28);
 }
 
 .modal-backdrop {
@@ -1297,7 +1445,7 @@ p {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(2, 8, 16, 0.72);
+  background: rgba(10, 10, 9, 0.78);
   backdrop-filter: blur(4px);
 }
 
@@ -1893,11 +2041,11 @@ p {
   border-radius: 12px;
   color: var(--faint);
   font-size: 13px;
-  border: 1px dashed #202020;
+  border: 1px dashed var(--border);
 }
 
 .empty-slot .player-avatar {
-  background: #0b0b0b;
+  background: var(--surface-2);
   color: var(--faint);
 }
 
@@ -2208,7 +2356,8 @@ p {
   gap: 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: #1a1410;
+  background: rgba(242, 179, 61, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(242, 179, 61, 0.35);
   color: var(--accent);
   font-size: 12px;
   margin-bottom: var(--gap);
@@ -4111,45 +4260,51 @@ p {
 }
 
 /* ==========================================================================
-   Skribbl match screen — an exact port of layout.html's classic theme.
-   Everything is scoped under .match-page so the home, create, join and lobby
-   screens keep their existing dark theme untouched.
+   Skribbl match screen — the layout.html composition wearing the homepage's
+   ink / paper / yellow palette. Everything is scoped under .match-page.
    ========================================================================== */
 
 .match-page {
-  --pat: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='%232d5fb8' stroke-width='3' stroke-linecap='round'><circle cx='30' cy='30' r='9'/><path d='M30 12v6M30 42v6M12 30h6M42 30h6'/><path d='M80 20l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z'/><rect x='20' y='78' width='22' height='22' rx='3'/><path d='M70 85q8-12 16 0t16 0'/></svg>");
-  --bg: #1f4a9c;
-  --panel: #fff;
-  --ink: #111;
-  --row-a: #fff;
-  --row-b: #ececec;
-  --good: #7ee05a;
-  --sub: #555;
-  --accent: #2b5fc9;
+  --pat: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='%23f2b33d' stroke-width='3' stroke-linecap='round' opacity='0.08'><circle cx='30' cy='30' r='9'/><path d='M30 12v6M30 42v6M12 30h6M42 30h6'/><path d='M80 20l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z'/><rect x='20' y='78' width='22' height='22' rx='3'/><path d='M70 85q8-12 16 0t16 0'/></svg>");
+  --bg: #0a0a09;
+  --paper: #f4eee0;
+  --paper-deep: #e8dfcc;
+  --panel: #f4eee0;
+  --ink: #0a0a09;
+  --row-a: #f4eee0;
+  --row-b: #e8dfcc;
+  --good: #bfe8cf;
+  --sub: #5c5548;
+  --accent: #f2b33d;
+  --accent-ink: #8a5a00;
   --radius: 0px;
   --gap: 0px;
-  --sys: #d4421b;
-  --ok: #2f9e1a;
+  --sys: #b3362b;
+  --ok: #1f7a4c;
 
-  /* Classic light values for the shared buttons, modals and overlays that are
+  /* Paper values for the shared buttons, modals and overlays that are
      reused from the rest of the app inside the match screen. */
-  --ground: #fff;
-  --surface: #fff;
-  --surface-2: #f2f2f2;
-  --raised: #e4e4e4;
-  --border: #d8d8d8;
-  --control: #b5b5b5;
-  --text: #111;
-  --muted: #555;
-  --faint: #777;
-  --radius-card: 8px;
-  --radius-control: 6px;
+  --ground: #0a0a09;
+  --surface: #f4eee0;
+  --surface-2: #e8dfcc;
+  --raised: #d9cbb2;
+  --border: #d8cbb4;
+  --rule: #d8cbb4;
+  --control: #b6a98f;
+  --text: #0a0a09;
+  --muted: #5c5548;
+  --faint: #7b7364;
+  --positive: #1f7a4c;
+  --negative: #b3362b;
+  --eyebrow: #8a5a00;
+  --radius-card: 10px;
+  --radius-control: 999px;
 
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--pat), var(--bg);
-  color: var(--ink);
-  font-family: "Nunito", system-ui, sans-serif;
+  color: var(--paper);
+  font-family: var(--font);
   font-size: 16px;
   line-height: normal;
   display: flex;
@@ -4168,12 +4323,15 @@ p {
 /* Logo and control bar --------------------------------------------------- */
 
 .match-page .match-logo {
+  font-family: var(--font-display);
   font-size: 44px;
-  font-weight: 900;
-  letter-spacing: 2px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.18;
   align-self: flex-start;
   margin-left: max(0px, calc(50% - 650px));
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  color: var(--paper);
+  text-shadow: 2px 2px 0 rgba(242, 179, 61, 0.32);
   white-space: nowrap;
 }
 
@@ -4184,6 +4342,7 @@ p {
   flex-wrap: wrap;
   min-height: 29px;
   font-size: 14px;
+  color: #b8b1a2;
 }
 
 .match-page .match-bar label {
@@ -4195,30 +4354,37 @@ p {
 .match-page .match-bar button,
 .match-page .match-bar a {
   font: inherit;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 238, 224, 0.24);
   cursor: pointer;
-  background: #efefef;
-  color: var(--ink);
+  background: #171613;
+  color: var(--paper);
   text-decoration: none;
 }
 
 .match-page .match-bar button:hover,
 .match-page .match-bar a:hover {
-  background: #e3e3e3;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--ink);
 }
 
 .match-page .match-bar .match-room-code {
   font-weight: 800;
   letter-spacing: 1px;
+  color: var(--accent);
+}
+
+.match-page .match-bar .match-room-code:hover {
+  color: var(--ink);
 }
 
 .match-page .match-bar-note {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  opacity: 0.8;
+  color: #b8b1a2;
 }
 
 .match-page .match-bar-note .status-dot {
@@ -4241,6 +4407,7 @@ p {
 .match-page .top {
   grid-column: 1 / 4;
   background: var(--panel);
+  color: var(--ink);
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -4260,6 +4427,7 @@ p {
   height: 48px;
   border: 3px solid var(--ink);
   border-radius: 50%;
+  background: var(--accent);
   display: grid;
   place-items: center;
   font-weight: 900;
@@ -4320,6 +4488,7 @@ p {
 
 .match-page .players {
   background: var(--panel);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   gap: var(--gap);
@@ -4385,8 +4554,12 @@ p {
   color: var(--sub);
 }
 
+.match-page .p.me {
+  background: #f6e2b6;
+}
+
 .match-page .p.me .nm {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .match-page .av {
@@ -4434,7 +4607,8 @@ p {
 /* Drawing board ---------------------------------------------------------- */
 
 .match-page .canvaswrap {
-  background: #fff;
+  background: #fbf7ee;
+  color: var(--ink);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -4453,7 +4627,7 @@ p {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: #fbf7ee;
 }
 
 .match-page .canvaswrap canvas {
@@ -4464,7 +4638,7 @@ p {
   display: block;
   touch-action: none;
   cursor: crosshair;
-  background: #fff;
+  background: #fbf7ee;
 }
 
 .match-page .thumbs {
@@ -4483,7 +4657,7 @@ p {
   display: flex;
   gap: 4px;
   padding: 6px;
-  background: #eee;
+  background: var(--paper-deep);
   align-items: center;
   flex: none;
 }
@@ -4491,7 +4665,7 @@ p {
 .match-page .tools .sw {
   width: 24px;
   height: 24px;
-  border: 2px solid #000;
+  border: 2px solid var(--ink);
   cursor: pointer;
   border-radius: 4px;
   padding: 0;
@@ -4502,9 +4676,9 @@ p {
   margin-left: auto;
   font: inherit;
   padding: 3px 10px;
-  border: 2px solid #767676;
+  border: 2px solid rgba(10, 10, 9, 0.55);
   border-radius: 2px;
-  background: #efefef;
+  background: var(--paper);
   color: var(--ink);
   cursor: pointer;
 }
@@ -4513,6 +4687,7 @@ p {
 
 .match-page .chat {
   background: var(--panel);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4553,7 +4728,7 @@ p {
 }
 
 .match-page .m.blue {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 
@@ -4562,36 +4737,44 @@ p {
   border-radius: var(--radius);
   padding: 8px;
   font: inherit;
-  background: var(--panel);
+  background: #fbf7ee;
   color: var(--ink);
   margin: 2px;
   outline: none;
   min-width: 0;
 }
 
+.match-page .chat input:focus {
+  border-color: var(--ink);
+}
+
+.match-page .chat input:focus-visible {
+  outline: none;
+}
+
 .match-page .chat input::placeholder {
-  color: #999;
+  color: #8a8273;
 }
 
 /* Choosing / round-over / game-over overlays ----------------------------- */
 
 .match-page .canvas-overlay {
-  background: rgba(0, 0, 0, 0.62);
-  color: #fff;
+  background: rgba(10, 10, 9, 0.74);
+  color: var(--paper);
 }
 
 .match-page .canvas-overlay .overlay-card,
 .match-page .canvas-overlay .choice-panel {
-  background: #fff;
+  background: var(--panel);
   color: var(--ink);
-  border-radius: 8px;
+  border-radius: 10px;
   border: 2px solid var(--ink);
 }
 
 .match-page .canvas-overlay .round-reveal {
-  background: #fff;
+  background: var(--panel);
   color: var(--ink);
-  border-radius: 8px;
+  border-radius: 10px;
   border: 2px solid var(--ink);
   padding: 20px;
 }
@@ -4606,42 +4789,74 @@ p {
 }
 
 .match-page .canvas-overlay .choice {
-  background: #fff;
+  background: var(--paper);
   border: 2px solid var(--ink);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--ink);
 }
 
 .match-page .canvas-overlay .choice:hover {
-  background: #eef4ff;
-  border-color: var(--accent);
+  background: var(--paper-deep);
+  border-color: var(--ink);
 }
 
 .match-page .canvas-overlay .round-rank-row .rank-score,
 .match-page .canvas-overlay .result-rank-score {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
-/* Shared light controls inside the match (settings modal, toasts, actions) */
+.match-page .canvas-overlay .btn {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.match-page .canvas-overlay .btn:hover {
+  background: #2a2620;
+  color: var(--paper);
+}
+
+.match-page .canvas-overlay .btn--primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.match-page .canvas-overlay .btn--primary:hover {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.match-page .canvas-overlay .btn--ghost {
+  background: transparent;
+  border-color: rgba(10, 10, 9, 0.32);
+  color: var(--ink);
+}
+
+.match-page .canvas-overlay .btn--ghost:hover {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+/* Shared paper controls inside the match (settings modal, toasts, actions) */
 
 .match-page .btn--primary {
-  background: var(--ink);
-  color: #fff;
+  background: var(--accent);
+  color: var(--ink);
 }
 
 .match-page .btn--primary:hover {
-  background: #333;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .match-page .modal-card {
-  background: #fff;
+  background: var(--paper);
   color: var(--ink);
-  border-color: var(--border);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  border-color: #d8cbb4;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 
 .match-page .modal-backdrop {
-  background: rgba(8, 20, 44, 0.62);
+  background: rgba(10, 10, 9, 0.78);
 }
 
 .match-page .modal-actions {
@@ -4652,12 +4867,12 @@ p {
 }
 
 .match-page .seg {
-  background: #f2f2f2;
-  border-color: var(--border);
+  background: var(--paper-deep);
+  border-color: #d8cbb4;
 }
 
 .match-page .seg button {
-  color: var(--muted);
+  color: var(--sub);
 }
 
 .match-page .seg button:hover {
@@ -4665,27 +4880,27 @@ p {
 }
 
 .match-page .seg button[aria-pressed="true"] {
-  background: #fff;
+  background: var(--accent);
   color: var(--ink);
-  box-shadow: 0 0 0 1px var(--border);
+  box-shadow: none;
 }
 
 .match-page .toast {
-  background: #fff;
-  color: var(--ink);
-  border-color: var(--border);
+  background: #141412;
+  color: var(--paper);
+  border-color: var(--raised);
 }
 
 .match-page .toast--error {
-  color: var(--sys);
-  border-color: var(--sys);
+  color: #ff9a8a;
+  border-color: #b3362b;
 }
 
 .match-page > .connection-banner {
   width: min(1300px, 100%);
   margin: 0;
   border-radius: 6px;
-  background: #fff;
+  background: var(--paper);
   border: 2px solid var(--sys);
   color: var(--sys);
 }
