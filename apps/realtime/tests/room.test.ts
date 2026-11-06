@@ -371,6 +371,105 @@ describe("Skribbl room rules", () => {
     expect(drawerPlayer.score).toBeGreaterThan(0);
   });
 
+  it("tags system chat lines with semantic kinds", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+
+    const messages = sockets[0].events("chat.message");
+    expect(messages.find((message: any) => message.text.includes("joined the room"))).toMatchObject({
+      kind: "player_joined",
+      system: true,
+    });
+    expect(messages.find((message: any) => message.text === "The game started.")).toMatchObject({
+      kind: "round_started",
+      system: true,
+    });
+    expect(
+      messages.find((message: any) => message.text.endsWith("is choosing a word.")),
+    ).toMatchObject({
+      kind: "drawing_started",
+      system: true,
+    });
+
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = snapshot.players.findIndex((player: any) => player.id === snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+
+    expect(
+      drawer.events("chat.message").find((message: any) => message.text.endsWith("is drawing.")),
+    ).toMatchObject({
+      kind: "drawing_started",
+      system: true,
+    });
+  });
+
+  it("shows the guesser a personal correct-guess line", async () => {
+    const names = ["Alice", "Bob", "Cara"];
+    const { sockets, playerIds } = await createAndJoin("skribbl", names);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const guesserIndex = [0, 1, 2].find((index) => index !== drawerIndex)!;
+    const guesser = sockets[guesserIndex];
+    const observer = sockets[[0, 1, 2].find((index) => index !== drawerIndex && index !== guesserIndex)!];
+
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = drawer.last("game.word.selected").word;
+    await guesser.message({ type: "chat.guess", text: word });
+
+    expect(
+      guesser.events("chat.message").find((message: any) => message.kind === "own_correct_guess"),
+    ).toMatchObject({
+      text: "You guessed the word!",
+      system: true,
+      kind: "own_correct_guess",
+    });
+    expect(
+      guesser.events("chat.message").some((message: any) => message.kind === "correct_guess"),
+    ).toBe(false);
+    const publicGuess = observer
+      .events("chat.message")
+      .find((message: any) => message.kind === "correct_guess");
+    expect(publicGuess?.text).toContain(`${names[guesserIndex]} guessed the word`);
+    expect(publicGuess).toMatchObject({
+      system: true,
+      kind: "correct_guess",
+    });
+    expect(observer.events("chat.message").some((message: any) => message.text === "You guessed the word!")).toBe(false);
+  });
+
+  it("sends a private close-guess hint for a near miss", async () => {
+    const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const guesser = sockets[drawerIndex === 0 ? 1 : 0];
+
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+    const word = drawer.last("game.word.selected").word;
+    const nearMiss = word.slice(0, -1);
+    expect(nearMiss).not.toBe(word);
+
+    await guesser.message({ type: "chat.guess", text: nearMiss });
+
+    expect(
+      guesser.events("chat.message").find((message: any) => message.kind === "close_guess"),
+    ).toMatchObject({
+      text: "You are very close to the word!",
+      system: true,
+      kind: "close_guess",
+    });
+    expect(
+      drawer.events("chat.message").some((message: any) => message.kind === "close_guess"),
+    ).toBe(false);
+  });
+
   it("broadcasts reactions from every guessing player while drawing", async () => {
     const names = ["Alice", "Bob", "Cara"];
     const { sockets, playerIds } = await createAndJoin("skribbl", names);

@@ -1289,6 +1289,75 @@ p {
 }
 
 /* Chat */
+/* Event colours are tokens so the same semantic message reads correctly on
+   both themes and on the paper match surface. Dark is the default. */
+:root {
+  --chat-normal: #f4eee0;
+  --chat-name: #ffffff;
+
+  --chat-joined-bg: rgba(16, 185, 129, 0.14);
+  --chat-joined-fg: #34d399;
+  --chat-left-bg: rgba(249, 115, 22, 0.14);
+  --chat-left-fg: #fb923c;
+  --chat-correct-bg: rgba(34, 197, 94, 0.16);
+  --chat-correct-fg: #4ade80;
+  --chat-own-bg: rgba(168, 85, 247, 0.16);
+  --chat-own-fg: #c084fc;
+  --chat-liked-bg: rgba(34, 197, 94, 0.16);
+  --chat-liked-fg: #4ade80;
+  --chat-disliked-bg: rgba(239, 68, 68, 0.16);
+  --chat-disliked-fg: #f87171;
+  --chat-drawing-bg: rgba(59, 130, 246, 0.16);
+  --chat-drawing-fg: #60a5fa;
+  --chat-close-bg: rgba(251, 191, 36, 0.16);
+  --chat-close-fg: #fbbf24;
+  --chat-word-bg: rgba(6, 182, 212, 0.16);
+  --chat-word-fg: #22d3ee;
+  --chat-round-bg: rgba(59, 130, 246, 0.16);
+  --chat-round-fg: #60a5fa;
+  --chat-disconnected-bg: rgba(249, 115, 22, 0.14);
+  --chat-disconnected-fg: #fb923c;
+  --chat-reconnected-bg: rgba(16, 185, 129, 0.14);
+  --chat-reconnected-fg: #34d399;
+  --chat-announcement-bg: rgba(168, 85, 247, 0.16);
+  --chat-announcement-fg: #c084fc;
+  --chat-error-bg: rgba(239, 68, 68, 0.16);
+  --chat-error-fg: #f87171;
+}
+
+[data-theme="light"] {
+  --chat-normal: #111111;
+  --chat-name: #0a0a09;
+
+  --chat-joined-bg: rgba(16, 185, 129, 0.14);
+  --chat-joined-fg: #047857;
+  --chat-left-bg: rgba(249, 115, 22, 0.14);
+  --chat-left-fg: #c2410c;
+  --chat-correct-bg: rgba(22, 163, 74, 0.15);
+  --chat-correct-fg: #15803d;
+  --chat-own-bg: rgba(168, 85, 247, 0.13);
+  --chat-own-fg: #7c3aed;
+  --chat-liked-bg: rgba(22, 163, 74, 0.15);
+  --chat-liked-fg: #15803d;
+  --chat-disliked-bg: rgba(239, 68, 68, 0.13);
+  --chat-disliked-fg: #b91c1c;
+  --chat-drawing-bg: rgba(59, 130, 246, 0.13);
+  --chat-drawing-fg: #2563eb;
+  --chat-close-bg: rgba(245, 158, 11, 0.16);
+  --chat-close-fg: #b45309;
+  --chat-word-bg: rgba(6, 182, 212, 0.13);
+  --chat-word-fg: #0e7490;
+  --chat-round-bg: rgba(59, 130, 246, 0.13);
+  --chat-round-fg: #2563eb;
+  --chat-disconnected-bg: rgba(249, 115, 22, 0.14);
+  --chat-disconnected-fg: #c2410c;
+  --chat-reconnected-bg: rgba(16, 185, 129, 0.14);
+  --chat-reconnected-fg: #047857;
+  --chat-announcement-bg: rgba(168, 85, 247, 0.13);
+  --chat-announcement-fg: #7c3aed;
+  --chat-error-bg: rgba(239, 68, 68, 0.13);
+  --chat-error-fg: #b91c1c;
+}
 
 .chat-card {
   background: var(--surface);
@@ -1314,13 +1383,13 @@ p {
 .chat-line {
   font-size: 13px;
   line-height: 19px;
-  color: var(--muted);
+  color: var(--chat-normal);
   overflow-wrap: anywhere;
 }
 
 .chat-name {
-  color: var(--text);
-  font-weight: 500;
+  color: var(--chat-name);
+  font-weight: 700;
   margin-right: 6px;
 }
 
@@ -2553,7 +2622,9 @@ p {
   }
 }
 
-/* Enhanced Chat Event Styling */
+/* Enhanced Chat Event Styling
+   The same semantic classes drive the room chat and the match chat. Colours
+   come from the theme tokens above, so a message type never hard-codes a hue. */
 .chat-line--event {
   width: 100%;
   padding: 4px 8px;
@@ -2562,208 +2633,92 @@ p {
 }
 
 .chat-line--normal {
-  color: var(--text);
+  color: var(--chat-normal);
   background: transparent;
 }
 
-[data-theme="light"] .chat-line--normal {
-  color: #111111;
+.chat-line--player_joined,
+.match-page .m--player_joined {
+  background: var(--chat-joined-bg);
+  color: var(--chat-joined-fg);
 }
 
-[data-theme="dark"] .chat-line--normal {
-  color: #ffffff;
+.chat-line--player_left,
+.match-page .m--player_left {
+  background: var(--chat-left-bg);
+  color: var(--chat-left-fg);
 }
 
-/* Player joined - Green */
-.chat-line--player_joined {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
+.chat-line--disconnected,
+.match-page .m--disconnected {
+  background: var(--chat-disconnected-bg);
+  color: var(--chat-disconnected-fg);
 }
 
-[data-theme="light"] .chat-line--player_joined {
-  background: rgba(16, 185, 129, 0.15);
-  color: #059669;
+.chat-line--reconnected,
+.match-page .m--reconnected {
+  background: var(--chat-reconnected-bg);
+  color: var(--chat-reconnected-fg);
 }
 
-[data-theme="dark"] .chat-line--player_joined {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+.chat-line--correct_guess,
+.match-page .m--correct_guess {
+  background: var(--chat-correct-bg);
+  color: var(--chat-correct-fg);
 }
 
-/* Player left - Orange/Red */
-.chat-line--player_left {
-  background: rgba(249, 115, 22, 0.12);
-  color: #f97316;
+.chat-line--own_correct_guess,
+.match-page .m--own_correct_guess {
+  background: var(--chat-own-bg);
+  color: var(--chat-own-fg);
 }
 
-[data-theme="light"] .chat-line--player_left {
-  background: rgba(249, 115, 22, 0.15);
-  color: #ea580c;
+.chat-line--liked,
+.match-page .m--liked {
+  background: var(--chat-liked-bg);
+  color: var(--chat-liked-fg);
 }
 
-[data-theme="dark"] .chat-line--player_left {
-  background: rgba(249, 115, 22, 0.15);
-  color: #fb923c;
+.chat-line--disliked,
+.match-page .m--disliked {
+  background: var(--chat-disliked-bg);
+  color: var(--chat-disliked-fg);
 }
 
-/* Disconnected - Orange */
-.chat-line--disconnected {
-  background: rgba(249, 115, 22, 0.12);
-  color: #f97316;
+.chat-line--drawing_started,
+.match-page .m--drawing_started {
+  background: var(--chat-drawing-bg);
+  color: var(--chat-drawing-fg);
 }
 
-[data-theme="light"] .chat-line--disconnected {
-  background: rgba(249, 115, 22, 0.15);
-  color: #ea580c;
+.chat-line--round_started,
+.match-page .m--round_started {
+  background: var(--chat-round-bg);
+  color: var(--chat-round-fg);
 }
 
-[data-theme="dark"] .chat-line--disconnected {
-  background: rgba(249, 115, 22, 0.15);
-  color: #fb923c;
+.chat-line--close_guess,
+.match-page .m--close_guess {
+  background: var(--chat-close-bg);
+  color: var(--chat-close-fg);
 }
 
-/* Reconnected - Green */
-.chat-line--reconnected {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
+.chat-line--word_revealed,
+.match-page .m--word_revealed {
+  background: var(--chat-word-bg);
+  color: var(--chat-word-fg);
 }
 
-[data-theme="light"] .chat-line--reconnected {
-  background: rgba(16, 185, 129, 0.15);
-  color: #059669;
+.chat-line--announcement,
+.match-page .m--announcement {
+  background: var(--chat-announcement-bg);
+  color: var(--chat-announcement-fg);
 }
 
-[data-theme="dark"] .chat-line--reconnected {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-}
-
-/* Correct guess - Bright green */
-.chat-line--correct_guess {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-}
-
-[data-theme="light"] .chat-line--correct_guess {
-  background: rgba(16, 185, 129, 0.18);
-  color: #047857;
-}
-
-[data-theme="dark"] .chat-line--correct_guess {
-  background: rgba(16, 185, 129, 0.18);
-  color: #22c55e;
-}
-
-/* Own correct guess - Purple */
-.chat-line--own_correct_guess {
-  background: rgba(168, 85, 247, 0.12);
-  color: #a855f7;
-}
-
-[data-theme="light"] .chat-line--own_correct_guess {
-  background: rgba(168, 85, 247, 0.15);
-  color: #7c3aed;
-}
-
-[data-theme="dark"] .chat-line--own_correct_guess {
-  background: rgba(168, 85, 247, 0.18);
-  color: #a78bfa;
-}
-
-/* Drawing started - Blue */
-.chat-line--drawing_started {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-}
-
-[data-theme="light"] .chat-line--drawing_started {
-  background: rgba(59, 130, 246, 0.15);
-  color: #2563eb;
-}
-
-[data-theme="dark"] .chat-line--drawing_started {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-
-/* Round started - Blue */
-.chat-line--round_started {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-}
-
-[data-theme="light"] .chat-line--round_started {
-  background: rgba(59, 130, 246, 0.15);
-  color: #2563eb;
-}
-
-[data-theme="dark"] .chat-line--round_started {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-
-/* Close to the word - Yellow */
-.chat-line--close_guess {
-  background: rgba(251, 191, 36, 0.12);
-  color: #f59e0b;
-}
-
-[data-theme="light"] .chat-line--close_guess {
-  background: rgba(251, 191, 36, 0.18);
-  color: #d97706;
-}
-
-[data-theme="dark"] .chat-line--close_guess {
-  background: rgba(251, 191, 36, 0.18);
-  color: #fbbf24;
-}
-
-/* Word revealed / round ended - Cyan */
-.chat-line--word_revealed {
-  background: rgba(6, 182, 212, 0.12);
-  color: #06b6d4;
-}
-
-[data-theme="light"] .chat-line--word_revealed {
-  background: rgba(6, 182, 212, 0.15);
-  color: #0891b2;
-}
-
-[data-theme="dark"] .chat-line--word_revealed {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
-}
-
-/* Host announcement - Purple */
-.chat-line--announcement {
-  background: rgba(168, 85, 247, 0.12);
-  color: #a855f7;
-}
-
-[data-theme="light"] .chat-line--announcement {
-  background: rgba(168, 85, 247, 0.15);
-  color: #7c3aed;
-}
-
-[data-theme="dark"] .chat-line--announcement {
-  background: rgba(168, 85, 247, 0.18);
-  color: #a78bfa;
-}
-
-/* System errors - Red */
-.chat-line--error {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-}
-
-[data-theme="light"] .chat-line--error {
-  background: rgba(239, 68, 68, 0.15);
-  color: #dc2626;
-}
-
-[data-theme="dark"] .chat-line--error {
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
+.chat-line--error,
+.match-page .m--error {
+  background: var(--chat-error-bg);
+  color: var(--chat-error-fg);
 }
 
 /* Leaderboard */
@@ -4773,9 +4728,45 @@ p {
 
 /* Chat ------------------------------------------------------------------- */
 
+/* The match always uses the warm paper surface, so it keeps the light event
+   palette even when the rest of the app is in dark mode. */
+.match-page {
+  --chat-normal: var(--ink);
+  --chat-name: var(--ink);
+
+  --chat-joined-bg: rgba(31, 122, 76, 0.13);
+  --chat-joined-fg: #17663f;
+  --chat-left-bg: rgba(179, 54, 43, 0.12);
+  --chat-left-fg: #a33227;
+  --chat-correct-bg: rgba(31, 122, 76, 0.17);
+  --chat-correct-fg: #14663c;
+  --chat-own-bg: rgba(124, 58, 237, 0.12);
+  --chat-own-fg: #6b21a8;
+  --chat-liked-bg: rgba(31, 122, 76, 0.17);
+  --chat-liked-fg: #14663c;
+  --chat-disliked-bg: rgba(179, 54, 43, 0.14);
+  --chat-disliked-fg: #a12f25;
+  --chat-drawing-bg: rgba(37, 99, 235, 0.12);
+  --chat-drawing-fg: #1d4ed8;
+  --chat-close-bg: rgba(242, 179, 61, 0.28);
+  --chat-close-fg: #7a4f00;
+  --chat-word-bg: rgba(8, 145, 178, 0.13);
+  --chat-word-fg: #0e6b7a;
+  --chat-round-bg: rgba(37, 99, 235, 0.12);
+  --chat-round-fg: #1d4ed8;
+  --chat-disconnected-bg: rgba(194, 65, 12, 0.13);
+  --chat-disconnected-fg: #9a3d0c;
+  --chat-reconnected-bg: rgba(31, 122, 76, 0.13);
+  --chat-reconnected-fg: #17663f;
+  --chat-announcement-bg: rgba(124, 58, 237, 0.12);
+  --chat-announcement-fg: #6b21a8;
+  --chat-error-bg: rgba(179, 54, 43, 0.14);
+  --chat-error-fg: #a12f25;
+}
+
 .match-page .chat {
   background: var(--panel);
-  color: var(--ink);
+  color: var(--chat-normal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4788,40 +4779,59 @@ p {
 .match-page .msgs {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  gap: 2px;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--raised) transparent;
+}
+
+/* Keep a short history anchored to the bottom without breaking scrolling once
+   the messages overflow. */
+.match-page .msgs::before {
+  content: "";
+  margin-top: auto;
 }
 
 .match-page .m {
-  padding: 3px 6px;
+  width: 100%;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-size: 14px;
-  line-height: 1.25;
+  line-height: 1.3;
   word-break: break-word;
   flex: none;
 }
 
-.match-page .m:nth-child(even) {
-  background: var(--row-b);
-}
-
-.match-page .m.sys {
-  color: var(--sys);
+.match-page .m-name {
+  color: var(--chat-name);
   font-weight: 700;
 }
 
-.match-page .m.ok {
-  color: var(--ok);
-  font-weight: 700;
-}
-
-.match-page .m.blue {
-  color: var(--accent-ink);
-  font-weight: 700;
+/* Game events use the same full-width, softly tinted rows as classic Skribbl,
+   while normal chat stays on the plain paper background. */
+.match-page .m--player_joined,
+.match-page .m--player_left,
+.match-page .m--correct_guess,
+.match-page .m--own_correct_guess,
+.match-page .m--liked,
+.match-page .m--disliked,
+.match-page .m--drawing_started,
+.match-page .m--close_guess,
+.match-page .m--word_revealed,
+.match-page .m--round_started,
+.match-page .m--disconnected,
+.match-page .m--reconnected,
+.match-page .m--announcement,
+.match-page .m--error {
+  font-weight: 600;
 }
 
 .match-page .chat input {
+  flex: 0 0 auto;
   border: 2px solid var(--accent);
   border-radius: var(--radius);
   padding: 8px;
@@ -5188,7 +5198,6 @@ p {
     grid-column: 2;
     grid-row: 3;
     background: var(--panel);
-    justify-content: flex-start;
   }
 
   .match-page .m {

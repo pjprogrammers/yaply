@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { MAX_CHAT_LENGTH } from "@yaply/shared/constants";
-import type { ChatMessage } from "./chat";
+import { resolveChatMessageType } from "@/lib/chat-message";
+import type { ChatMessage } from "@/lib/chat-message";
 
 type MatchChatProps = {
   messages: ChatMessage[];
@@ -11,47 +12,10 @@ type MatchChatProps = {
   placeholder?: string;
 };
 
-function messageTone(message: ChatMessage): "" | "sys" | "ok" | "blue" {
-  if (message.private) return "ok";
-  if (!message.system) return "";
-
-  switch (message.type) {
-    case "player_joined":
-    case "correct_guess":
-    case "own_correct_guess":
-    case "reconnected":
-    case "liked":
-      return "ok";
-    case "player_left":
-    case "disconnected":
-    case "error":
-    case "disliked":
-      return "sys";
-    case "drawing_started":
-    case "round_started":
-    case "word_revealed":
-    case "close_guess":
-    case "announcement":
-      return "blue";
-    default:
-      break;
-  }
-
-  // Older messages can arrive without a type; fall back to the same wording
-  // checks the regular room chat uses.
-  const text = message.text.toLowerCase();
-  if (text.includes("joined the room") || text.includes("guessed the word")) return "ok";
-  if (text.includes("left the room") || text.includes("disconnected")) return "sys";
-  // Check "disliked" before "liked": the former contains the latter.
-  if (text.includes("disliked the drawing")) return "sys";
-  if (text.includes("liked the drawing")) return "ok";
-  if (text.includes("drawing") || text.includes("round") || text.includes("word was")) return "blue";
-  return "";
-}
-
 /**
- * The match chat mirrors the classic layout: a plain message stack whose rows
- * alternate backgrounds and a borderless input docked under it.
+ * The match chat mirrors the classic layout: neutral player messages and
+ * full-width, softly tinted rows for game events. The list sticks to the
+ * newest line only while the reader is already at the bottom.
  */
 export function MatchChat({
   messages,
@@ -61,13 +25,21 @@ export function MatchChat({
 }: MatchChatProps) {
   const [value, setValue] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const stayAtBottomRef = useRef(true);
   const composingRef = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
-    list.scrollTop = list.scrollHeight;
+    if (stayAtBottomRef.current) list.scrollTop = list.scrollHeight;
   }, [messages]);
+
+  const handleScroll = () => {
+    const list = listRef.current;
+    if (!list) return;
+    const distance = list.scrollHeight - list.scrollTop - list.clientHeight;
+    stayAtBottomRef.current = distance < 32;
+  };
 
   const submit = () => {
     if (composingRef.current) return;
@@ -79,12 +51,22 @@ export function MatchChat({
 
   return (
     <div className="chat">
-      <div className="msgs" ref={listRef} role="log" aria-live="polite">
+      <div className="msgs" ref={listRef} onScroll={handleScroll} role="log" aria-live="polite">
         {messages.map((message) => {
-          const tone = messageTone(message);
+          const type = resolveChatMessageType(message);
+          const isEvent = type !== "normal";
           return (
-            <div key={message.id} className={`m ${tone}`.trim()}>
-              {message.system ? message.text : `${message.nickname}: ${message.text}`}
+            <div
+              key={message.id}
+              className={["m", isEvent ? `m--${type}` : ""].filter(Boolean).join(" ")}
+            >
+              {message.system ? (
+                message.text
+              ) : (
+                <>
+                  <span className="m-name">{message.nickname}:</span> {message.text}
+                </>
+              )}
             </div>
           );
         })}

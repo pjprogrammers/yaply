@@ -4,6 +4,7 @@ import { WORD_ALIASES, WORD_CATEGORIES_BY_LANGUAGE, WORDS } from "../src/words";
 import {
   acceptedAnswers,
   containsSecretWord,
+  isCloseGuess,
   isExactGuess,
   maskWord,
   matchesWord,
@@ -174,5 +175,21 @@ describe("multilingual guesses", () => {
     expect(isExactGuess("kimchi", "kimchi")).toBe(true);
     expect(isExactGuess("kimchi soup", "kimchi")).toBe(false);
     expect(matchesWord("kimchi soup", "kimchi")).toBe(true);
+  });
+});
+
+describe("close guesses", () => {
+  it("recognises small typos as near misses", () => {
+    expect(isCloseGuess("daughrer", "daughter")).toBe(true);
+    expect(isCloseGuess("daughters", "daughter")).toBe(true);
+    expect(isCloseGuess("kimci", "kimchi")).toBe(true);
+    expect(isCloseGuess("hot air ballon", "hot air balloon")).toBe(true);
+  });
+
+  it("does not flag unrelated messages or whole sentences", () => {
+    expect(isCloseGuess("dog", "daughter")).toBe(false);
+    expect(isCloseGuess("nice drawing", "daughter")).toBe(false);
+    expect(isCloseGuess("hot air balloon ride", "hot air balloon")).toBe(false);
+    expect(isCloseGuess("kimchi soup", "kimchi")).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
   MAX_STROKE_POINTS_PER_MESSAGE,
   SMASH_MAX_PLAYERS,
 } from "./constants";
+import { CHAT_EVENT_KINDS } from "./events";
 
 const noControlCharacters = (value: string) => !/[\u0000-\u001f\u007f]/.test(value);
 
@@ -427,6 +428,7 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     text: z.string(),
     createdAt: z.number(),
     system: z.boolean().optional(),
+    kind: z.enum(CHAT_EVENT_KINDS).optional(),
     private: z.boolean().optional(),
   }),
   z.object({

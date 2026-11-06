@@ -151,3 +151,40 @@ export function isExactGuess(text: string, word: string): boolean {
     return compactForWordMatch(answer) === compactGuess;
   });
 }
+
+/** Levenshtein distance, used only for the friendly "very close" hint. */
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      const insert = current[j - 1] + 1;
+      const remove = previous[j] + 1;
+      const replace = previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1);
+      current[j] = Math.min(insert, remove, replace);
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/**
+ * True when a wrong guess is a near miss for the answer. Longer words get a
+ * little more room, while whole sentences are never treated as close.
+ */
+export function isCloseGuess(text: string, word: string): boolean {
+  const guess = normalizeForWordMatch(text).replace(/\s+/g, " ").trim();
+  if (!guess) return false;
+
+  return acceptedAnswers(word).some((answer) => {
+    const target = normalizeForWordMatch(answer).replace(/\s+/g, " ").trim();
+    if (!target) return false;
+    const tolerance = target.length <= 4 ? 1 : target.length <= 8 ? 2 : 3;
+    if (Math.abs(guess.length - target.length) > tolerance) return false;
+    return editDistance(guess, target) <= tolerance;
+  });
+}

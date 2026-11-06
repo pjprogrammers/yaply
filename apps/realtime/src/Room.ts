@@ -10,7 +10,7 @@ import type {
   SmashMatchSnapshot,
   Stroke,
 } from "@yaply/shared/types";
-import type { ClientEvent, ServerEvent } from "@yaply/shared/events";
+import type { ChatEventKind, ClientEvent, ServerEvent } from "@yaply/shared/events";
 import {
   CHAIN_MAX_MOVES,
   DEFAULT_GAME_SETTINGS,
@@ -47,7 +47,7 @@ import {
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
-import { pickWordChoices, isExactGuess, matchesWord, containsSecretWord } from "./words-util";
+import { pickWordChoices, isExactGuess, isCloseGuess, matchesWord, containsSecretWord } from "./words-util";
 import { calculateGuessPoints, calculateDrawerPoints } from "./scoring";
 import {
   applyChainMove,
@@ -981,7 +981,7 @@ export class GameRoom {
     this.attachSocket(ws, player);
     this.sendWelcome(ws, player);
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
-    this.broadcastSystemChat(`${player.nickname} joined the room.`);
+    this.broadcastSystemChat(`${player.nickname} joined the room.`, "player_joined");
     logRoom("info", "room.created", {
       game: this.room.game,
       code: safeCode(this.room.code),
@@ -1078,7 +1078,7 @@ export class GameRoom {
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcast({ type: "room.player.joined", playerId: departed.id });
       this.broadcastSnapshot();
-      this.broadcastSystemChat(`${departed.nickname} rejoined the room.`);
+      this.broadcastSystemChat(`${departed.nickname} rejoined the room.`, "reconnected");
       logRoom("info", "room.rejoined_match", {
         game: this.room.game,
         code: safeCode(this.room.code),
@@ -1122,7 +1122,7 @@ export class GameRoom {
     this.sendSmashState(ws);
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
     this.broadcastSnapshot();
-    this.broadcastSystemChat(`${player.nickname} joined the room.`);
+    this.broadcastSystemChat(`${player.nickname} joined the room.`, "player_joined");
     logRoom("info", "room.joined", {
       game: this.room.game,
       code: safeCode(this.room.code),
@@ -1153,7 +1153,7 @@ export class GameRoom {
       player.lastSeen = Date.now();
       this.room.lastActivity = Date.now();
       this.broadcast({ type: "room.player.left", playerId: player.id });
-      this.broadcastSystemChat(`${player.nickname} left the room.`);
+      this.broadcastSystemChat(`${player.nickname} left the room.`, "player_left");
     } else {
       this.removePlayer(player.id, "left");
     }
@@ -1184,7 +1184,7 @@ export class GameRoom {
     }
 
     this.startGame();
-    this.broadcastSystemChat("The game started.");
+    this.broadcastSystemChat("The game started.", "round_started");
     logRoom("info", "room.started", {
       game: this.room.game,
       code: safeCode(this.room.code),
@@ -1347,7 +1347,7 @@ export class GameRoom {
       });
     }
 
-    this.broadcastSystemChat(`${drawer.nickname} is choosing a word.`);
+    this.broadcastSystemChat(`${drawer.nickname} is choosing a word.`, "drawing_started");
     this.broadcastSnapshot();
   }
 
@@ -1383,7 +1383,7 @@ export class GameRoom {
     }
 
     const drawer = this.player(this.room.drawerId);
-    if (drawer) this.broadcastSystemChat(`${drawer.nickname} is drawing.`);
+    if (drawer) this.broadcastSystemChat(`${drawer.nickname} is drawing.`, "drawing_started");
     this.broadcastSnapshot();
   }
 
@@ -1530,6 +1530,10 @@ export class GameRoom {
         this.sendSecretMessage(player, trimmed);
       } else {
         this.broadcastChat(player, trimmed);
+        // A near miss is a private nudge, not a room-wide event.
+        if (isCloseGuess(trimmed, selectedWord)) {
+          this.sendSystemChat(player.id, "You are very close to the word!", "close_guess");
+        }
       }
       return;
     }
@@ -1554,7 +1558,7 @@ export class GameRoom {
       nickname: player.nickname,
       points,
     });
-    this.broadcastSystemChat(`${player.nickname} guessed the word (+${points}).`);
+    this.broadcastGuessChat(player, points);
 
     const guessers = this.room.players.filter(
       (entry) => entry.id !== this.room.drawerId && entry.connected,
@@ -1584,7 +1588,10 @@ export class GameRoom {
     this.reactedPlayerIds.add(player.id);
 
     const verb = reaction === "like" ? "liked" : "disliked";
-    this.broadcastSystemChat(`${player.nickname} ${verb} the drawing`);
+    this.broadcastSystemChat(
+      `${player.nickname} ${verb} the drawing`,
+      reaction === "like" ? "liked" : "disliked",
+    );
   }
 
   private sendSecretMessage(player: StoredPlayer, text: string) {
@@ -1621,7 +1628,7 @@ export class GameRoom {
     });
   }
 
-  private broadcastSystemChat(text: string) {
+  private broadcastSystemChat(text: string, kind?: ChatEventKind) {
     this.broadcast({
       type: "chat.message",
       playerId: "system",
@@ -1629,7 +1636,47 @@ export class GameRoom {
       text,
       createdAt: Date.now(),
       system: true,
+      kind,
     });
+  }
+
+  /** Send a system chat line to one player without leaking it to the room. */
+  private sendSystemChat(playerId: string, text: string, kind: ChatEventKind) {
+    const ws = this.playerSockets.get(playerId);
+    if (!ws) return;
+    this.send(ws, {
+      type: "chat.message",
+      playerId: "system",
+      nickname: "Room",
+      text,
+      createdAt: Date.now(),
+      system: true,
+      kind,
+    });
+  }
+
+  /**
+   * Correct guessers see a personal purple line; everyone else sees the green
+   * room announcement. Both carry the semantic kind so the UI stays in charge
+   * of presentation.
+   */
+  private broadcastGuessChat(guesser: StoredPlayer, points: number) {
+    const createdAt = Date.now();
+    for (const [ws, playerId] of this.sockets.entries()) {
+      if (!playerId) continue;
+      const own = playerId === guesser.id;
+      this.send(ws, {
+        type: "chat.message",
+        playerId: "system",
+        nickname: "Room",
+        text: own
+          ? "You guessed the word!"
+          : `${guesser.nickname} guessed the word (+${points}).`,
+        createdAt,
+        system: true,
+        kind: own ? "own_correct_guess" : "correct_guess",
+      });
+    }
   }
 
   private endRound(reason: "all-guessed" | "timeout" | "drawer-disconnected") {
@@ -1653,7 +1700,7 @@ export class GameRoom {
       word,
       rankings: this.rankings(),
     });
-    this.broadcastSystemChat(`The word was "${word}".`);
+    this.broadcastSystemChat(`The word was "${word}".`, "word_revealed");
     this.broadcastSnapshot();
   }
 
@@ -1673,7 +1720,7 @@ export class GameRoom {
 
     const rankings = this.rankings();
     this.broadcast({ type: "game.finished", rankings, winnerId: rankings[0]?.playerId });
-    this.broadcastSystemChat("The game is over.");
+    this.broadcastSystemChat("The game is over.", "announcement");
     this.broadcastSnapshot();
   }
 
@@ -1720,7 +1767,7 @@ export class GameRoom {
 
     for (const eliminatedId of result.eliminated) {
       const eliminated = this.player(eliminatedId);
-      if (eliminated) this.broadcastSystemChat(`${eliminated.nickname} was eliminated.`);
+      if (eliminated) this.broadcastSystemChat(`${eliminated.nickname} was eliminated.`, "announcement");
     }
 
     this.broadcastSnapshot();
@@ -1751,7 +1798,7 @@ export class GameRoom {
 
     this.room.chain = next;
     this.syncChainScores();
-    this.broadcastSystemChat(`${player.nickname} surrendered.`);
+    this.broadcastSystemChat(`${player.nickname} surrendered.`, "announcement");
     this.broadcastSnapshot();
 
     if (next.winnerId) {
@@ -1802,7 +1849,7 @@ export class GameRoom {
       .filter((entry): entry is Ranking => entry !== null);
 
     const winner = this.player(winnerId);
-    if (winner) this.broadcastSystemChat(`${winner.nickname} won the board.`);
+    if (winner) this.broadcastSystemChat(`${winner.nickname} won the board.`, "announcement");
     this.broadcast({ type: "game.finished", rankings, winnerId: winnerId ?? undefined });
     this.broadcastSnapshot();
   }
@@ -1820,7 +1867,7 @@ export class GameRoom {
     const current = this.player(currentId);
     if (current) {
       this.broadcast({ type: "chain.turn.timeout", playerId: currentId });
-      this.broadcastSystemChat(`${current.nickname} ran out of time.`);
+      this.broadcastSystemChat(`${current.nickname} ran out of time.`, "announcement");
     }
 
     const autoMove = pickAutoMove(this.room.chain, currentId);
@@ -1967,7 +2014,7 @@ export class GameRoom {
     this.room.endsAt = null;
     const winnerId = rankings[0]?.playerId ?? null;
     const winner = this.player(winnerId);
-    if (winner) this.broadcastSystemChat(`${winner.nickname} won the match.`);
+    if (winner) this.broadcastSystemChat(`${winner.nickname} won the match.`, "announcement");
     this.broadcast({ type: "game.finished", rankings, winnerId: winnerId ?? undefined });
     this.broadcastSnapshot();
   }
@@ -1989,7 +2036,7 @@ export class GameRoom {
     }
 
     this.startGame();
-    this.broadcastSystemChat("Rematch started.");
+    this.broadcastSystemChat("Rematch started.", "round_started");
     await this.commit();
   }
 
@@ -2084,7 +2131,10 @@ export class GameRoom {
       });
     }
 
-    this.broadcastSystemChat(`${player.nickname} ${reason === "left" ? "left the room" : "disconnected"}.`);
+    this.broadcastSystemChat(
+      `${player.nickname} ${reason === "left" ? "left the room" : "disconnected"}.`,
+      reason === "left" ? "player_left" : "disconnected",
+    );
     if (wasTurn && this.room.chain && !this.room.chain.turnEndsAt) {
       this.room.chain.turnEndsAt = Date.now() + (this.room.settings.turnTimeSeconds ?? 45) * 1000;
     }
@@ -2310,7 +2360,7 @@ export class GameRoom {
         // The old host keeps its seat for the reconnect grace period. If it
         // comes back it returns as a guest so two engines never race.
         this.room.hostId = next.id;
-        this.broadcastSystemChat(`${next.nickname} is now hosting the match.`);
+        this.broadcastSystemChat(`${next.nickname} is now hosting the match.`, "announcement");
         changed = true;
       }
     }

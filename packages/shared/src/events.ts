@@ -9,6 +9,30 @@ import type {
   SmashMatchSnapshot,
 } from "./types";
 
+/**
+ * Semantic kinds for system chat lines. The server says what happened and the
+ * chat UI decides how it looks, so colours stay a presentation concern and
+ * never leak into the game rules.
+ */
+export const CHAT_EVENT_KINDS = [
+  "player_joined",
+  "player_left",
+  "correct_guess",
+  "own_correct_guess",
+  "liked",
+  "disliked",
+  "drawing_started",
+  "close_guess",
+  "word_revealed",
+  "round_started",
+  "disconnected",
+  "reconnected",
+  "announcement",
+  "error",
+] as const;
+
+export type ChatEventKind = (typeof CHAT_EVENT_KINDS)[number];
+
 export type ClientEvent =
   | {
       type: "room.create";
@@ -81,6 +105,8 @@ export type ServerEvent =
       text: string;
       createdAt: number;
       system?: boolean;
+      /** Semantic event kind for system lines; the UI maps it to a colour. */
+      kind?: ChatEventKind;
       /** True when the server applied secret-word visibility to this message. */
       private?: boolean;
     }

@@ -18,7 +18,8 @@ import {
   REALTIME_URL,
   storeNickname,
 } from "@/lib/config";
-import type { ChatMessage } from "./chat";
+import { classifyChatEvent } from "@/lib/chat-message";
+import type { ChatMessage } from "@/lib/chat-message";
 import { DrawingCanvas } from "./drawing-canvas";
 import {
   CheckIcon,
@@ -213,23 +214,7 @@ function ConnectedRoom({
     switch (event.type) {
       case "chat.message": {
         const msgType = event.system
-          ? (() => {
-              const text = event.text.toLowerCase();
-              if (text.includes("joined the room") || text.includes("reconnect")) return "player_joined" as const;
-              if (text.includes("left the room")) return "player_left" as const;
-              if (text.includes("disconnected")) return "disconnected" as const;
-              if (text.includes("you guessed")) return "own_correct_guess" as const;
-              if (text.includes("guessed the word")) return "correct_guess" as const;
-              // Check "disliked" before "liked": the former contains the latter.
-              if (text.includes("disliked the drawing")) return "disliked" as const;
-              if (text.includes("liked the drawing")) return "liked" as const;
-              if (text.includes("drawing")) return "drawing_started" as const;
-              if (text.includes("round")) return "round_started" as const;
-              if (text.includes("word was") || text.includes("revealed")) return "word_revealed" as const;
-              if (text.includes("close")) return "close_guess" as const;
-              if (text.includes("error")) return "error" as const;
-              return "announcement" as const;
-            })()
+          ? event.kind ?? classifyChatEvent(event.text)
           : "normal";
         setMessages((previous) => [
           ...previous.slice(-90),
