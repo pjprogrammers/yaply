@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isWordLanguage, MAX_NICKNAME_LENGTH, WORD_LANGUAGES } from "@yaply/shared/constants";
-import type { WordLanguage } from "@yaply/shared/types";
+import type { SkribblMode, SkribblTheme, WordLanguage } from "@yaply/shared/types";
 import { ArrowLeftIcon, PlayIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
 import { Topbar } from "@/components/topbar";
@@ -23,6 +23,8 @@ function CreateContent() {
   const [drawTime, setDrawTime] = useState(80);
   const [words, setWords] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(8);
+  const [mode, setMode] = useState<SkribblMode>("light");
+  const [roomTheme, setRoomTheme] = useState<SkribblTheme>("paper");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,6 +50,8 @@ function CreateContent() {
         words: String(words),
         max: String(maxPlayers),
         lang: language,
+        mode,
+        theme: roomTheme,
       });
       router.push(`/room/${code}?${params.toString()}`);
     } catch (cause) {
@@ -158,6 +162,30 @@ function CreateContent() {
                       { label: "12", value: 12 },
                     ]}
                     onChange={setMaxPlayers}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Mode</span>
+                  <Segmented
+                    label="Light or dark room"
+                    value={mode}
+                    options={[
+                      { label: "Light", value: "light" },
+                      { label: "Dark", value: "dark" },
+                    ]}
+                    onChange={setMode}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">Theme</span>
+                  <Segmented
+                    label="Room theme"
+                    value={roomTheme}
+                    options={[
+                      { label: "Paper", value: "paper" },
+                      { label: "Classic", value: "classic" },
+                    ]}
+                    onChange={setRoomTheme}
                   />
                 </div>
               </div>

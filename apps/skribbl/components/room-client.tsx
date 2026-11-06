@@ -112,6 +112,8 @@ export function RoomClient({ code }: { code: string }) {
   const isHost = searchParams.get("host") === "1";
   const settings = useMemo<GameSettings>(() => {
     const language = searchParams.get("lang");
+    const mode = searchParams.get("mode");
+    const theme = searchParams.get("theme");
     return {
       ...DEFAULT_GAME_SETTINGS,
       rounds: numberParam(searchParams.get("rounds"), DEFAULT_GAME_SETTINGS.rounds, 1, 10),
@@ -124,6 +126,8 @@ export function RoomClient({ code }: { code: string }) {
       wordCount: numberParam(searchParams.get("words"), DEFAULT_GAME_SETTINGS.wordCount ?? 3, 2, 5),
       maxPlayers: numberParam(searchParams.get("max"), DEFAULT_GAME_SETTINGS.maxPlayers, 2, 12),
       language: isWordLanguage(language) ? language : DEFAULT_GAME_SETTINGS.language,
+      skribblMode: mode === "dark" ? "dark" : "light",
+      skribblTheme: theme === "classic" ? "classic" : "paper",
     };
   }, [searchParams]);
 
@@ -308,6 +312,8 @@ function ConnectedRoom({
   const isDrawer = snapshot?.drawerId === playerId;
   const phase = snapshot?.phase ?? "lobby";
   const roomSettings = snapshot?.settings ?? initialSettings;
+  const roomMode = roomSettings.skribblMode === "dark" ? "dark" : "light";
+  const roomTheme = roomSettings.skribblTheme === "classic" ? "classic" : "paper";
   const drawer = snapshot?.players.find((player) => player.id === snapshot.drawerId) ?? null;
   const remaining = useCountdown(snapshot?.endsAt ?? null, now);
   const fatal = error && FATAL_CODES.has(error.code) ? error : null;
@@ -713,7 +719,7 @@ function ConnectedRoom({
     : [];
 
   return (
-    <div className="match-page">
+    <div className="match-page" data-room-theme={roomTheme} data-room-mode={roomMode}>
       <div className="match-logo">Yaply Skribbl</div>
 
       <div className="match-bar">

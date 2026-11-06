@@ -41,6 +41,8 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   allowLateJoin: true,
   wordCount: 3,
   turnTimeSeconds: 45,
+  skribblMode: "light",
+  skribblTheme: "paper",
   playerCount: 4,
   boardSize: "medium",
   palette: "classic",

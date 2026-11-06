@@ -8,6 +8,10 @@ export type GameKind = "skribbl" | "chain" | "smashkarts";
  */
 export type WordLanguage = "en" | "tl" | "ja" | "ko";
 
+/** Skribbl room presentation controls, chosen by the host. */
+export type SkribblMode = "light" | "dark";
+export type SkribblTheme = "paper" | "classic";
+
 export type ChainBoardSize = "small" | "medium" | "large" | "xxl";
 export type ChainPaletteId = "classic" | "vivid" | "pastel" | "neon" | "mono" | "custom";
 export type ChainTheme = "dark" | "light" | "neon";
@@ -99,6 +103,10 @@ export type GameSettings = {
   allowLateJoin: boolean;
   wordCount?: number;
   turnTimeSeconds?: number;
+  /** Light or dark surface treatment for a Skribbl room. */
+  skribblMode?: SkribblMode;
+  /** Paper is the Yaply look; Classic mirrors the layout.html skribbl theme. */
+  skribblTheme?: SkribblTheme;
   /** Desired seats for a local game. Online rooms use it as the capacity. */
   playerCount?: number;
   boardSize?: ChainBoardSize;

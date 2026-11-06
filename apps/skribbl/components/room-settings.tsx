@@ -113,6 +113,42 @@ export function RoomSettingsFields({
           <span className="setting-value">{settings.maxPlayers}</span>
         )}
       </div>
+      <div className="setting-row">
+        <span className="setting-label">Mode</span>
+        {isHost ? (
+          <Segmented
+            label="Light or dark room"
+            value={settings.skribblMode ?? "light"}
+            options={[
+              { label: "Light", value: "light" },
+              { label: "Dark", value: "dark" },
+            ]}
+            onChange={(value) => onChange({ skribblMode: value })}
+          />
+        ) : (
+          <span className="setting-value">
+            {settings.skribblMode === "dark" ? "Dark" : "Light"}
+          </span>
+        )}
+      </div>
+      <div className="setting-row">
+        <span className="setting-label">Theme</span>
+        {isHost ? (
+          <Segmented
+            label="Room theme"
+            value={settings.skribblTheme ?? "paper"}
+            options={[
+              { label: "Paper", value: "paper" },
+              { label: "Classic", value: "classic" },
+            ]}
+            onChange={(value) => onChange({ skribblTheme: value })}
+          />
+        ) : (
+          <span className="setting-value">
+            {settings.skribblTheme === "classic" ? "Classic" : "Paper"}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

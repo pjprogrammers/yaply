@@ -4265,6 +4265,35 @@ p {
   --radius-card: 10px;
   --radius-control: 999px;
 
+  /* Presentation tokens keep the paper, classic and dark variants from
+     hard-coding their own colours in individual selectors. */
+  --outer-muted: #b8b1a2;
+  --bar-btn-bg: #171613;
+  --bar-btn-border: rgba(244, 238, 224, 0.24);
+  --bar-btn-fg: var(--paper);
+  --bar-btn-hover-bg: var(--accent);
+  --bar-btn-hover-fg: var(--ink);
+  --room-code-fg: var(--accent);
+  --on-accent: #0a0a09;
+  --solid-btn-bg: var(--ink);
+  --solid-btn-fg: var(--paper);
+  --solid-btn-hover-bg: #2a2620;
+  --solid-btn-hover-fg: var(--paper);
+  --me-row: #f6e2b6;
+  --canvas: #fbf7ee;
+  --input-bg: #fbf7ee;
+  --placeholder: #8a8273;
+  --thumb-hover: rgba(10, 10, 9, 0.08);
+  --control-border: rgba(10, 10, 9, 0.55);
+  --button-hover: #2a2620;
+  --overlay: rgba(10, 10, 9, 0.74);
+  --modal-border: #d8cbb4;
+  --toast-bg: #141412;
+  --toast-fg: var(--paper);
+  --toast-error-fg: #ff9a8a;
+  --toast-error-border: #b3362b;
+  --shadow-color: rgba(0, 0, 0, 0.55);
+
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--pat), var(--bg);
@@ -4277,6 +4306,262 @@ p {
   align-items: center;
   padding: 14px;
   gap: 10px;
+}
+
+/* Classic mirrors the default room in layout.html: blue patterned backdrop,
+   white name boxes, square corners and the original green/orange event inks. */
+.match-page[data-room-theme="classic"] {
+  --pat: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='%232d5fb8' stroke-width='3' stroke-linecap='round'><circle cx='30' cy='30' r='9'/><path d='M30 12v6M30 42v6M12 30h6M42 30h6'/><path d='M80 20l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z'/><rect x='20' y='78' width='22' height='22' rx='3'/><path d='M70 85q8-12 16 0t16 0'/></svg>");
+  --bg: #1f4a9c;
+  --paper: #ffffff;
+  --paper-deep: #ececec;
+  --panel: #ffffff;
+  --ink: #111111;
+  --row-a: #ffffff;
+  --row-b: #ececec;
+  --good: #7ee05a;
+  --sub: #555555;
+  --accent: #2b5fc9;
+  --accent-ink: #2b5fc9;
+  --radius: 0px;
+  --gap: 0px;
+  --sys: #d4421b;
+  --ok: #2f9e1a;
+
+  --ground: #1f4a9c;
+  --surface: #ffffff;
+  --surface-2: #ececec;
+  --raised: #dddddd;
+  --border: #c9c9c9;
+  --rule: #dddddd;
+  --control: #888888;
+  --text: #111111;
+  --muted: #555555;
+  --faint: #777777;
+  --positive: #2f9e1a;
+  --negative: #d4421b;
+  --eyebrow: #2b5fc9;
+  --radius-card: 0px;
+  --font-display: var(--font);
+
+  --outer-muted: #dbe6ff;
+  --bar-btn-bg: rgba(255, 255, 255, 0.14);
+  --bar-btn-border: rgba(255, 255, 255, 0.45);
+  --bar-btn-fg: #ffffff;
+  --bar-btn-hover-bg: #ffffff;
+  --bar-btn-hover-fg: #1f4a9c;
+  --room-code-fg: #ffffff;
+  --on-accent: #ffffff;
+  --solid-btn-bg: #111111;
+  --solid-btn-fg: #ffffff;
+  --solid-btn-hover-bg: #333333;
+  --solid-btn-hover-fg: #ffffff;
+  --me-row: #e6efff;
+  --canvas: #ffffff;
+  --input-bg: #ffffff;
+  --placeholder: #777777;
+  --thumb-hover: rgba(0, 0, 0, 0.08);
+  --control-border: rgba(0, 0, 0, 0.45);
+  --button-hover: #333333;
+  --overlay: rgba(13, 26, 52, 0.76);
+  --modal-border: #c9c9c9;
+  --toast-bg: #111111;
+  --toast-fg: #ffffff;
+  --toast-error-fg: #ff9a8a;
+  --toast-error-border: #d4421b;
+  --shadow-color: rgba(0, 0, 0, 0.55);
+
+  --chat-normal: #111111;
+  --chat-name: #111111;
+  --chat-joined-bg: rgba(47, 158, 26, 0.14);
+  --chat-joined-fg: #2f7a12;
+  --chat-left-bg: rgba(212, 66, 27, 0.12);
+  --chat-left-fg: #b43c16;
+  --chat-correct-bg: rgba(47, 158, 26, 0.16);
+  --chat-correct-fg: #2f7a12;
+  --chat-own-bg: rgba(43, 95, 201, 0.12);
+  --chat-own-fg: #2b5fc9;
+  --chat-secret-bg: rgba(47, 158, 26, 0.16);
+  --chat-secret-fg: #2f7a12;
+  --chat-liked-bg: rgba(47, 158, 26, 0.16);
+  --chat-liked-fg: #2f7a12;
+  --chat-disliked-bg: rgba(212, 66, 27, 0.14);
+  --chat-disliked-fg: #b43c16;
+  --chat-drawing-bg: rgba(43, 95, 201, 0.12);
+  --chat-drawing-fg: #2b5fc9;
+  --chat-close-bg: rgba(242, 179, 61, 0.3);
+  --chat-close-fg: #7a4f00;
+  --chat-word-bg: rgba(8, 145, 178, 0.13);
+  --chat-word-fg: #0e6b7a;
+  --chat-round-bg: rgba(43, 95, 201, 0.12);
+  --chat-round-fg: #2b5fc9;
+  --chat-disconnected-bg: rgba(212, 66, 27, 0.12);
+  --chat-disconnected-fg: #b43c16;
+  --chat-reconnected-bg: rgba(47, 158, 26, 0.14);
+  --chat-reconnected-fg: #2f7a12;
+  --chat-announcement-bg: rgba(124, 58, 237, 0.12);
+  --chat-announcement-fg: #6b21a8;
+  --chat-error-bg: rgba(212, 66, 27, 0.14);
+  --chat-error-fg: #b43c16;
+}
+
+.match-page[data-room-theme="classic"] .match-logo {
+  font-family: var(--font);
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Dark mode works on both themes. The paper palette becomes an ink surface
+   with warm paper text, while classic switches to layout.html's dark board. */
+.match-page[data-room-mode="dark"] {
+  --bg: #0a0a09;
+  --paper: #f4eee0;
+  --paper-deep: #2a2823;
+  --panel: #1c1b18;
+  --ink: #f4eee0;
+  --row-a: #1c1b18;
+  --row-b: #24231f;
+  --good: #1f6b45;
+  --sub: #b8b1a2;
+  --accent: #f2b33d;
+  --accent-ink: #f2b33d;
+  --sys: #ff8a7a;
+  --ok: #5fd08c;
+
+  --ground: #0a0a09;
+  --surface: #141412;
+  --surface-2: #1c1b18;
+  --raised: #2a2823;
+  --border: #3a362d;
+  --rule: #2a2823;
+  --control: #5c5548;
+  --text: #f4eee0;
+  --muted: #b8b1a2;
+  --faint: #8f8778;
+  --positive: #3fc07a;
+  --negative: #ef6b6b;
+  --eyebrow: #f2b33d;
+
+  --outer-muted: #b8b1a2;
+  --bar-btn-bg: #171613;
+  --bar-btn-border: rgba(244, 238, 224, 0.24);
+  --bar-btn-fg: #f4eee0;
+  --bar-btn-hover-bg: #f2b33d;
+  --bar-btn-hover-fg: #0a0a09;
+  --room-code-fg: #f2b33d;
+  --on-accent: #0a0a09;
+  --solid-btn-bg: #f4eee0;
+  --solid-btn-fg: #0a0a09;
+  --solid-btn-hover-bg: #d8cbb4;
+  --solid-btn-hover-fg: #0a0a09;
+  --me-row: #342d1d;
+  --canvas: #fbf7ee;
+  --input-bg: #24231f;
+  --placeholder: #8f8778;
+  --thumb-hover: rgba(255, 255, 255, 0.1);
+  --control-border: rgba(244, 238, 224, 0.42);
+  --button-hover: #2a2823;
+  --overlay: rgba(0, 0, 0, 0.76);
+  --modal-border: #3a362d;
+  --toast-bg: #f4eee0;
+  --toast-fg: #0a0a09;
+  --toast-error-fg: #b3362b;
+  --toast-error-border: #b3362b;
+  --shadow-color: rgba(0, 0, 0, 0.7);
+
+  --chat-normal: #f4eee0;
+  --chat-name: #ffffff;
+  --chat-joined-bg: rgba(16, 185, 129, 0.14);
+  --chat-joined-fg: #34d399;
+  --chat-left-bg: rgba(249, 115, 22, 0.14);
+  --chat-left-fg: #fb923c;
+  --chat-correct-bg: rgba(34, 197, 94, 0.16);
+  --chat-correct-fg: #4ade80;
+  --chat-own-bg: rgba(168, 85, 247, 0.16);
+  --chat-own-fg: #c084fc;
+  --chat-secret-bg: rgba(63, 192, 122, 0.16);
+  --chat-secret-fg: #86efac;
+  --chat-liked-bg: rgba(34, 197, 94, 0.16);
+  --chat-liked-fg: #4ade80;
+  --chat-disliked-bg: rgba(239, 68, 68, 0.16);
+  --chat-disliked-fg: #f87171;
+  --chat-drawing-bg: rgba(59, 130, 246, 0.16);
+  --chat-drawing-fg: #60a5fa;
+  --chat-close-bg: rgba(251, 191, 36, 0.16);
+  --chat-close-fg: #fbbf24;
+  --chat-word-bg: rgba(6, 182, 212, 0.16);
+  --chat-word-fg: #22d3ee;
+  --chat-round-bg: rgba(59, 130, 246, 0.16);
+  --chat-round-fg: #60a5fa;
+  --chat-disconnected-bg: rgba(249, 115, 22, 0.14);
+  --chat-disconnected-fg: #fb923c;
+  --chat-reconnected-bg: rgba(16, 185, 129, 0.14);
+  --chat-reconnected-fg: #34d399;
+  --chat-announcement-bg: rgba(168, 85, 247, 0.16);
+  --chat-announcement-fg: #c084fc;
+  --chat-error-bg: rgba(239, 68, 68, 0.16);
+  --chat-error-fg: #f87171;
+}
+
+.match-page[data-room-theme="classic"][data-room-mode="dark"] {
+  --pat: none;
+  --bg: #12141c;
+  --paper: #e8ecf5;
+  --paper-deep: #242a3d;
+  --panel: #1d2130;
+  --ink: #e8ecf5;
+  --row-a: #242a3d;
+  --row-b: #1d2130;
+  --good: #1f7a3a;
+  --sub: #9aa3b8;
+  --accent: #6c8cff;
+  --accent-ink: #93b4ff;
+  --radius: 0px;
+  --gap: 0px;
+  --sys: #ff7a59;
+  --ok: #5fdc7a;
+
+  --ground: #12141c;
+  --surface: #1d2130;
+  --surface-2: #242a3d;
+  --raised: #2f3750;
+  --border: #30384d;
+  --rule: #252c3d;
+  --control: #6b748c;
+  --text: #e8ecf5;
+  --muted: #9aa3b8;
+  --faint: #7c859c;
+  --positive: #5fdc7a;
+  --negative: #ff7a59;
+  --eyebrow: #93b4ff;
+
+  --outer-muted: #9aa3b8;
+  --bar-btn-bg: #1d2130;
+  --bar-btn-border: rgba(232, 236, 245, 0.18);
+  --bar-btn-fg: #e8ecf5;
+  --bar-btn-hover-bg: #6c8cff;
+  --bar-btn-hover-fg: #12141c;
+  --room-code-fg: #6c8cff;
+  --on-accent: #12141c;
+  --solid-btn-bg: #e8ecf5;
+  --solid-btn-fg: #12141c;
+  --solid-btn-hover-bg: #b9c7e6;
+  --solid-btn-hover-fg: #12141c;
+  --me-row: #2b3550;
+  --canvas: #ffffff;
+  --input-bg: #12141c;
+  --placeholder: #9aa3b8;
+  --thumb-hover: rgba(255, 255, 255, 0.1);
+  --control-border: rgba(232, 236, 245, 0.42);
+  --button-hover: #242a3d;
+  --overlay: rgba(6, 8, 15, 0.78);
+  --modal-border: #30384d;
+  --toast-bg: #e8ecf5;
+  --toast-fg: #12141c;
+  --toast-error-fg: #ff7a59;
+  --toast-error-border: #ff7a59;
+  --shadow-color: rgba(0, 0, 0, 0.7);
 }
 
 .match-page *,
@@ -4307,7 +4592,7 @@ p {
   flex-wrap: wrap;
   min-height: 29px;
   font-size: 14px;
-  color: #b8b1a2;
+  color: var(--outer-muted);
 }
 
 .match-page .match-bar label {
@@ -4321,35 +4606,35 @@ p {
   font: inherit;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(244, 238, 224, 0.24);
+  border: 1px solid var(--bar-btn-border);
   cursor: pointer;
-  background: #171613;
-  color: var(--paper);
+  background: var(--bar-btn-bg);
+  color: var(--bar-btn-fg);
   text-decoration: none;
 }
 
 .match-page .match-bar button:hover,
 .match-page .match-bar a:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--ink);
+  background: var(--bar-btn-hover-bg);
+  border-color: var(--bar-btn-hover-bg);
+  color: var(--bar-btn-hover-fg);
 }
 
 .match-page .match-bar .match-room-code {
   font-weight: 800;
   letter-spacing: 1px;
-  color: var(--accent);
+  color: var(--room-code-fg);
 }
 
 .match-page .match-bar .match-room-code:hover {
-  color: var(--ink);
+  color: var(--bar-btn-hover-fg);
 }
 
 .match-page .match-bar-note {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #b8b1a2;
+  color: var(--outer-muted);
 }
 
 .match-page .match-bar-note .status-dot {
@@ -4393,6 +4678,7 @@ p {
   border: 3px solid var(--ink);
   border-radius: 50%;
   background: var(--accent);
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   font-weight: 900;
@@ -4542,7 +4828,7 @@ p {
 }
 
 .match-page .p.me {
-  background: #f6e2b6;
+  background: var(--me-row);
 }
 
 .match-page .p.me .nm {
@@ -4594,7 +4880,7 @@ p {
 /* Drawing board ---------------------------------------------------------- */
 
 .match-page .canvaswrap {
-  background: #fbf7ee;
+  background: var(--canvas);
   color: var(--ink);
   position: relative;
   display: flex;
@@ -4614,7 +4900,7 @@ p {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #fbf7ee;
+  background: var(--canvas);
 }
 
 .match-page .canvaswrap canvas {
@@ -4625,7 +4911,7 @@ p {
   display: block;
   touch-action: none;
   cursor: crosshair;
-  background: #fbf7ee;
+  background: var(--canvas);
 }
 
 .match-page .thumbs {
@@ -4655,7 +4941,7 @@ p {
 
 .match-page .thumbs .thumb:hover:not(:disabled) {
   transform: scale(1.15);
-  background: rgba(10, 10, 9, 0.08);
+  background: var(--thumb-hover);
 }
 
 .match-page .thumbs .thumb:active:not(:disabled) {
@@ -4725,15 +5011,16 @@ p {
 .match-page .tools .tool-btn {
   font: inherit;
   padding: 3px 10px;
-  border: 2px solid rgba(10, 10, 9, 0.55);
+  border: 2px solid var(--control-border);
   border-radius: 2px;
-  background: var(--paper);
+  background: var(--panel);
   color: var(--ink);
   cursor: pointer;
 }
 
 .match-page .tools .tool-btn:hover:not(:disabled) {
   background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Chat ------------------------------------------------------------------- */
@@ -4849,7 +5136,7 @@ p {
   border-radius: var(--radius);
   padding: 8px;
   font: inherit;
-  background: #fbf7ee;
+  background: var(--input-bg);
   color: var(--ink);
   margin: 2px;
   outline: none;
@@ -4865,13 +5152,13 @@ p {
 }
 
 .match-page .chat input::placeholder {
-  color: #8a8273;
+  color: var(--placeholder);
 }
 
 /* Choosing / round-over / game-over overlays ----------------------------- */
 
 .match-page .canvas-overlay {
-  background: rgba(10, 10, 9, 0.74);
+  background: var(--overlay);
   color: var(--paper);
 }
 
@@ -4901,7 +5188,7 @@ p {
 }
 
 .match-page .canvas-overlay .choice {
-  background: var(--paper);
+  background: var(--panel);
   border: 2px solid var(--ink);
   border-radius: 8px;
   color: var(--ink);
@@ -4957,18 +5244,18 @@ p {
 }
 
 .match-page .canvas-overlay .btn {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--solid-btn-bg);
+  color: var(--solid-btn-fg);
 }
 
 .match-page .canvas-overlay .btn:hover {
-  background: #2a2620;
-  color: var(--paper);
+  background: var(--solid-btn-hover-bg);
+  color: var(--solid-btn-hover-fg);
 }
 
 .match-page .canvas-overlay .btn--primary {
   background: var(--accent);
-  color: var(--ink);
+  color: var(--on-accent);
 }
 
 .match-page .canvas-overlay .btn--primary:hover {
@@ -4978,7 +5265,7 @@ p {
 
 .match-page .canvas-overlay .btn--ghost {
   background: transparent;
-  border-color: rgba(10, 10, 9, 0.32);
+  border-color: var(--control-border);
   color: var(--ink);
 }
 
@@ -4991,23 +5278,23 @@ p {
 
 .match-page .btn--primary {
   background: var(--accent);
-  color: var(--ink);
+  color: var(--on-accent);
 }
 
 .match-page .btn--primary:hover {
-  background: var(--paper);
+  background: var(--paper-deep);
   color: var(--ink);
 }
 
 .match-page .modal-card {
-  background: var(--paper);
+  background: var(--panel);
   color: var(--ink);
-  border-color: #d8cbb4;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  border-color: var(--modal-border);
+  box-shadow: 0 24px 80px var(--shadow-color);
 }
 
 .match-page .modal-backdrop {
-  background: rgba(10, 10, 9, 0.78);
+  background: var(--overlay);
 }
 
 .match-page .modal-actions {
@@ -5019,7 +5306,7 @@ p {
 
 .match-page .seg {
   background: var(--paper-deep);
-  border-color: #d8cbb4;
+  border-color: var(--modal-border);
 }
 
 .match-page .seg button {
@@ -5032,26 +5319,26 @@ p {
 
 .match-page .seg button[aria-pressed="true"] {
   background: var(--accent);
-  color: var(--ink);
+  color: var(--on-accent);
   box-shadow: none;
 }
 
 .match-page .toast {
-  background: #141412;
-  color: var(--paper);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   border-color: var(--raised);
 }
 
 .match-page .toast--error {
-  color: #ff9a8a;
-  border-color: #b3362b;
+  color: var(--toast-error-fg);
+  border-color: var(--toast-error-border);
 }
 
 .match-page > .connection-banner {
   width: min(1300px, 100%);
   margin: 0;
   border-radius: 6px;
-  background: var(--paper);
+  background: var(--panel);
   border: 2px solid var(--sys);
   color: var(--sys);
 }

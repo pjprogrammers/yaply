@@ -836,6 +836,31 @@ describe("Security and abuse controls", () => {
     expect(sockets[0].last("room.snapshot").snapshot.settings.rounds).toBe(9);
   });
 
+  it("stores the host's Skribbl mode and theme choices", async () => {
+    const harness = await makeRoom("skribbl");
+    const host = harness.connect();
+    await host.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Alice",
+      settings: { skribblMode: "dark", skribblTheme: "classic" },
+    });
+
+    const created = host.last("room.snapshot").snapshot.settings;
+    expect(created.skribblMode).toBe("dark");
+    expect(created.skribblTheme).toBe("classic");
+
+    await host.message({
+      type: "room.settings.update",
+      settings: { skribblMode: "light", skribblTheme: "paper" },
+    });
+
+    const updated = host.last("room.snapshot").snapshot.settings;
+    expect(updated.skribblMode).toBe("light");
+    expect(updated.skribblTheme).toBe("paper");
+  });
+
   it("ignores a word choice from a player who is not the drawer", async () => {
     const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     await sockets[0].message({ type: "room.start" });

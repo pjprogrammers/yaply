@@ -197,6 +197,8 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       15,
       120,
     ),
+    skribblMode: input?.skribblMode === "dark" ? "dark" : "light",
+    skribblTheme: input?.skribblTheme === "classic" ? "classic" : "paper",
     playerCount,
     boardSize: isChainBoardSize(input?.boardSize)
       ? input.boardSize
