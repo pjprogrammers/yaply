@@ -99,7 +99,9 @@ export function canPlace(
   if (state.eliminatedPlayerIds.includes(playerId)) return false;
   if (row < 0 || row >= state.rows || col < 0 || col >= state.cols) return false;
   const cell = state.cells[cellIndex(state.rows, state.cols, row, col)];
-  return !cell.ownerId || cell.ownerId === playerId;
+  // A cell that has exploded down to zero orbs is empty even if an older
+  // snapshot still carries the previous owner on it.
+  return cell.orbs === 0 || !cell.ownerId || cell.ownerId === playerId;
 }
 
 export function activePlayerIds(state: ChainState, playerOrder: PlayerId[]): PlayerId[] {
@@ -171,6 +173,7 @@ export function applyChainMove(
 
     const owner = cell.ownerId;
     cell.orbs -= mass;
+    if (cell.orbs === 0) cell.ownerId = null;
     explosions += 1;
     explosionLog.push({ row: position.row, col: position.col, ownerId: owner });
 

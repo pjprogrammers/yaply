@@ -22,5 +22,7 @@ export function isPlayableCell(
   if (!canPlay || !meId) return false;
   if (row < 0 || row >= chain.rows || col < 0 || col >= chain.cols) return false;
   const cell = chain.cells[row * chain.cols + col];
-  return !cell.ownerId || cell.ownerId === meId;
+  // Empty cells are playable by everyone, including cells that keep a stale
+  // owner after exploding down to zero orbs in an older snapshot.
+  return cell.orbs === 0 || !cell.ownerId || cell.ownerId === meId;
 }

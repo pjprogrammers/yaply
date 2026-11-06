@@ -50,7 +50,7 @@ describe("chain engine", () => {
     const result = applyChainMove(state, "a", 0, 0, ["a", "b"], 2_000, 45)!;
 
     expect(result.move.explosions).toEqual([{ row: 0, col: 0, ownerId: "a" }]);
-    expect(result.state.cells[0]).toEqual({ ownerId: "a", orbs: 0 });
+    expect(result.state.cells[0]).toEqual({ ownerId: null, orbs: 0 });
     expect(result.state.cells[1]).toEqual({ ownerId: "a", orbs: 1 });
     expect(result.state.cells[9]).toEqual({ ownerId: "a", orbs: 1 });
   });
@@ -75,6 +75,21 @@ describe("chain engine", () => {
     state = { ...state, turnPlayerId: "b" };
     expect(canPlace(state, "b", 3, 4)).toBe(false);
     expect(applyChainMove(state, "b", 3, 4, ["a", "b"], 2_000, 45)).toBeNull();
+  });
+
+  it("allows any player to fill an empty cell even when it has a stale owner", () => {
+    let state = fresh();
+    // The corner exploded down to zero orbs but an old snapshot still points
+    // at player a. A neighbouring enemy orb must not lock the empty corner.
+    state.cells[0] = { ownerId: "a", orbs: 0 };
+    state.cells[1] = { ownerId: "a", orbs: 1 };
+    state = { ...state, turnPlayerId: "b" };
+
+    expect(canPlace(state, "b", 0, 0)).toBe(true);
+    const result = applyChainMove(state, "b", 0, 0, ["a", "b"], 2_000, 45);
+
+    expect(result).not.toBeNull();
+    expect(result!.state.cells[0]).toEqual({ ownerId: "b", orbs: 1 });
   });
 
   it("eliminates a player whose last orb is captured and names a winner", () => {
@@ -157,7 +172,7 @@ describe("chain explosions and determinism", () => {
     const result = applyChainMove(state, "a", 0, 4, ["a", "b"], 1_000, 45)!;
 
     expect(result.move.explosions).toEqual([{ row: 0, col: 4, ownerId: "a" }]);
-    expect(result.state.cells[4]).toEqual({ ownerId: "a", orbs: 0 });
+    expect(result.state.cells[4]).toEqual({ ownerId: null, orbs: 0 });
     for (const index of [3, 5, 1 * 9 + 4]) {
       expect(result.state.cells[index]).toMatchObject({ ownerId: "a", orbs: 1 });
     }
@@ -171,7 +186,7 @@ describe("chain explosions and determinism", () => {
     const result = applyChainMove(state, "a", 2, 4, ["a", "b"], 1_000, 45)!;
 
     expect(result.move.explosions).toEqual([{ row: 2, col: 4, ownerId: "a" }]);
-    expect(result.state.cells[2 * 9 + 4]).toEqual({ ownerId: "a", orbs: 0 });
+    expect(result.state.cells[2 * 9 + 4]).toEqual({ ownerId: null, orbs: 0 });
     for (const index of [1 * 9 + 4, 3 * 9 + 4, 2 * 9 + 3, 2 * 9 + 5]) {
       expect(result.state.cells[index]).toMatchObject({ ownerId: "a", orbs: 1 });
     }
