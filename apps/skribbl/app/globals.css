@@ -87,6 +87,30 @@ a {
   background: var(--ground);
 }
 
+/* The room keeps the classic blue arcade backdrop while the cards stay dark. */
+.app-shell--room {
+  --ground: #071c2f;
+  --surface: #0d1f31;
+  --surface-2: #142a3f;
+  --raised: #1d3a53;
+  --border: #173149;
+  --rule: #102538;
+  --control: #3a5d78;
+  background-color: var(--ground);
+  background-image:
+    radial-gradient(circle at 16% 8%, rgba(72, 158, 255, 0.18), transparent 42%),
+    radial-gradient(circle at 84% 92%, rgba(72, 158, 255, 0.12), transparent 46%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+
+.app-shell--room .topbar {
+  background: rgba(7, 28, 47, 0.9);
+  backdrop-filter: blur(14px);
+}
+
 .topbar {
   height: 56px;
   display: flex;
@@ -295,6 +319,102 @@ p {
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--gap);
   align-items: start;
+}
+
+.page--game {
+  max-width: 1420px;
+  padding-top: 20px;
+}
+
+.game-stage {
+  display: grid;
+  grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(270px, 330px);
+  grid-template-areas:
+    "header header header"
+    "left canvas right"
+    "left toolbar right";
+  gap: var(--gap);
+  align-items: start;
+}
+
+.game-header {
+  grid-area: header;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.game-header-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.game-header-word {
+  min-width: 0;
+}
+
+.game-header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.game-header .word-zone {
+  min-height: 0;
+  flex-wrap: nowrap;
+}
+
+.game-header .word-zone .word-mask {
+  font-size: 20px;
+}
+
+.game-header .word-zone .timer {
+  flex: 0 0 170px;
+}
+
+.game-left {
+  grid-area: left;
+  display: grid;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+.game-canvas {
+  grid-area: canvas;
+  position: relative;
+}
+
+.game-canvas .guess-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+
+.game-toolbar {
+  grid-area: toolbar;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.game-toolbar .toolbar {
+  padding: 0;
+}
+
+.game-right {
+  grid-area: right;
+  min-width: 0;
 }
 
 .rail {
@@ -812,6 +932,11 @@ p {
   min-width: 0;
 }
 
+.canvas-top {
+  display: grid;
+  gap: 12px;
+}
+
 .canvas-head {
   display: flex;
   align-items: center;
@@ -819,6 +944,13 @@ p {
   gap: 12px;
   padding: 4px 8px 0;
   flex-wrap: wrap;
+}
+
+.canvas-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .canvas-paper {
@@ -846,8 +978,9 @@ p {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-items: safe center;
   padding: 20px;
+  overflow-y: auto;
   background: rgba(0, 0, 0, 0.74);
   text-align: center;
 }
@@ -1157,12 +1290,48 @@ p {
   color: var(--accent);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 8, 16, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  width: min(480px, 100%);
+  max-height: min(84vh, 760px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.modal-note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
 .toast {
   position: fixed;
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: 90;
   max-width: calc(100vw - 32px);
   padding: 10px 16px;
   border: 1px solid var(--raised);
@@ -1305,7 +1474,29 @@ p {
 
 @media (max-width: 700px) {
   .topbar {
-    padding: 0 16px;
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 10px 16px;
+  }
+
+  /* The room controls get their own full-width row so the code and live
+     status never get clipped by the fixed-height bar. */
+  .topbar .room-bar {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  .topbar .room-bar-actions {
+    width: auto;
+    margin-left: auto;
+    flex-wrap: nowrap;
+  }
+
+  .topbar .room-bar-actions .btn {
+    flex: none;
   }
 
   .page {
@@ -1370,11 +1561,63 @@ p {
   .word-mask {
     font-size: 18px;
   }
+
+  .game-stage {
+    gap: 10px;
+  }
+
+  .canvas-card {
+    padding: 10px;
+  }
+
+  .canvas-head {
+    align-items: flex-start;
+  }
+
+  .canvas-head-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .word-zone .timer {
+    flex: 1 1 100%;
+  }
+
+  .game-right .chat-card {
+    padding: 12px;
+  }
+
+  .game-right .chat-line {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .swatch {
+    width: 18px;
+    height: 18px;
+  }
+
+  .width-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolbar-label {
+    font-size: 10px;
+  }
 }
 
 @media (max-width: 460px) {
   .topbar {
-    height: 52px;
+    min-height: 52px;
+  }
+
+  .topbar .room-bar-actions a {
+    display: none;
+  }
+
+  .topbar .room-bar {
+    gap: 8px;
   }
 
   .brand {
@@ -1404,6 +1647,24 @@ p {
 
   .timer {
     width: 100%;
+  }
+
+  .game-stage {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+    gap: 8px;
+  }
+
+  .game-right .chat-card {
+    padding: 10px;
+  }
+
+  .game-right .chat-line {
+    font-size: 11px;
+  }
+
+  .game-right .chat-form {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
 
@@ -2098,6 +2359,7 @@ p {
   align-items: flex-end;
   justify-content: center;
   min-width: 0.7em;
+  min-height: 1.3em;
   border-bottom: 2px solid var(--raised);
   padding-bottom: 2px;
 }
@@ -2356,70 +2618,105 @@ p {
 }
 
 /* Leaderboard */
+
 .leaderboard {
   background: var(--surface);
   border-radius: var(--radius-card);
-  padding: 12px 14px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .leaderboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 2px 4px 4px;
 }
 
 .leaderboard-list {
-  display: grid;
-  gap: 4px;
-}
-
-.leaderboard-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding: 4px 8px;
-  border-radius: 10px;
-}
-
-.leaderboard-row--top {
-  background: var(--surface-2);
-}
-
-.leaderboard-row--me {
-  outline: 1px solid var(--border);
-}
-
-.leaderboard-rank {
-  font-size: 11px;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.leaderboard-name {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--raised) transparent;
 }
 
-.leaderboard-name-text {
-  color: var(--text);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Each box holds only the live rank and the player's full name. Names wrap
+   instead of being clipped, so long nicknames stay fully readable. */
+.player-name-box {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  flex: none;
+}
+
+.player-name-box .player-rank {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
   white-space: nowrap;
 }
 
-.leaderboard-score {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+.player-name-box .player-name {
+  display: block;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-overflow: clip;
+  overflow: visible;
+}
+
+.player-name-box--me {
+  background: var(--raised);
+}
+
+.player-name-box--host .player-rank {
+  color: var(--accent);
+}
+
+.player-name-box--drawing {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.player-name-box--out {
+  opacity: 0.55;
+}
+
+.player-name-box--empty {
+  background: transparent;
+  border-color: var(--raised);
+  border-style: dashed;
+}
+
+.player-name-box--empty .player-rank,
+.player-name-box--empty .player-name {
+  color: var(--faint);
+  font-weight: 400;
 }
 
 /* Messages the server marked as private (secret-word protection) */
@@ -3774,5 +4071,798 @@ p {
 
   .landing-ticket-players {
     margin-bottom: 18px;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Word-choice and result overlays need room to breathe inside the 4:3
+     mobile canvas, and they scroll if the viewport is especially short. */
+  .canvas-paper[data-overlay="true"] {
+    min-height: 300px;
+  }
+
+  .canvas-overlay {
+    padding: 12px;
+  }
+
+  .choice-panel {
+    padding: 14px;
+  }
+
+  .choice-panel .overlay-title {
+    font-size: 18px;
+  }
+
+  .choice-panel .overlay-sub {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .choice-list {
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .choice {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+}
+
+/* ==========================================================================
+   Skribbl match screen — an exact port of layout.html's classic theme.
+   Everything is scoped under .match-page so the home, create, join and lobby
+   screens keep their existing dark theme untouched.
+   ========================================================================== */
+
+.match-page {
+  --pat: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='%232d5fb8' stroke-width='3' stroke-linecap='round'><circle cx='30' cy='30' r='9'/><path d='M30 12v6M30 42v6M12 30h6M42 30h6'/><path d='M80 20l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z'/><rect x='20' y='78' width='22' height='22' rx='3'/><path d='M70 85q8-12 16 0t16 0'/></svg>");
+  --bg: #1f4a9c;
+  --panel: #fff;
+  --ink: #111;
+  --row-a: #fff;
+  --row-b: #ececec;
+  --good: #7ee05a;
+  --sub: #555;
+  --accent: #2b5fc9;
+  --radius: 0px;
+  --gap: 0px;
+  --sys: #d4421b;
+  --ok: #2f9e1a;
+
+  /* Classic light values for the shared buttons, modals and overlays that are
+     reused from the rest of the app inside the match screen. */
+  --ground: #fff;
+  --surface: #fff;
+  --surface-2: #f2f2f2;
+  --raised: #e4e4e4;
+  --border: #d8d8d8;
+  --control: #b5b5b5;
+  --text: #111;
+  --muted: #555;
+  --faint: #777;
+  --radius-card: 8px;
+  --radius-control: 6px;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--pat), var(--bg);
+  color: var(--ink);
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: normal;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px;
+  gap: 10px;
+}
+
+.match-page *,
+.match-page *::before,
+.match-page *::after {
+  box-sizing: border-box;
+}
+
+/* Logo and control bar --------------------------------------------------- */
+
+.match-page .match-logo {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  align-self: flex-start;
+  margin-left: max(0px, calc(50% - 650px));
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+.match-page .match-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 29px;
+  font-size: 14px;
+}
+
+.match-page .match-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.match-page .match-bar button,
+.match-page .match-bar a {
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  background: #efefef;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.match-page .match-bar button:hover,
+.match-page .match-bar a:hover {
+  background: #e3e3e3;
+}
+
+.match-page .match-bar .match-room-code {
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.match-page .match-bar-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.8;
+}
+
+.match-page .match-bar-note .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+/* Game grid -------------------------------------------------------------- */
+
+.match-page .game {
+  width: min(1300px, 100%);
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 300px;
+  grid-template-rows: 50px 600px;
+  background: transparent;
+}
+
+/* Top strip -------------------------------------------------------------- */
+
+.match-page .top {
+  grid-column: 1 / 4;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  position: relative;
+  border-radius: var(--radius) var(--radius) 0 0;
+  backdrop-filter: blur(8px);
+  min-width: 0;
+}
+
+.match-page .clockbox {
+  display: flex;
+  align-items: center;
+}
+
+.match-page .clock {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 1;
+  margin-right: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.match-page .round {
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.match-page .hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1;
+}
+
+.match-page .hint small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--sub);
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.match-page .hint b {
+  display: inline-block;
+  font-size: 26px;
+  letter-spacing: 4px;
+}
+
+.match-page .hint sup {
+  font-size: 10px;
+  vertical-align: top;
+}
+
+.match-page .gear {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Player rail ------------------------------------------------------------ */
+
+.match-page .players {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  height: 600px;
+  min-height: 0;
+}
+
+.match-page .p {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 6px;
+  background: var(--row-a);
+  overflow: hidden;
+  border-radius: var(--radius);
+  transition: background 0.2s;
+}
+
+.match-page .p:nth-child(even) {
+  background: var(--row-b);
+}
+
+.match-page .p.guessed {
+  background: var(--good) !important;
+}
+
+.match-page .p.out {
+  opacity: 0.45;
+}
+
+.match-page .p .rank {
+  font-weight: 800;
+  font-size: clamp(9px, 2.2vh, 15px);
+  width: 24px;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-page .p .info {
+  flex: 1;
+  text-align: center;
+  line-height: 1.05;
+  min-width: 0;
+}
+
+.match-page .p .nm {
+  display: block;
+  font-weight: 800;
+  font-size: clamp(9px, 2.2vh, 14px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-page .p .pt {
+  display: block;
+  font-size: clamp(8px, 1.9vh, 12px);
+  color: var(--sub);
+}
+
+.match-page .p.me .nm {
+  color: var(--accent);
+}
+
+.match-page .av {
+  height: min(88%, 46px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  position: relative;
+  border: 2px solid #000;
+  flex: none;
+}
+
+.match-page .av::before {
+  content: "";
+  position: absolute;
+  left: 22%;
+  top: 32%;
+  width: 18%;
+  height: 18%;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 2px #000,
+    0.55em 0 0 0 #fff,
+    0.55em 0 0 2px #000;
+  transform: scale(0.9);
+}
+
+.match-page .av::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  bottom: 20%;
+  width: 40%;
+  height: 14%;
+  border-bottom: 2px solid #000;
+  border-radius: 0 0 50% 50%;
+}
+
+.match-page .pen {
+  margin-right: -16px;
+  z-index: 1;
+  font-size: 14px;
+}
+
+/* Drawing board ---------------------------------------------------------- */
+
+.match-page .canvaswrap {
+  background: #fff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.match-page .canvaswrap .canvas-paper {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.match-page .canvaswrap canvas {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+}
+
+.match-page .thumbs {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  font-size: 26px;
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.match-page .tools {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: #eee;
+  align-items: center;
+  flex: none;
+}
+
+.match-page .tools .sw {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #000;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  flex: none;
+}
+
+.match-page .tools .clear-btn {
+  margin-left: auto;
+  font: inherit;
+  padding: 3px 10px;
+  border: 2px solid #767676;
+  border-radius: 2px;
+  background: #efefef;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* Chat ------------------------------------------------------------------- */
+
+.match-page .chat {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  height: 600px;
+  min-width: 0;
+}
+
+.match-page .msgs {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.match-page .m {
+  padding: 3px 6px;
+  font-size: 14px;
+  line-height: 1.25;
+  word-break: break-word;
+  flex: none;
+}
+
+.match-page .m:nth-child(even) {
+  background: var(--row-b);
+}
+
+.match-page .m.sys {
+  color: var(--sys);
+  font-weight: 700;
+}
+
+.match-page .m.ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.match-page .m.blue {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.match-page .chat input {
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 8px;
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+  margin: 2px;
+  outline: none;
+  min-width: 0;
+}
+
+.match-page .chat input::placeholder {
+  color: #999;
+}
+
+/* Choosing / round-over / game-over overlays ----------------------------- */
+
+.match-page .canvas-overlay {
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+}
+
+.match-page .canvas-overlay .overlay-card,
+.match-page .canvas-overlay .choice-panel {
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  border: 2px solid var(--ink);
+}
+
+.match-page .canvas-overlay .round-reveal {
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  border: 2px solid var(--ink);
+  padding: 20px;
+}
+
+.match-page .canvas-overlay .eyebrow {
+  color: var(--sub);
+}
+
+.match-page .canvas-overlay .overlay-sub,
+.match-page .canvas-overlay .muted {
+  color: var(--sub);
+}
+
+.match-page .canvas-overlay .choice {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  color: var(--ink);
+}
+
+.match-page .canvas-overlay .choice:hover {
+  background: #eef4ff;
+  border-color: var(--accent);
+}
+
+.match-page .canvas-overlay .round-rank-row .rank-score,
+.match-page .canvas-overlay .result-rank-score {
+  color: var(--accent);
+}
+
+/* Shared light controls inside the match (settings modal, toasts, actions) */
+
+.match-page .btn--primary {
+  background: var(--ink);
+  color: #fff;
+}
+
+.match-page .btn--primary:hover {
+  background: #333;
+}
+
+.match-page .modal-card {
+  background: #fff;
+  color: var(--ink);
+  border-color: var(--border);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.match-page .modal-backdrop {
+  background: rgba(8, 20, 44, 0.62);
+}
+
+.match-page .modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.match-page .seg {
+  background: #f2f2f2;
+  border-color: var(--border);
+}
+
+.match-page .seg button {
+  color: var(--muted);
+}
+
+.match-page .seg button:hover {
+  color: var(--ink);
+}
+
+.match-page .seg button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.match-page .toast {
+  background: #fff;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.match-page .toast--error {
+  color: var(--sys);
+  border-color: var(--sys);
+}
+
+.match-page > .connection-banner {
+  width: min(1300px, 100%);
+  margin: 0;
+  border-radius: 6px;
+  background: #fff;
+  border: 2px solid var(--sys);
+  color: var(--sys);
+}
+
+.match-page > .connection-banner button {
+  color: var(--sys);
+}
+
+/* Mobile — exactly the layout.html narrow-screen arrangement: the logo and
+   control bar disappear, the board spans both columns, players and chat sit
+   side by side, and the chat input spans the full width in the last row. */
+
+@media (max-width: 900px) {
+  .match-page {
+    display: block;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .match-page .match-logo,
+  .match-page .match-bar {
+    display: none;
+  }
+
+  .match-page .game {
+    width: 100%;
+    height: 100dvh;
+    grid-template-columns: 49% 51%;
+    grid-template-rows: 34px 248px 1fr 26px;
+  }
+
+  .match-page .top {
+    grid-column: 1 / 3;
+    padding: 0 4px;
+    border-radius: 0;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .match-page .clockbox {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 64px;
+  }
+
+  .match-page .clock {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+    font-size: 11px;
+    margin: 0;
+  }
+
+  .match-page .round {
+    font-size: 6.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    margin-top: -1px;
+  }
+
+  .match-page .hint small {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+
+  .match-page .hint b {
+    font-size: 17px;
+    letter-spacing: 2px;
+  }
+
+  .match-page .hint sup {
+    font-size: 8px;
+  }
+
+  .match-page .gear {
+    font-size: 30px;
+  }
+
+  .match-page .canvaswrap {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .match-page .tools {
+    display: none;
+  }
+
+  .match-page .thumbs {
+    font-size: 22px;
+  }
+
+  .match-page .players {
+    grid-column: 1;
+    grid-row: 3;
+    height: auto;
+    background: transparent;
+    gap: 0;
+    backdrop-filter: none;
+  }
+
+  .match-page .p {
+    flex: 0 1 29px;
+    max-height: none;
+    padding: 1px 5px 1px 4px;
+    border-radius: 0;
+  }
+
+  .match-page .p .rank {
+    align-self: flex-start;
+    margin-top: 3px;
+    font-size: 9px;
+    width: 18px;
+  }
+
+  .match-page .p .nm {
+    font-size: 8.5px;
+  }
+
+  .match-page .p .pt {
+    font-size: 7.5px;
+  }
+
+  .match-page .av {
+    height: 24px;
+  }
+
+  .match-page .pen {
+    font-size: 11px;
+    margin-right: -12px;
+  }
+
+  .match-page .chat {
+    display: contents;
+  }
+
+  .match-page .msgs {
+    grid-column: 2;
+    grid-row: 3;
+    background: var(--panel);
+    justify-content: flex-start;
+  }
+
+  .match-page .m {
+    font-size: 8.5px;
+    padding: 2px 3px;
+  }
+
+  .match-page .chat input {
+    grid-column: 1 / 3;
+    grid-row: 4;
+    margin: 0;
+    border: 0;
+    border-top: 2px solid var(--accent);
+    border-radius: 0;
+    font-size: 12px;
+    padding: 0 10px;
+    height: 26px;
+  }
+
+  .match-page .canvas-overlay {
+    padding: 12px;
+  }
+
+  .match-page .canvas-overlay .overlay-card,
+  .match-page .canvas-overlay .choice-panel,
+  .match-page .canvas-overlay .round-reveal {
+    padding: 14px;
+  }
+
+  .match-page > .connection-banner {
+    position: fixed;
+    top: 38px;
+    left: 6px;
+    right: 6px;
+    z-index: 20;
+    width: auto;
   }
 }

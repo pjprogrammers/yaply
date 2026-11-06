@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>skribbl-style room with name-box themes</title>
+<style>
+:root{--pat:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" fill="none" stroke="%232d5fb8" stroke-width="3" stroke-linecap="round"><circle cx="30" cy="30" r="9"/><path d="M30 12v6M30 42v6M12 30h6M42 30h6"/><path d="M80 20l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z"/><rect x="20" y="78" width="22" height="22" rx="3"/><path d="M70 85q8-12 16 0t16 0"/></svg>');--bg:#1f4a9c;--panel:#fff;--ink:#111;--row-a:#fff;--row-b:#ececec;--good:#7ee05a;--sub:#555;--accent:#2b5fc9;--radius:0px;--gap:0px;--sys:#d4421b;--ok:#2f9e1a;--font:'Nunito',system-ui,sans-serif}
+body[data-theme=dark]{--bg:#12141c;--panel:#1d2130;--ink:#e8ecf5;--row-a:#242a3d;--row-b:#1d2130;--good:#1f7a3a;--sub:#9aa3b8;--accent:#6c8cff;--sys:#ff7a59;--ok:#5fdc7a}
+body[data-theme=neon]{--bg:#0a0014;--panel:#12002a;--ink:#f4e9ff;--row-a:#1c0040;--row-b:#14002e;--good:#00b894;--sub:#c18cff;--accent:#ff2fd6;--sys:#ff5c8a;--ok:#39ff88;--radius:8px;--gap:3px}
+body[data-theme=pastel]{--bg:#ffd9e8;--panel:#fffaf3;--ink:#5b4350;--row-a:#e8f6ff;--row-b:#fff0d9;--good:#b8f0c2;--sub:#8a7380;--accent:#ff8fb8;--sys:#e0668a;--ok:#3e9e5a;--radius:14px;--gap:4px}
+body[data-theme=paper]{--bg:#d9c9a3;--panel:#fbf4e2;--ink:#3b2f1d;--row-a:#fbf4e2;--row-b:#efe2c2;--good:#c9e3a0;--sub:#7a6a4a;--accent:#8b5a2b;--sys:#a8431f;--ok:#4a7a1f;--radius:3px;--gap:2px;--font:Georgia,serif}
+body[data-theme=glass]{--bg:linear-gradient(135deg,#4facfe,#8f5bff);--panel:rgba(255,255,255,.18);--ink:#fff;--row-a:rgba(255,255,255,.16);--row-b:rgba(255,255,255,.08);--good:rgba(80,255,150,.45);--sub:#e6e9ff;--accent:#fff;--sys:#ffd0c2;--ok:#c6ffd9;--radius:12px;--gap:4px}
+body[data-theme]:not([data-theme=classic]){--pat:none}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--pat),var(--bg);color:var(--ink);font-family:var(--font);display:flex;flex-direction:column;align-items:center;padding:14px;gap:10px}
+.logo{font-size:44px;font-weight:900;letter-spacing:2px;align-self:flex-start;margin-left:max(0px,calc(50% - 650px));text-shadow:2px 2px 0 rgba(0,0,0,.25)}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.bar select,.bar button{font:inherit;padding:4px 8px;border-radius:6px;border:1px solid rgba(0,0,0,.3);cursor:pointer}
+.game{width:min(1300px,100%);display:grid;grid-template-columns:200px 1fr 300px;grid-template-rows:50px 600px;background:transparent}
+.top{grid-column:1/4;background:var(--panel);display:flex;align-items:center;padding:0 10px;position:relative;border-radius:var(--radius) var(--radius) 0 0;backdrop-filter:blur(8px)}
+.clock{width:48px;height:48px;border:3px solid var(--ink);border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:20px;margin-right:12px}
+.round{font-weight:800;font-size:20px}
+.hint{position:absolute;left:50%;transform:translateX(-50%);text-align:center;line-height:1}
+.hint small{display:block;font-size:11px;letter-spacing:1px;color:var(--sub)}
+.hint b{font-size:26px;letter-spacing:4px}
+.players{background:var(--panel);display:flex;flex-direction:column;gap:var(--gap);overflow:hidden;backdrop-filter:blur(8px);height:600px}
+.p{flex:1 1 0;min-height:0;max-height:56px;display:flex;align-items:center;gap:6px;padding:2px 8px 2px 6px;background:var(--row-a);overflow:hidden;border-radius:var(--radius);transition:background .2s}
+.p:nth-child(even){background:var(--row-b)}
+.p.guessed{background:var(--good)!important}
+.p .rank{font-weight:800;font-size:clamp(9px,2.2vh,15px);width:24px}
+.p .info{flex:1;text-align:center;line-height:1.05;min-width:0}
+.p .nm{display:block;font-weight:800;font-size:clamp(9px,2.2vh,14px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p .pt{display:block;font-size:clamp(8px,1.9vh,12px);color:var(--sub)}
+.p.me .nm{color:var(--accent)}
+.av{height:min(88%,46px);aspect-ratio:1;border-radius:50%;position:relative;border:2px solid #000;flex:none}
+.av::before{content:"";position:absolute;left:22%;top:32%;width:18%;height:18%;border-radius:50%;background:#fff;box-shadow:0 0 0 2px #000,.55em 0 0 0 #fff,.55em 0 0 2px #000;transform:scale(.9)}
+.av::after{content:"";position:absolute;left:30%;bottom:20%;width:40%;height:14%;border-bottom:2px solid #000;border-radius:0 0 50% 50%}
+.canvaswrap{background:#fff;position:relative;display:flex;flex-direction:column}
+canvas{width:100%;flex:1;min-height:0;touch-action:none;cursor:crosshair;background:#fff}
+.tools{display:flex;gap:4px;padding:6px;background:#eee;align-items:center}
+.sw{width:24px;height:24px;border:2px solid #000;cursor:pointer;border-radius:4px}
+.tools button{margin-left:auto;font:inherit;padding:3px 10px}
+.chat{background:var(--panel);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(8px);height:600px}
+.msgs{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.m{padding:3px 6px;font-size:14px;line-height:1.25;word-break:break-word;flex:none}
+.m:nth-child(even){background:var(--row-b)}
+.m.sys{color:var(--sys);font-weight:700}.m.ok{color:var(--ok);font-weight:700}
+.chat input{border:2px solid var(--accent);border-radius:var(--radius);padding:8px;font:inherit;background:var(--panel);color:var(--ink);margin:2px;outline:none}
+.clockbox{display:flex;align-items:center}
+.gear{margin-left:auto;background:none;border:0;font-size:34px;line-height:1;color:var(--ink);cursor:pointer;padding:0}
+.hint sup{font-size:10px;vertical-align:top}.hint b{display:inline-block}
+.thumbs{position:absolute;top:6px;right:8px;display:flex;gap:6px;font-size:26px;opacity:.85;pointer-events:none}
+.m.blue{color:var(--accent);font-weight:700}
+.pen{margin-right:-16px;z-index:1;font-size:14px}
+@media(max-width:900px){
+html,body{height:100%;overflow:hidden}
+body{padding:0;gap:0;display:block}
+.logo{display:none}
+.bar{display:none;position:fixed;top:34px;left:0;right:0;z-index:9;background:var(--panel);color:var(--ink);padding:6px;border-bottom:2px solid var(--accent)}
+.bar.open{display:flex}.bar span{display:none}
+.game{width:100%;height:100dvh;grid-template-columns:49% 51%;grid-template-rows:34px 248px 1fr 26px}
+.top{grid-column:1/3;padding:0 4px;border-radius:0;border-bottom:2px solid var(--accent)}
+.clockbox{flex-direction:column;align-items:flex-start;width:64px}
+.clock{width:24px;height:24px;border-width:2px;font-size:11px;margin:0}
+.round{font-size:6.5px;font-weight:700;white-space:nowrap;margin-top:-1px}
+.hint small{font-size:7px}.hint b{font-size:17px;letter-spacing:2px}.hint sup{font-size:8px}
+.gear{font-size:30px}
+.canvaswrap{grid-column:1/3;grid-row:2}.tools{display:none}.thumbs{font-size:22px}
+.players{grid-column:1;grid-row:3;height:auto;background:transparent;gap:0;backdrop-filter:none}
+.p{flex:0 1 29px;max-height:none;padding:1px 5px 1px 4px;border-radius:0}
+.p .rank{align-self:flex-start;margin-top:3px;font-size:9px;width:18px}
+.p .nm{font-size:8.5px}.p .pt{font-size:7.5px}.av{height:24px}.pen{font-size:11px;margin-right:-12px}
+.chat{display:contents}
+.msgs{grid-column:2;grid-row:3;background:var(--panel);justify-content:flex-start}
+.m{font-size:8.5px;padding:2px 3px}
+.chat input{grid-column:1/3;grid-row:4;margin:0;border:0;border-top:2px solid var(--accent);border-radius:0;font-size:12px;padding:0 10px;height:26px}
+}
+</style></head>
+<body data-theme="classic">
+<div class="logo">skribbl-style</div>
+<div class="bar">
+ <label>Name-box theme:
+  <select id="theme"><option value="classic">Classic</option><option value="dark">Dark</option><option value="neon">Neon</option><option value="pastel">Pastel</option><option value="paper">Paper</option><option value="glass">Glass</option></select></label>
+ <button id="add">+ Player</button><button id="rem">− Player</button><button id="guess">Auto guess</button>
+ <span style="opacity:.8">Rows shrink to fit and chat auto-trims, so no scrollbars ever. Word: "doormat"</span>
+</div>
+<div class="game">
+ <div class="top"><div class="clockbox"><div class="clock" id="clock">60</div><div class="round">Round 3 of 3</div></div>
+  <div class="hint"><small>GUESS THIS</small><b id="hint">d______</b><sup>7</sup></div><button class="gear" id="gear" aria-label="settings">&#9881;</button></div>
+ <div class="players" id="players"></div>
+ <div class="canvaswrap"><div class="thumbs"><span>&#128077;</span><span>&#128078;</span></div><canvas id="cv" width="800" height="560"></canvas>
+  <div class="tools" id="tools"><button id="clr">Clear</button></div></div>
+ <div class="chat"><div class="msgs" id="msgs"></div><input id="inp" placeholder="Type your guess here..." autocomplete="off"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const names=['vorp','× TANJIRO ×','kadf','PRINCESS','buttercup','Hippopotatoe','Hasnain','Mia','kilou','Me hun','car','SITA'];
+const cols=['#27c4f5','#f0b27a','#4a5cf0','#e8223c','#f55a5a','#a64de8','#4ccf5b','#f4f4f4','#e34242','#f5d300','#8a8a8a','#ff8fb8'];
+let players=[{n:'Me hun',pt:500,c:'#f5d300',g:0},{n:'vorp',pt:865,c:'#27c4f5',g:0},{n:'× TANJIRO ×',pt:795,c:'#f0b27a',g:0,pen:1},{n:'Hasnain',pt:0,c:'#4ccf5b',g:0},{n:'kilou',pt:0,c:'#e34242',g:0},{n:'Mia',pt:0,c:'#f4f4f4',g:0},{n:'jashan (You)',pt:0,c:'#2fd99a',me:1,g:0}];
+function render(){
+ $('players').innerHTML=players.map(p=>`<div class="p ${p.me?'me':''} ${p.g?'guessed':''}"><span class="rank">#${1+players.filter(q=>q.pt>p.pt).length}</span><div class="info"><span class="nm">${p.n}</span><span class="pt">${p.pt} points</span></div>${p.pen?'<span class="pen">&#9999;&#65039;</span>':''}<div class="av" style="background:${p.c}"></div></div>`).join('');
+}
+function say(t,c=''){const d=document.createElement('div');d.className='m '+c;d.textContent=t;const m=$('msgs');m.appendChild(d);
+ while(m.scrollHeight>m.clientHeight&&m.children.length>1)m.removeChild(m.firstChild)}
+$('add').onclick=()=>{const i=players.length;if(i>=20)return;const n=names[i%names.length]+(i>=names.length?i:'');players.push({n,pt:0,c:cols[i%cols.length],g:0});say(n+' joined the room!','ok');render()};
+$('rem').onclick=()=>{if(players.length>1){const p=players.pop();say(p.n+' left the room!','sys');render()}};
+$('guess').onclick=()=>{const o=players.filter(p=>!p.me);const p=o[Math.floor(Math.random()*o.length)];if(p){p.g=1;p.pt+=100;say(p.n+' guessed the word!','ok');render()}};
+$('theme').onchange=e=>document.body.dataset.theme=e.target.value;
+$('inp').onkeydown=e=>{if(e.key!=='Enter'||!e.target.value.trim())return;const v=e.target.value.trim();e.target.value='';
+ if(v.toLowerCase()==='doormat'){players[0].g=1;players[0].pt+=250;say('jashan guessed the word!','ok');render()}else say('jashan: '+v)};
+// timer
+let t=60;setInterval(()=>{t=t<=0?60:t-1;$('clock').textContent=t},1000);
+// drawing
+const cv=$('cv'),x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);
+let col='#000',dr=0;x.lineWidth=5;x.lineCap='round';
+['#000','#e22','#2a2','#26e','#fc0','#a4e','#888','#fff'].forEach(c=>{const s=document.createElement('div');s.className='sw';s.style.background=c;s.onclick=()=>col=c;$('tools').insertBefore(s,$('clr'))});
+$('clr').onclick=()=>{x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height)};
+const pos=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+cv.onpointerdown=e=>{dr=1;const[a,b]=pos(e);x.strokeStyle=col;x.beginPath();x.moveTo(a,b)};
+cv.onpointermove=e=>{if(!dr)return;const[a,b]=pos(e);x.lineTo(a,b);x.stroke()};
+addEventListener('pointerup',()=>dr=0);
+render();say('× TANJIRO × is drawing now!','blue');say('sweater left the room!','sys');say('car joined the room!','ok');say('Hasnain: Scenery');say('car left the room!','sys');
+$('gear').onclick=()=>document.querySelector('.bar').classList.toggle('open');
+</script></body></html>

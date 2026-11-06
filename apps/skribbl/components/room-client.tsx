@@ -9,7 +9,6 @@ import {
   DEFAULT_GAME_SETTINGS,
   isWordLanguage,
   MAX_NICKNAME_LENGTH,
-  WORD_LANGUAGES,
 } from "@yaply/shared/constants";
 import { useCountdown, useGameRoom, useNow } from "@yaply/shared/react";
 import {
@@ -19,22 +18,14 @@ import {
   REALTIME_URL,
   storeNickname,
 } from "@/lib/config";
-import { Chat, type ChatMessage } from "./chat";
+import type { ChatMessage } from "./chat";
 import { DrawingCanvas } from "./drawing-canvas";
-import {
-  CheckIcon,
-  ClockIcon,
-  CopyIcon,
-  PlayIcon,
-  TrashIcon,
-  UndoIcon,
-} from "./icons";
-import { PlayerList } from "./player-list";
+import { CheckIcon, ClockIcon, CopyIcon, PlayIcon, XIcon } from "./icons";
 import { Leaderboard } from "./leaderboard";
-import { Segmented } from "./segmented";
+import { MatchChat } from "./match-chat";
+import { RoomSettingsFields } from "./room-settings";
 import { Topbar } from "./topbar";
 import { MAIN_URL } from "@/lib/config";
-import { WordMask } from "./word-mask";
 
 const FATAL_CODES = new Set([
   "ROOM_NOT_FOUND",
@@ -47,8 +38,8 @@ const FATAL_CODES = new Set([
   "PROTOCOL_MISMATCH",
 ]);
 
-const DRAW_COLORS = ["#111111", "#6b6b6b", "#e5484d", "#4cb3f0", "#3fc07a", "#f2b33d", "#b06cf0"];
-const DRAW_WIDTHS = [4, 8, 16];
+const DRAW_COLORS = ["#000000", "#e22b2b", "#2a9d3c", "#2666e2", "#f2c200", "#a44ce0", "#8a8a8a", "#ffffff"];
+const DRAW_WIDTH = 8;
 const CHOOSE_SECONDS = 20;
 
 const STATUS_LABEL: Record<string, string> = {
@@ -198,11 +189,11 @@ function ConnectedRoom({
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
-  const [guessFlash, setGuessFlash] = useState<{ nickname: string; points: number } | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [copied, setCopied] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [color, setColor] = useState(DRAW_COLORS[0]);
-  const [width, setWidth] = useState(DRAW_WIDTHS[1]);
+  const width = DRAW_WIDTH;
 
   const now = useNow(250);
   const playerIdRef = useRef<string | null>(null);
@@ -247,10 +238,6 @@ function ConnectedRoom({
       case "game.word.selected": {
         setSelectedWord(event.word);
         setChoices([]);
-        break;
-      }
-      case "game.correct-guess": {
-        setGuessFlash({ nickname: event.nickname, points: event.points });
         break;
       }
       case "drawing.stroke": {
@@ -324,13 +311,6 @@ function ConnectedRoom({
   const roomSettings = snapshot?.settings ?? initialSettings;
   const drawer = snapshot?.players.find((player) => player.id === snapshot.drawerId) ?? null;
   const remaining = useCountdown(snapshot?.endsAt ?? null, now);
-  const totalSeconds =
-    phase === "choosing"
-      ? CHOOSE_SECONDS
-      : phase === "round-result"
-        ? 5
-        : roomSettings.drawingTimeSeconds;
-  const progress = snapshot?.endsAt ? Math.min(1, Math.max(0, remaining / totalSeconds)) : 0;
   const fatal = error && FATAL_CODES.has(error.code) ? error : null;
 
   useEffect(() => {
@@ -347,10 +327,13 @@ function ConnectedRoom({
   }, [toast]);
 
   useEffect(() => {
-    if (!guessFlash) return;
-    const timer = window.setTimeout(() => setGuessFlash(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [guessFlash]);
+    if (!settingsOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [settingsOpen]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -460,6 +443,7 @@ function ConnectedRoom({
   const rankings = finished?.rankings ?? snapshot?.rankings ?? [];
   const winnerId = finished?.winnerId ?? snapshot?.winnerId ?? rankings[0]?.playerId;
   const winner = rankings.find((entry) => entry.playerId === winnerId);
+  const letterCount = (snapshot?.maskedWord ?? "").replace(/\s/g, "").length;
 
   if (!snapshot && (fatal || status === "failed")) {
     return (
@@ -507,44 +491,107 @@ function ConnectedRoom({
     ? Math.max(0, Math.min(12, roomSettings.maxPlayers) - snapshot.players.length)
     : 0;
 
-  return (
-    <div className="app-shell">
-      <Topbar>
-        <div className="room-bar">
+  const connectionBanner =
+    (status === "reconnecting" || status === "disconnected" || status === "failed") && (
+      <div className="connection-banner">
+        <span>Connection lost. Rejoining the room…</span>
+        <button type="button" onClick={() => window.location.reload()}>
+          Reload now
+        </button>
+      </div>
+    );
+
+  const settingsModal = settingsOpen ? (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) setSettingsOpen(false);
+      }}
+    >
+      <section
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-settings-title"
+      >
+        <div className="modal-head">
           <div>
-            <div className="room-bar-label">Room</div>
-            <div className="room-code">{code.toUpperCase()}</div>
+            <p className="eyebrow">Room {code.toUpperCase()}</p>
+            <h2 id="room-settings-title" className="card-title">
+              Room settings
+            </h2>
           </div>
-          <span className="status" title={`Connection: ${STATUS_LABEL[status] ?? status}`}>
-            <span className="status-dot" data-status={status} />
-            {STATUS_LABEL[status] ?? status}
-          </span>
-          <div className="room-bar-actions">
-            <button className="btn btn--sm" type="button" onClick={copyInvite}>
-              {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-              {copied ? "Copied" : "Copy invite"}
-            </button>
-            <button className="btn btn--ghost btn--sm" type="button" onClick={handleLeave}>
-              Leave
-            </button>
-            <a className="btn btn--ghost btn--sm" href={MAIN_URL}>
-              Main Yaply page
-            </a>
-          </div>
+          <button
+            className="icon-btn"
+            type="button"
+            onClick={() => setSettingsOpen(false)}
+            aria-label="Close settings"
+          >
+            <XIcon size={16} />
+          </button>
         </div>
-      </Topbar>
+        <RoomSettingsFields
+          settings={roomSettings}
+          isHost={isHost}
+          onChange={updateSettings}
+          maxPlayersFloor={snapshot.players.length}
+        />
+        <p className="modal-note">
+          {isHost ? "Changes apply from the next round." : "Only the host can change these settings."}
+        </p>
+        <div className="modal-actions">
+          <button className="btn btn--ghost" type="button" onClick={copyInvite}>
+            {copied ? "Copied!" : "Copy invite"}
+          </button>
+          <button className="btn btn--ghost" type="button" onClick={handleLeave}>
+            Leave room
+          </button>
+          <a className="btn btn--ghost" href={MAIN_URL}>
+            Main Yaply page
+          </a>
+        </div>
+      </section>
+    </div>
+  ) : null;
 
-      <main className="page">
-        {(status === "reconnecting" || status === "disconnected" || status === "failed") && (
-          <div className="connection-banner">
-            <span>Connection lost. Rejoining the room…</span>
-            <button type="button" onClick={() => window.location.reload()}>
-              Reload now
-            </button>
+  const toastView = toast ? (
+    <div className={`toast ${toast.error ? "toast--error" : ""}`} role="status">
+      {toast.message}
+    </div>
+  ) : null;
+
+  if (isLobby) {
+    return (
+      <div className="app-shell app-shell--room app-shell--lobby">
+        <Topbar>
+          <div className="room-bar">
+            <div>
+              <div className="room-bar-label">Room</div>
+              <div className="room-code">{code.toUpperCase()}</div>
+            </div>
+            <span className="status" title={`Connection: ${STATUS_LABEL[status] ?? status}`}>
+              <span className="status-dot" data-status={status} />
+              {STATUS_LABEL[status] ?? status}
+            </span>
+            <div className="room-bar-actions">
+              <button className="btn btn--sm" type="button" onClick={copyInvite}>
+                {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+                {copied ? "Copied" : "Copy invite"}
+              </button>
+              <button className="btn btn--ghost btn--sm" type="button" onClick={handleLeave}>
+                Leave
+              </button>
+              <a className="btn btn--ghost btn--sm" href={MAIN_URL}>
+                Main Yaply page
+              </a>
+            </div>
           </div>
-        )}
+        </Topbar>
 
-        {isLobby ? (
+        <main className="page page--game page--lobby">
+          {connectionBanner}
+
           <div className="lobby-grid">
             <section className="card">
               <div className="page-head">
@@ -575,17 +622,14 @@ function ConnectedRoom({
                 </p>
               </div>
 
-              <div className="rail-head" style={{ marginTop: 18 }}>
-                <span className="rail-title">Players in the room</span>
-                <span className="rail-count">{snapshot.players.length} joined</span>
-              </div>
-              <div className="lobby-list">
-                <PlayerList
+              <div className="lobby-list" style={{ marginTop: 18 }}>
+                <Leaderboard
                   players={snapshot.players}
                   meId={playerId}
                   hostId={snapshot.hostId}
-                  showScores={false}
                   emptySlots={emptySlots}
+                  title="Players in the room"
+                  countLabel={`${snapshot.players.length} joined`}
                 />
               </div>
             </section>
@@ -596,100 +640,12 @@ function ConnectedRoom({
                   <h2 className="card-title">Room settings</h2>
                   {isHost ? <span className="pill">Host</span> : <span className="pill">Host sets these</span>}
                 </div>
-                <div className="settings-list">
-                  <div className="setting-row">
-                    <span className="setting-label">Language</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Word language"
-                        value={roomSettings.language}
-                        options={WORD_LANGUAGES.map(({ id, nativeLabel }) => ({
-                          label: nativeLabel,
-                          value: id,
-                        }))}
-                        onChange={(value) => updateSettings({ language: value })}
-                      />
-                    ) : (
-                      <span className="setting-value">
-                        {WORD_LANGUAGES.find((entry) => entry.id === roomSettings.language)
-                          ?.nativeLabel ?? "English"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="setting-row">
-                    <span className="setting-label">Rounds</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Rounds"
-                        value={roomSettings.rounds}
-                        options={[
-                          { label: "2", value: 2 },
-                          { label: "3", value: 3 },
-                          { label: "5", value: 5 },
-                        ]}
-                        onChange={(value) => updateSettings({ rounds: value })}
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.rounds}</span>
-                    )}
-                  </div>
-                  <div className="setting-row">
-                    <span className="setting-label">Draw time</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Draw time"
-                        value={roomSettings.drawingTimeSeconds}
-                        options={[
-                          { label: "60s", value: 60 },
-                          { label: "80s", value: 80 },
-                          { label: "120s", value: 120 },
-                        ]}
-                        onChange={(value) => updateSettings({ drawingTimeSeconds: value })}
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.drawingTimeSeconds}s</span>
-                    )}
-                  </div>
-                  <div className="setting-row">
-                    <span className="setting-label">Word choices</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Word choices"
-                        value={roomSettings.wordCount ?? 3}
-                        options={[
-                          { label: "2", value: 2 },
-                          { label: "3", value: 3 },
-                          { label: "4", value: 4 },
-                          { label: "5", value: 5 },
-                        ]}
-                        onChange={(value) => updateSettings({ wordCount: value })}
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.wordCount ?? 3}</span>
-                    )}
-                  </div>
-                  <div className="setting-row">
-                    <span className="setting-label">Max players</span>
-                    {isHost ? (
-                      <Segmented
-                        label="Max players"
-                        value={roomSettings.maxPlayers}
-                        options={[
-                          { label: "4", value: 4 },
-                          { label: "8", value: 8 },
-                          { label: "12", value: 12 },
-                        ]}
-                        onChange={(value) =>
-                          updateSettings({
-                            maxPlayers: Math.max(value, snapshot.players.length),
-                          })
-                        }
-                      />
-                    ) : (
-                      <span className="setting-value">{roomSettings.maxPlayers}</span>
-                    )}
-                  </div>
-                </div>
+                <RoomSettingsFields
+                  settings={roomSettings}
+                  isHost={isHost}
+                  onChange={updateSettings}
+                  maxPlayersFloor={snapshot.players.length}
+                />
               </section>
 
               <section className="card">
@@ -719,284 +675,292 @@ function ConnectedRoom({
               </section>
             </aside>
           </div>
-        ) : (
-          <div className="room-grid">
-            <section className="canvas-card">
-              <div className="canvas-head">
-                <div className="round-line">
-                  <span>
-                    Round <strong>{Math.max(1, snapshot.roundNumber)}</strong> of{" "}
-                    <strong>{roomSettings.rounds}</strong>
-                  </span>
-                  <span aria-hidden>·</span>
-                  <span>{phase === "choosing" ? "Choosing a word" : phase === "drawing" ? "Drawing" : phase === "round-result" ? "Round over" : "Final scores"}</span>
-                </div>
-                <div className="status-line">
-                  {drawer ? (
-                    <>
-                      <span className="legend-dot" style={{ background: drawer.color }} />
-                      {drawer.nickname} is drawing
-                    </>
-                  ) : (
-                    "Scores on the board"
-                  )}
-                </div>
-              </div>
+        </main>
 
-              <div className="word-zone">
-                {isDrawer && selectedWord ? (
-                  <div className="drawer-word">
-                    <small>Your word</small>
-                    {selectedWord}
+        {settingsModal}
+        {toastView}
+      </div>
+    );
+  }
+
+  const sortedPlayers = [...snapshot.players].sort(
+    (a, b) => b.score - a.score || a.nickname.localeCompare(b.nickname),
+  );
+  const canDraw = Boolean(isDrawer && phase === "drawing");
+
+  const hintLabel =
+    phase === "round-result"
+      ? "The word was"
+      : phase === "game-over"
+        ? "Final scores"
+        : isDrawer
+          ? "Your word"
+          : "Guess this";
+
+  const hintText =
+    phase === "game-over"
+      ? winner
+        ? `${winner.nickname} wins`
+        : "Game over"
+      : phase === "round-result"
+        ? roundResult?.word ?? snapshot.maskedWord ?? ""
+        : isDrawer
+          ? selectedWord ?? ""
+          : snapshot.maskedWord ?? "";
+
+  const showLetterCount = !isDrawer && phase === "drawing" && letterCount > 0;
+
+  return (
+    <div className="match-page">
+      <div className="match-logo">Yaply Skribbl</div>
+
+      <div className="match-bar">
+        <label>
+          Room:
+          <button className="match-room-code" type="button" onClick={copyInvite} title="Copy invite link">
+            {code.toUpperCase()}
+          </button>
+        </label>
+        <button type="button" onClick={copyInvite}>
+          {copied ? "Copied!" : "Copy invite"}
+        </button>
+        <button type="button" onClick={handleLeave}>
+          Leave
+        </button>
+        <a href={MAIN_URL}>Main Yaply page</a>
+        <span className="match-bar-note">
+          <span className="status-dot" data-status={status} />
+          {STATUS_LABEL[status] ?? status}
+          <span aria-hidden>·</span>
+          {snapshot.players.length}/{roomSettings.maxPlayers} players
+        </span>
+      </div>
+
+      {connectionBanner}
+
+      <div className="game">
+        <div className="top">
+          <div className="clockbox">
+            <div className="clock" role="timer" aria-label={`${remaining} seconds left`}>
+              {snapshot.endsAt ? remaining : "–"}
+            </div>
+            <div className="round">
+              Round {Math.max(1, snapshot.roundNumber)} of {roomSettings.rounds}
+            </div>
+          </div>
+
+          <div className="hint">
+            <small>{hintLabel}</small>
+            <b>{hintText || "…"}</b>
+            {showLetterCount && <sup>{letterCount}</sup>}
+          </div>
+
+          <button
+            className="gear"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Room settings"
+            title="Room settings"
+          >
+            ⚙
+          </button>
+        </div>
+
+        <div className="players" aria-label="Players">
+          {sortedPlayers.map((player) => {
+            const rank = 1 + snapshot.players.filter((entry) => entry.score > player.score).length;
+            return (
+              <div
+                key={player.id}
+                className={[
+                  "p",
+                  player.id === playerId ? "me" : "",
+                  player.guessedCorrectly ? "guessed" : "",
+                  !player.connected ? "out" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                title={player.nickname}
+              >
+                <span className="rank">#{rank}</span>
+                <div className="info">
+                  <span className="nm">
+                    {player.nickname}
+                    {player.id === playerId ? " (You)" : ""}
+                  </span>
+                  <span className="pt">{player.score} points</span>
+                </div>
+                {player.id === snapshot.drawerId && (
+                  <span className="pen" aria-label="Drawing">
+                    ✏️
+                  </span>
+                )}
+                <div className="av" style={{ background: player.color }} aria-hidden />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="canvaswrap">
+          <div className="thumbs" aria-hidden>
+            <span>👍</span>
+            <span>👎</span>
+          </div>
+
+          <DrawingCanvas
+            strokes={strokes}
+            canDraw={canDraw}
+            color={color}
+            width={width}
+            onStroke={handleLocalStroke}
+            overlay={
+              phase === "choosing" ? (
+                isDrawer ? (
+                  <div className="choice-panel">
+                    <p className="eyebrow">Pick a word</p>
+                    <p className="overlay-title">What will you draw?</p>
+                    <p className="overlay-sub">
+                      You have {snapshot.endsAt ? remaining : CHOOSE_SECONDS} seconds. If you do not
+                      choose, the first word is picked.
+                    </p>
+                    <div className="choice-list">
+                      {choices.length === 0 ? (
+                        <div className="empty">Loading word choices…</div>
+                      ) : (
+                        choices.map((choice) => (
+                          <button
+                            key={choice.id}
+                            className="choice"
+                            type="button"
+                            onClick={() => send({ type: "game.word.choose", wordId: choice.id })}
+                          >
+                            {choice.display}
+                          </button>
+                        ))
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <WordMask
-                    maskedWord={snapshot.maskedWord}
-                    word={phase === "round-result" ? roundResult?.word ?? snapshot.maskedWord : null}
-                  />
-                )}
-                <div className="timer" aria-label={`${remaining} seconds left`}>
-                  <ClockIcon size={14} />
-                  <span className="timer-value num">{snapshot.endsAt ? remaining : "–"}</span>
-                  <span className="timer-track">
-                    <span className="timer-fill" style={{ width: `${progress * 100}%` }} />
-                  </span>
-                </div>
-              </div>
-
-              {guessFlash && (
-                <div className="guess-banner" role="status">
-                  <span className="player-dot" style={{ background: "var(--accent)" }} />
-                  <span>
-                    <strong>{guessFlash.nickname}</strong> guessed the word
-                  </span>
-                  <span className="points">+{guessFlash.points}</span>
-                </div>
-              )}
-
-              <DrawingCanvas
-                strokes={strokes}
-                canDraw={Boolean(isDrawer && phase === "drawing")}
-                color={color}
-                width={width}
-                onStroke={handleLocalStroke}
-                overlay={
-                  phase === "choosing" ? (
-                    isDrawer ? (
-                      <div className="choice-panel">
-                        <p className="eyebrow">Pick a word</p>
-                        <p className="overlay-title">What will you draw?</p>
-                        <p className="overlay-sub">
-                          You have {snapshot.endsAt ? remaining : CHOOSE_SECONDS} seconds. If you do not
-                          choose, the first word is picked.
-                        </p>
-                        <div className="choice-list">
-                          {choices.length === 0 ? (
-                            <div className="empty">Loading word choices…</div>
-                          ) : (
-                            choices.map((choice) => (
-                              <button
-                                key={choice.id}
-                                className="choice"
-                                type="button"
-                                onClick={() => send({ type: "game.word.choose", wordId: choice.id })}
-                              >
-                                {choice.display}
-                              </button>
-                            ))
-                          )}
-                        </div>
+                  <div className="overlay-card">
+                    <p className="eyebrow">Round {Math.max(1, snapshot.roundNumber)}</p>
+                    <p className="overlay-title">
+                      {drawer?.nickname ?? "The drawer"} is choosing a word
+                    </p>
+                    <p className="overlay-sub">
+                      The clock gives them {snapshot.endsAt ? remaining : CHOOSE_SECONDS} seconds.
+                      Get ready to guess.
+                    </p>
+                  </div>
+                )
+              ) : phase === "round-result" ? (
+                <div className="round-reveal">
+                  <p className="eyebrow">
+                    Round {Math.max(1, snapshot.roundNumber)} ·{" "}
+                    {reasonLabel(roundResult?.reason ?? "timeout")}
+                  </p>
+                  <p className="round-word">{roundResult?.word ?? snapshot.maskedWord}</p>
+                  <div className="round-rankings">
+                    {(roundResult?.rankings ?? snapshot.rankings ?? []).slice(0, 5).map((entry, index) => (
+                      <div className="round-rank-row" key={entry.playerId}>
+                        <span className="rank">{index + 1}</span>
+                        <span className="rank-name">{entry.nickname}</span>
+                        <span className="rank-score">{entry.score}</span>
                       </div>
+                    ))}
+                  </div>
+                  <p className="muted small">Next turn starts automatically.</p>
+                </div>
+              ) : phase === "game-over" ? (
+                <div className="overlay-card">
+                  <p className="eyebrow">Game over</p>
+                  <p className="overlay-title">
+                    {winner ? `${winner.nickname} wins` : "Final scores"}
+                  </p>
+                  <p className="overlay-sub">
+                    {rankings.length} players · {roomSettings.rounds} rounds played
+                  </p>
+                  <div className="result-rankings">
+                    {rankings.map((entry, index) => (
+                      <div
+                        className={`result-rank-row ${entry.playerId === winnerId ? "result-rank-row--winner" : ""}`}
+                        key={entry.playerId}
+                      >
+                        <span className="rank">{index + 1}</span>
+                        <span className="result-rank-name">
+                          {entry.nickname}
+                          {entry.playerId === playerId ? " (you)" : ""}
+                        </span>
+                        <span className="result-rank-score">{entry.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="overlay-actions">
+                    {isHost ? (
+                      <button className="btn btn--primary" type="button" onClick={rematch}>
+                        <PlayIcon size={14} />
+                        Rematch
+                      </button>
                     ) : (
-                      <div className="overlay-card">
-                        <p className="eyebrow">Round {Math.max(1, snapshot.roundNumber)}</p>
-                        <p className="overlay-title">
-                          {drawer?.nickname ?? "The drawer"} is choosing a word
-                        </p>
-                        <p className="overlay-sub">
-                          The clock gives them {snapshot.endsAt ? remaining : CHOOSE_SECONDS} seconds.
-                          Get ready to guess.
-                        </p>
-                      </div>
-                    )
-                  ) : phase === "round-result" ? (
-                    <div className="round-reveal">
-                      <p className="eyebrow">Round {Math.max(1, snapshot.roundNumber)} · {reasonLabel(roundResult?.reason ?? "timeout")}</p>
-                      <p className="round-word">{roundResult?.word ?? snapshot.maskedWord}</p>
-                      <div className="round-rankings">
-                        {(roundResult?.rankings ?? snapshot.rankings ?? []).slice(0, 5).map((entry, index) => (
-                          <div className="round-rank-row" key={entry.playerId}>
-                            <span className="rank">{index + 1}</span>
-                            <span className="rank-name">{entry.nickname}</span>
-                            <span className="rank-score">{entry.score}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="muted small">Next turn starts automatically.</p>
-                    </div>
-                  ) : phase === "game-over" ? (
-                    <div className="overlay-card">
-                      <p className="eyebrow">Game over</p>
-                      <p className="overlay-title">
-                        {winner ? `${winner.nickname} wins` : "Final scores"}
-                      </p>
-                      <p className="overlay-sub">
-                        {rankings.length} players · {roomSettings.rounds} rounds played
-                      </p>
-                      <div className="result-rankings">
-                        {rankings.map((entry, index) => (
-                          <div
-                            className={`result-rank-row ${entry.playerId === winnerId ? "result-rank-row--winner" : ""}`}
-                            key={entry.playerId}
-                          >
-                            <span className="rank">{index + 1}</span>
-                            <span className="result-rank-name">
-                              {entry.nickname}
-                              {entry.playerId === playerId ? " (you)" : ""}
-                            </span>
-                            <span className="result-rank-score">{entry.score}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="overlay-actions">
-                        {isHost ? (
-                          <button className="btn btn--primary" type="button" onClick={rematch}>
-                            <PlayIcon size={14} />
-                            Rematch
-                          </button>
-                        ) : (
-                          <span className="muted small">Waiting for the host to start a rematch.</span>
-                        )}
-                        <button className="btn btn--ghost" type="button" onClick={handleLeave}>
-                          Leave room
-                        </button>
-                        <a className="btn btn--ghost" href={MAIN_URL}>
-                          Main Yaply page
-                        </a>
-                      </div>
-                    </div>
-                  ) : null
-                }
-                overlayClear={phase === "round-result"}
-              />
-
-              {isDrawer && phase === "drawing" ? (
-                <div className="toolbar">
-                  <div className="toolbar-group">
-                    <span className="toolbar-label">Ink</span>
-                    <div className="swatches" role="group" aria-label="Pen colour">
-                      {DRAW_COLORS.map((swatch) => (
-                        <button
-                          key={swatch}
-                          type="button"
-                          className="swatch"
-                          style={{ background: swatch }}
-                          aria-label={`Use ${swatch}`}
-                          aria-pressed={color === swatch}
-                          onClick={() => setColor(swatch)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <span className="toolbar-divider" aria-hidden />
-                  <div className="toolbar-group">
-                    <span className="toolbar-label">Size</span>
-                    <div className="widths" role="group" aria-label="Pen size">
-                      {DRAW_WIDTHS.map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          className="width-btn"
-                          aria-label={`Pen size ${value}`}
-                          aria-pressed={width === value}
-                          onClick={() => setWidth(value)}
-                        >
-                          <span
-                            className="width-dot"
-                            style={{ width: value, height: value }}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <span className="toolbar-divider" aria-hidden />
-                  <div className="toolbar-group">
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      type="button"
-                      onClick={() => send({ type: "drawing.undo" })}
-                    >
-                      <UndoIcon size={13} />
-                      Undo
+                      <span className="muted small">Waiting for the host to start a rematch.</span>
+                    )}
+                    <button className="btn btn--ghost" type="button" onClick={handleLeave}>
+                      Leave room
                     </button>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      type="button"
-                      onClick={() => send({ type: "drawing.clear" })}
-                    >
-                      <TrashIcon size={13} />
-                      Clear
-                    </button>
+                    <a className="btn btn--ghost" href={MAIN_URL}>
+                      Main Yaply page
+                    </a>
                   </div>
-                  <span className="tool-hint">Draw with a mouse, pen or finger</span>
                 </div>
-              ) : (
-                <div className="toolbar">
-                  <span className="spectator-note">
-                    {phase === "drawing"
-                      ? me?.guessedCorrectly
-                        ? "You guessed it. Watch the clock or chat with the room."
-                        : "Type your guess in the chat on the right."
-                      : "The board is read only between rounds."}
-                  </span>
-                </div>
-              )}
-            </section>
+              ) : null
+            }
+            overlayClear={phase === "round-result"}
+          />
 
-            <aside className="rail">
-              <section className="card">
-                <div className="rail-head">
-                  <span className="rail-title">Players</span>
-                  <span className="rail-count">{snapshot.players.length} in room</span>
-                </div>
-                <PlayerList
-                  players={snapshot.players}
-                  meId={playerId}
-                  hostId={snapshot.hostId}
-                  drawerId={snapshot.drawerId}
-                />
-              </section>
-              <Leaderboard players={snapshot.players} meId={playerId} hostId={snapshot.hostId} />
-
-              <Chat
-                messages={messages}
-                onSend={(text) => send({ type: "chat.guess", text })}
-                disabled={status !== "connected"}
-                placeholder={
-                  phase === "drawing"
-                    ? isDrawer
-                      ? "You are drawing — chat with the room…"
-                      : me?.guessedCorrectly
-                        ? "You guessed it — chat with the room…"
-                        : "Type your guess…"
-                    : "Type a message…"
-                }
-                hint={
-                  phase === "drawing" && !isDrawer && !me?.guessedCorrectly
-                    ? "Correct guesses are announced. Wrong ones stay in chat."
-                    : undefined
-                }
+          <div className="tools">
+            {DRAW_COLORS.map((swatch) => (
+              <button
+                key={swatch}
+                type="button"
+                className="sw"
+                style={{ background: swatch }}
+                aria-label={`Use ${swatch}`}
+                aria-pressed={color === swatch}
+                onClick={() => {
+                  if (canDraw) setColor(swatch);
+                }}
               />
-            </aside>
+            ))}
+            <button
+              className="clear-btn"
+              type="button"
+              aria-disabled={!canDraw}
+              onClick={() => {
+                if (canDraw) send({ type: "drawing.clear" });
+              }}
+            >
+              Clear
+            </button>
           </div>
-        )}
-      </main>
-
-      {toast && (
-        <div className={`toast ${toast.error ? "toast--error" : ""}`} role="status">
-          {toast.message}
         </div>
-      )}
+
+        <MatchChat
+          messages={messages}
+          onSend={(text) => send({ type: "chat.guess", text })}
+          disabled={status !== "connected"}
+          placeholder={
+            phase === "drawing"
+              ? isDrawer
+                ? "You are drawing - chat with the room..."
+                : me?.guessedCorrectly
+                  ? "You guessed it - chat with the room..."
+                  : "Type your guess here..."
+              : "Type a message..."
+          }
+        />
+      </div>
+
+      {settingsModal}
+      {toastView}
     </div>
   );
 }

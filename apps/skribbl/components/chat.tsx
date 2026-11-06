@@ -82,7 +82,7 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
   return (
     <div className="chat-card">
       <div className="rail-head">
-        <span className="rail-title">Room chat</span>
+        <span className="rail-title">Game chat</span>
         <span className="rail-count">{messages.length > 0 ? `${messages.length} lines` : "quiet"}</span>
       </div>
       <div className="chat-list" ref={listRef} role="log" aria-live="polite">
@@ -108,17 +108,20 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
                   .filter(Boolean)
                   .join(" ")}
               >
-                {!isSystem && (
-                  <span className="chat-name">
-                    {message.nickname}
-                  </span>
+                {isSystem ? (
+                  message.text
+                ) : (
+                  <>
+                    <span className="chat-name">{message.nickname}:</span>
+                    {message.text}
+                  </>
                 )}
-                {isSystem ? message.text : `${message.nickname}: ${message.text}`}
               </div>
             );
           })
         )}
       </div>
+      {hint && <p className="chat-hint">{hint}</p>}
       <form className="chat-form" onSubmit={submit}>
         <input
           className="input input--chat"
@@ -153,7 +156,6 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
           <SendIcon size={14} />
         </button>
       </form>
-      {hint && <p className="chat-hint">{hint}</p>}
     </div>
   );
 }

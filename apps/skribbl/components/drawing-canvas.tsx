@@ -194,7 +194,11 @@ export function DrawingCanvas({
   }, [stopTimer]);
 
   return (
-    <div className="canvas-paper" data-drawer={canDraw ? "true" : "false"}>
+    <div
+      className="canvas-paper"
+      data-drawer={canDraw ? "true" : "false"}
+      data-overlay={overlay ? "true" : "false"}
+    >
       <canvas
         ref={canvasRef}
         onPointerDown={handlePointerDown}
