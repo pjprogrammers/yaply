@@ -371,6 +371,82 @@ describe("Skribbl room rules", () => {
     expect(drawerPlayer.score).toBeGreaterThan(0);
   });
 
+  it("broadcasts reactions from every guessing player while drawing", async () => {
+    const names = ["Alice", "Bob", "Cara"];
+    const { sockets, playerIds } = await createAndJoin("skribbl", names);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const guesserIndexes = [0, 1, 2].filter((index) => index !== drawerIndex);
+
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+
+    await sockets[guesserIndexes[0]].message({ type: "chat.reaction", reaction: "dislike" });
+    await sockets[guesserIndexes[1]].message({ type: "chat.reaction", reaction: "like" });
+
+    const messages = sockets[guesserIndexes[0]].events("chat.message");
+    expect(messages.at(-2)).toMatchObject({
+      text: `${names[guesserIndexes[0]]} disliked the drawing`,
+      system: true,
+    });
+    expect(messages.at(-1)).toMatchObject({
+      text: `${names[guesserIndexes[1]]} liked the drawing`,
+      system: true,
+    });
+  });
+
+  it("does not let the drawer react to their own drawing", async () => {
+    const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawer = sockets[playerIds.indexOf(snapshot.drawerId)];
+
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+
+    const reactionCount = () =>
+      drawer.events("chat.message").filter((message: any) => message.text.endsWith("the drawing")).length;
+    const before = reactionCount();
+    await drawer.message({ type: "chat.reaction", reaction: "like" });
+
+    expect(reactionCount()).toBe(before);
+  });
+
+  it("accepts only one reaction per player in a drawing turn", async () => {
+    const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const snapshot = sockets[0].last("room.snapshot").snapshot;
+    const drawerIndex = playerIds.indexOf(snapshot.drawerId);
+    const drawer = sockets[drawerIndex];
+    const guesser = sockets[drawerIndex === 0 ? 1 : 0];
+    const guesserName = drawerIndex === 0 ? "Bob" : "Alice";
+
+    const choices = drawer.last("game.word.choices").choices;
+    await drawer.message({ type: "game.word.choose", wordId: choices[0].id });
+
+    await guesser.message({ type: "chat.reaction", reaction: "like" });
+    await guesser.message({ type: "chat.reaction", reaction: "dislike" });
+    await guesser.message({ type: "chat.reaction", reaction: "like" });
+
+    const reactions = guesser
+      .events("chat.message")
+      .filter((message: any) => message.text.endsWith("the drawing"));
+    expect(reactions).toHaveLength(1);
+    expect(reactions[0].text).toBe(`${guesserName} liked the drawing`);
+  });
+
+  it("ignores reactions outside the drawing phase", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    await sockets[0].message({ type: "room.start" });
+    const before = sockets[0].events("chat.message").length;
+
+    await sockets[0].message({ type: "chat.reaction", reaction: "like" });
+
+    expect(sockets[0].events("chat.message")).toHaveLength(before);
+  });
+
   it("ignores drawing events from a guessing player", async () => {
     const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     await sockets[0].message({ type: "room.start" });

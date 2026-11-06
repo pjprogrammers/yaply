@@ -4468,9 +4468,30 @@ p {
   letter-spacing: 4px;
 }
 
-.match-page .hint sup {
+.match-page .hint-words {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.match-page .hint-word {
+  display: inline-flex;
+  align-items: center;
+}
+
+.match-page .hint-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--paper-deep);
   font-size: 10px;
-  vertical-align: top;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  vertical-align: middle;
 }
 
 .match-page .gear {
@@ -4494,8 +4515,9 @@ p {
   gap: var(--gap);
   overflow: hidden;
   backdrop-filter: blur(8px);
-  height: 600px;
+  height: 420px;
   min-height: 0;
+  align-self: start;
 }
 
 .match-page .p {
@@ -4646,11 +4668,56 @@ p {
   top: 6px;
   right: 8px;
   display: flex;
-  gap: 6px;
-  font-size: 26px;
-  opacity: 0.85;
-  pointer-events: none;
+  align-items: center;
+  gap: 4px;
   z-index: 3;
+}
+
+.match-page .thumbs .thumb {
+  display: inline-grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.match-page .thumbs .thumb:hover:not(:disabled) {
+  transform: scale(1.15);
+  background: rgba(10, 10, 9, 0.08);
+}
+
+.match-page .thumbs .thumb:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.match-page .thumbs .thumb:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.match-page .thumbs .thumb:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.match-page .thumbs .thumb--up {
+  color: var(--ok);
+}
+
+.match-page .thumbs .thumb--down {
+  color: var(--sys);
+}
+
+.match-page .thumbs svg {
+  display: block;
+  filter: drop-shadow(0 1px 0 rgba(251, 247, 238, 0.8));
 }
 
 .match-page .tools {
@@ -4660,6 +4727,18 @@ p {
   background: var(--paper-deep);
   align-items: center;
   flex: none;
+  flex-wrap: wrap;
+}
+
+.match-page .tool-swatches,
+.match-page .tool-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.match-page .tool-actions {
+  margin-left: auto;
 }
 
 .match-page .tools .sw {
@@ -4672,8 +4751,13 @@ p {
   flex: none;
 }
 
-.match-page .tools .clear-btn {
-  margin-left: auto;
+.match-page .tools .sw:disabled,
+.match-page .tools .tool-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.match-page .tools .tool-btn {
   font: inherit;
   padding: 3px 10px;
   border: 2px solid rgba(10, 10, 9, 0.55);
@@ -4681,6 +4765,10 @@ p {
   background: var(--paper);
   color: var(--ink);
   cursor: pointer;
+}
+
+.match-page .tools .tool-btn:hover:not(:disabled) {
+  background: var(--accent);
 }
 
 /* Chat ------------------------------------------------------------------- */
@@ -4692,8 +4780,9 @@ p {
   flex-direction: column;
   overflow: hidden;
   backdrop-filter: blur(8px);
-  height: 600px;
+  height: 420px;
   min-width: 0;
+  align-self: start;
 }
 
 .match-page .msgs {
@@ -4798,6 +4887,45 @@ p {
 .match-page .canvas-overlay .choice:hover {
   background: var(--paper-deep);
   border-color: var(--ink);
+}
+
+/* The word chooser is just a small prompt with the options side by side. No
+   surrounding panel — only each option gets a thin box. */
+.match-page .canvas-overlay .choice-panel {
+  width: auto;
+  max-width: min(580px, 100%);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-align: center;
+}
+
+.match-page .canvas-overlay .choice-panel .eyebrow {
+  margin-bottom: 8px;
+  font-size: 10px;
+  color: var(--paper);
+  opacity: 0.86;
+}
+
+.match-page .canvas-overlay .choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.match-page .canvas-overlay .choice {
+  width: auto;
+  min-width: 72px;
+  min-height: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .match-page .canvas-overlay .round-rank-row .rank-score,
@@ -4973,7 +5101,13 @@ p {
     letter-spacing: 2px;
   }
 
-  .match-page .hint sup {
+  .match-page .hint-words {
+    gap: 2px 6px;
+  }
+
+  .match-page .hint-count {
+    margin-left: 2px;
+    padding: 0 4px;
     font-size: 8px;
   }
 
@@ -4987,17 +5121,29 @@ p {
   }
 
   .match-page .tools {
-    display: none;
+    padding: 4px;
   }
 
-  .match-page .thumbs {
-    font-size: 22px;
+  .match-page .tools .sw {
+    width: 20px;
+    height: 20px;
+  }
+
+  .match-page .tools .tool-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  .match-page .thumbs svg {
+    width: 22px;
+    height: 22px;
   }
 
   .match-page .players {
     grid-column: 1;
     grid-row: 3;
     height: auto;
+    align-self: stretch;
     background: transparent;
     gap: 0;
     backdrop-filter: none;
@@ -5070,6 +5216,23 @@ p {
   .match-page .canvas-overlay .choice-panel,
   .match-page .canvas-overlay .round-reveal {
     padding: 14px;
+  }
+
+  .match-page .canvas-overlay .choice-panel {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .match-page .canvas-overlay .choice-list {
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .match-page .canvas-overlay .choice {
+    min-width: 0;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .match-page > .connection-banner {

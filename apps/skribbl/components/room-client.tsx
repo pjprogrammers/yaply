@@ -20,7 +20,15 @@ import {
 } from "@/lib/config";
 import type { ChatMessage } from "./chat";
 import { DrawingCanvas } from "./drawing-canvas";
-import { CheckIcon, ClockIcon, CopyIcon, PlayIcon, XIcon } from "./icons";
+import {
+  CheckIcon,
+  ClockIcon,
+  CopyIcon,
+  PlayIcon,
+  ThumbDownIcon,
+  ThumbUpIcon,
+  XIcon,
+} from "./icons";
 import { Leaderboard } from "./leaderboard";
 import { MatchChat } from "./match-chat";
 import { RoomSettingsFields } from "./room-settings";
@@ -193,6 +201,9 @@ function ConnectedRoom({
   const [copied, setCopied] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [color, setColor] = useState(DRAW_COLORS[0]);
+  // A reaction belongs to one drawing turn. Tracking the turn key instead of a
+  // plain boolean lets the buttons come back automatically on the next turn.
+  const [reactedTurn, setReactedTurn] = useState<string | null>(null);
   const width = DRAW_WIDTH;
 
   const now = useNow(250);
@@ -209,6 +220,9 @@ function ConnectedRoom({
               if (text.includes("disconnected")) return "disconnected" as const;
               if (text.includes("you guessed")) return "own_correct_guess" as const;
               if (text.includes("guessed the word")) return "correct_guess" as const;
+              // Check "disliked" before "liked": the former contains the latter.
+              if (text.includes("disliked the drawing")) return "disliked" as const;
+              if (text.includes("liked the drawing")) return "liked" as const;
               if (text.includes("drawing")) return "drawing_started" as const;
               if (text.includes("round")) return "round_started" as const;
               if (text.includes("word was") || text.includes("revealed")) return "word_revealed" as const;
@@ -304,6 +318,8 @@ function ConnectedRoom({
 
   playerIdRef.current = playerId;
 
+  const reactionTurnKey = snapshot ? `${snapshot.roundNumber}:${snapshot.drawerId ?? ""}` : "";
+  const hasReactedThisTurn = reactedTurn !== null && reactedTurn === reactionTurnKey;
   const me = snapshot?.players.find((player) => player.id === playerId) ?? null;
   const isHost = snapshot ? snapshot.hostId === playerId : createdByHost;
   const isDrawer = snapshot?.drawerId === playerId;
@@ -709,6 +725,9 @@ function ConnectedRoom({
           : snapshot.maskedWord ?? "";
 
   const showLetterCount = !isDrawer && phase === "drawing" && letterCount > 0;
+  const hintWords = showLetterCount
+    ? hintText.trim().split(/\s+/).filter(Boolean)
+    : [];
 
   return (
     <div className="match-page">
@@ -751,8 +770,20 @@ function ConnectedRoom({
 
           <div className="hint">
             <small>{hintLabel}</small>
-            <b>{hintText || "…"}</b>
-            {showLetterCount && <sup>{letterCount}</sup>}
+            {showLetterCount ? (
+              <span className="hint-words">
+                {hintWords.map((word, index) => (
+                  <span className="hint-word" key={`${index}-${word}`}>
+                    <b>{word}</b>
+                    <span className="hint-count" aria-label={`${word.length} letters`}>
+                      {word.length}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <b>{hintText || "…"}</b>
+            )}
           </div>
 
           <button
@@ -802,10 +833,38 @@ function ConnectedRoom({
         </div>
 
         <div className="canvaswrap">
-          <div className="thumbs" aria-hidden>
-            <span>👍</span>
-            <span>👎</span>
-          </div>
+          {!isDrawer && !hasReactedThisTurn && (
+            <div className="thumbs" role="group" aria-label="Rate the drawing">
+              <button
+                type="button"
+                className="thumb thumb--up"
+                aria-label="Like the drawing"
+                title="Like the drawing"
+                disabled={phase !== "drawing" || status !== "connected"}
+                onClick={() => {
+                  if (phase !== "drawing" || status !== "connected") return;
+                  setReactedTurn(reactionTurnKey);
+                  send({ type: "chat.reaction", reaction: "like" });
+                }}
+              >
+                <ThumbUpIcon size={26} />
+              </button>
+              <button
+                type="button"
+                className="thumb thumb--down"
+                aria-label="Dislike the drawing"
+                title="Dislike the drawing"
+                disabled={phase !== "drawing" || status !== "connected"}
+                onClick={() => {
+                  if (phase !== "drawing" || status !== "connected") return;
+                  setReactedTurn(reactionTurnKey);
+                  send({ type: "chat.reaction", reaction: "dislike" });
+                }}
+              >
+                <ThumbDownIcon size={26} />
+              </button>
+            </div>
+          )}
 
           <DrawingCanvas
             strokes={strokes}
@@ -817,12 +876,7 @@ function ConnectedRoom({
               phase === "choosing" ? (
                 isDrawer ? (
                   <div className="choice-panel">
-                    <p className="eyebrow">Pick a word</p>
-                    <p className="overlay-title">What will you draw?</p>
-                    <p className="overlay-sub">
-                      You have {snapshot.endsAt ? remaining : CHOOSE_SECONDS} seconds. If you do not
-                      choose, the first word is picked.
-                    </p>
+                    <p className="eyebrow">Choose a word</p>
                     <div className="choice-list">
                       {choices.length === 0 ? (
                         <div className="empty">Loading word choices…</div>
@@ -916,30 +970,45 @@ function ConnectedRoom({
             overlayClear={phase === "round-result"}
           />
 
-          <div className="tools">
-            {DRAW_COLORS.map((swatch) => (
+          <div className="tools" role="group" aria-label="Drawing tools">
+            <div className="tool-swatches">
+              {DRAW_COLORS.map((swatch) => (
+                <button
+                  key={swatch}
+                  type="button"
+                  className="sw"
+                  style={{ background: swatch }}
+                  aria-label={`Use ${swatch}`}
+                  aria-pressed={color === swatch}
+                  disabled={!canDraw}
+                  onClick={() => {
+                    if (canDraw) setColor(swatch);
+                  }}
+                />
+              ))}
+            </div>
+            <div className="tool-actions">
               <button
-                key={swatch}
+                className="tool-btn"
                 type="button"
-                className="sw"
-                style={{ background: swatch }}
-                aria-label={`Use ${swatch}`}
-                aria-pressed={color === swatch}
+                disabled={!canDraw}
                 onClick={() => {
-                  if (canDraw) setColor(swatch);
+                  if (canDraw) send({ type: "drawing.undo" });
                 }}
-              />
-            ))}
-            <button
-              className="clear-btn"
-              type="button"
-              aria-disabled={!canDraw}
-              onClick={() => {
-                if (canDraw) send({ type: "drawing.clear" });
-              }}
-            >
-              Clear
-            </button>
+              >
+                Undo
+              </button>
+              <button
+                className="tool-btn tool-btn--clear"
+                type="button"
+                disabled={!canDraw}
+                onClick={() => {
+                  if (canDraw) send({ type: "drawing.clear" });
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
 

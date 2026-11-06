@@ -20,10 +20,12 @@ function messageTone(message: ChatMessage): "" | "sys" | "ok" | "blue" {
     case "correct_guess":
     case "own_correct_guess":
     case "reconnected":
+    case "liked":
       return "ok";
     case "player_left":
     case "disconnected":
     case "error":
+    case "disliked":
       return "sys";
     case "drawing_started":
     case "round_started":
@@ -40,6 +42,9 @@ function messageTone(message: ChatMessage): "" | "sys" | "ok" | "blue" {
   const text = message.text.toLowerCase();
   if (text.includes("joined the room") || text.includes("guessed the word")) return "ok";
   if (text.includes("left the room") || text.includes("disconnected")) return "sys";
+  // Check "disliked" before "liked": the former contains the latter.
+  if (text.includes("disliked the drawing")) return "sys";
+  if (text.includes("liked the drawing")) return "ok";
   if (text.includes("drawing") || text.includes("round") || text.includes("word was")) return "blue";
   return "";
 }

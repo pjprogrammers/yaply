@@ -268,6 +268,12 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      type: z.literal("chat.reaction"),
+      reaction: z.enum(["like", "dislike"]),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal("chain.place"),
       row: z.number().int().min(0).max(20),
       col: z.number().int().min(0).max(20),

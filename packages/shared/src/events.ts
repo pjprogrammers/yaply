@@ -40,6 +40,7 @@ export type ClientEvent =
   | { type: "drawing.undo"; strokeId?: string }
   | { type: "drawing.clear" }
   | { type: "chat.guess"; text: string }
+  | { type: "chat.reaction"; reaction: "like" | "dislike" }
   | { type: "chain.place"; row: number; col: number }
   | { type: "chain.surrender" }
   | { type: "smash.input"; input: SmashInput }

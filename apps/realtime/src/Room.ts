@@ -272,6 +272,9 @@ export class GameRoom {
   private sockets = new Map<WebSocket, string | null>();
   private playerSockets = new Map<string, WebSocket>();
   private socketState = new Map<WebSocket, SocketState>();
+  // Reactions are ephemeral chat messages, so they stay in memory and reset
+  // with every drawing turn instead of growing the persisted room state.
+  private reactedPlayerIds = new Set<string>();
   private ready: Promise<void>;
   private lastSmashPersistAt = 0;
 
@@ -887,6 +890,9 @@ export class GameRoom {
       case "chat.guess":
         await this.handleChat(ws, event.text);
         break;
+      case "chat.reaction":
+        this.handleReaction(ws, event.reaction);
+        break;
       case "chain.place":
         await this.handleChainPlace(ws, event.row, event.col);
         break;
@@ -1280,6 +1286,7 @@ export class GameRoom {
     if (this.room.game !== "skribbl") return;
 
     this.room.guessedPlayerIds = [];
+    this.reactedPlayerIds.clear();
     for (const p of this.room.players) {
       p.guessedCorrectly = false;
     }
@@ -1564,6 +1571,20 @@ export class GameRoom {
     }
 
     await this.commit();
+  }
+
+  private handleReaction(ws: WebSocket, reaction: "like" | "dislike") {
+    const player = this.socketPlayer(ws);
+    if (!player || this.room.game !== "skribbl" || this.room.phase !== "drawing") return;
+    // The drawer rates their own work with the scoreboard, not the chat.
+    if (player.id === this.room.drawerId) return;
+    // One reaction per player per drawing turn prevents chat spam even when a
+    // client bypasses the button state.
+    if (this.reactedPlayerIds.has(player.id)) return;
+    this.reactedPlayerIds.add(player.id);
+
+    const verb = reaction === "like" ? "liked" : "disliked";
+    this.broadcastSystemChat(`${player.nickname} ${verb} the drawing`);
   }
 
   private sendSecretMessage(player: StoredPlayer, text: string) {

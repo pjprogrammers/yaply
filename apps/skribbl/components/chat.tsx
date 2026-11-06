@@ -10,6 +10,8 @@ export type ChatMessageType =
   | "player_left"
   | "correct_guess"
   | "own_correct_guess"
+  | "liked"
+  | "disliked"
   | "drawing_started"
   | "close_guess"
   | "word_revealed"
@@ -47,6 +49,9 @@ function getMessageType(message: ChatMessage): ChatMessageType {
     if (text.includes("disconnected")) return "disconnected";
     if (text.includes("you guessed")) return "own_correct_guess";
     if (text.includes("guessed the word")) return "correct_guess";
+    // Check "disliked" before "liked": the former contains the latter.
+    if (text.includes("disliked the drawing")) return "disliked";
+    if (text.includes("liked the drawing")) return "liked";
     if (text.includes("drawing")) return "drawing_started";
     if (text.includes("round")) return "round_started";
     if (text.includes("word was") || text.includes("revealed")) return "word_revealed";
