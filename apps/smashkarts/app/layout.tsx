@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Inter } from "next/font/google";
+import { PwaBridge } from "@yaply/shared/install";
 import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 
@@ -61,6 +62,7 @@ export default function RootLayout({
           Skip to content
         </a>
         {children}
+        <PwaBridge />
       </body>
     </html>
   );

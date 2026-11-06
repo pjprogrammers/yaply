@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Shantell_Sans } from "next/font/google";
+import { PwaBridge } from "@yaply/shared/install";
 import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 
@@ -18,6 +19,11 @@ export const metadata: Metadata = {
   description:
     "A private drawing and guessing game for 2–12 players. Create a room, share the code, and try to draw a word nobody can guess.",
   applicationName: "Skribbl",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Skribbl",
+  },
   openGraph: {
     title: "Skribbl — draw badly, guess fast",
     description:
@@ -48,7 +54,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${sketch.variable}`}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        <PwaBridge />
+      </body>
     </html>
   );
 }

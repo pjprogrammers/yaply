@@ -185,6 +185,7 @@ export default function Home() {
               <a href="#rules">Critical mass</a>
               <a href="#boards">The board</a>
               <Link href="/how-to-play">How to play</Link>
+              <Link href="/install">Install app</Link>
             </nav>
 
             <div className="cr-nav-actions">
@@ -617,6 +618,7 @@ export default function Home() {
                 <a href="#boards">The board</a>
                 <Link href="/how-to-play">How to play</Link>
                 <Link href="/create">Set up a game</Link>
+                <Link href="/install">Install app</Link>
                 <a href={MAIN_URL}>All games</a>
               </div>
             </div>

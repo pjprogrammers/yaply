@@ -74,6 +74,9 @@ export function Navbar({
           <Link href="/games" className="site-header__link">
             Games
           </Link>
+          <Link href="/install" className="site-header__link">
+            Install
+          </Link>
           <Link href="/#how" className="site-header__link">
             How it works
           </Link>

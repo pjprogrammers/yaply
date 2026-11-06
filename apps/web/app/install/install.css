@@ -1,0 +1,563 @@
+/* PWA install page — Yaply main site */
+
+.install-hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(3.25rem, 7vw, 6.5rem);
+  border-bottom: 10px solid var(--yellow);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(247, 221, 71, 0.18), transparent 26rem),
+    radial-gradient(circle at 12% 88%, rgba(233, 71, 159, 0.2), transparent 22rem),
+    var(--blue);
+  color: var(--white);
+}
+
+.install-hero::before {
+  content: "";
+  position: absolute;
+  top: -8rem;
+  right: -7rem;
+  width: min(34rem, 58vw);
+  aspect-ratio: 1;
+  border: 2px solid rgba(223, 227, 255, 0.2);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.install-hero::after {
+  content: "";
+  position: absolute;
+  right: 11%;
+  bottom: -12rem;
+  width: min(24rem, 48vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(247, 221, 71, 0.08);
+  pointer-events: none;
+}
+
+.install-hero__grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(0, 0.84fr);
+  gap: clamp(2.25rem, 5vw, 5rem);
+  align-items: center;
+}
+
+.install-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.8rem;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(7, 7, 7, 0.12);
+  color: var(--soft-blue);
+  font-size: var(--step-small);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.install-eyebrow span {
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--yellow);
+  transform: rotate(45deg);
+}
+
+.install-hero h1 {
+  max-width: 11ch;
+  margin-top: 1.4rem;
+  font-size: clamp(3rem, 7.2vw, 7.2rem);
+  line-height: 0.84;
+  letter-spacing: -0.065em;
+}
+
+.install-hero h1 span {
+  display: block;
+  color: var(--yellow);
+}
+
+.install-lede {
+  max-width: 48ch;
+  margin-top: 1.5rem;
+  color: var(--soft-blue);
+  font-size: var(--step-lead);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.install-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 1.6rem 0 0;
+  list-style: none;
+}
+
+.install-specs li {
+  padding: 0.42rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  color: var(--white);
+  font-size: var(--step-small);
+}
+
+.install-card {
+  position: relative;
+  width: min(100%, 30rem);
+  justify-self: end;
+  padding: clamp(1.3rem, 2.6vw, 2rem);
+  border-radius: var(--radius);
+  background: var(--yellow);
+  color: var(--black);
+  box-shadow: 18px 18px 0 rgba(7, 7, 7, 0.28);
+}
+
+.install-card::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 1.6rem;
+  width: 5.5rem;
+  height: 1.5rem;
+  background: var(--pink);
+  transform: rotate(-3deg);
+}
+
+.install-card__head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.install-card__icon {
+  flex: none;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 6px 0 rgba(7, 7, 7, 0.15);
+}
+
+.install-card__kicker {
+  color: var(--maroon);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.install-card__name {
+  margin-top: 0.18rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.install-card__meta {
+  margin-top: 0.25rem;
+  color: var(--olive);
+  font-size: var(--step-small);
+}
+
+.install-card__status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.2rem;
+  padding-top: 1.1rem;
+  border-top: 2px dashed rgba(7, 7, 7, 0.28);
+  color: var(--olive);
+  font-size: var(--step-small);
+  font-weight: 600;
+}
+
+.install-card__status i {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pink);
+}
+
+.install-card__status[data-state="ready"] i,
+.install-card__status[data-state="installed"] i {
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(31, 194, 122, 0.16);
+}
+
+.install-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 1.1rem;
+}
+
+.install-card__actions .button {
+  width: 100%;
+  min-height: 3.4rem;
+  background: var(--black);
+  color: var(--white);
+}
+
+.install-card__actions .button:hover {
+  background: var(--blue);
+}
+
+.install-card__hint {
+  max-width: none;
+  color: var(--olive);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.install-card__message {
+  max-width: none;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border-left: 4px solid var(--pink);
+  background: rgba(7, 7, 7, 0.08);
+  color: var(--maroon);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.install-ticker {
+  overflow: hidden;
+  padding: 0.78rem 0;
+  border-bottom: 2px solid var(--black);
+  background: var(--yellow);
+  color: var(--black);
+  white-space: nowrap;
+}
+
+.install-ticker__track {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 2.2vw, 1.8rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  animation: install-ticker 30s linear infinite;
+}
+
+.install-ticker__track > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.install-ticker__track > span > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.install-ticker__track > span > span::after {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  background: var(--black);
+  transform: rotate(45deg);
+}
+
+@keyframes install-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.install-section {
+  padding-block: clamp(4rem, 8vw, 7rem);
+}
+
+.install-section--black {
+  background: var(--black);
+  color: var(--white);
+}
+
+.install-section--yellow {
+  background: var(--yellow);
+  color: var(--black);
+}
+
+.install-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: end;
+  margin-bottom: clamp(2.2rem, 5vw, 4rem);
+}
+
+.install-head h2 {
+  max-width: 10ch;
+  font-size: clamp(2.6rem, 5.8vw, 5.6rem);
+  line-height: 0.86;
+  letter-spacing: -0.055em;
+}
+
+.install-head p {
+  max-width: 40ch;
+  color: var(--black-muted);
+  font-size: var(--step-body);
+  line-height: 1.5;
+}
+
+.install-section--yellow .install-head p {
+  color: var(--olive);
+}
+
+.install-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.install-feature {
+  min-height: 15rem;
+  padding: clamp(1.4rem, 3vw, 2.2rem);
+  background: var(--black);
+}
+
+.install-feature__no {
+  display: block;
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 4vw, 3.6rem);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.install-feature h3 {
+  margin-top: 2rem;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1;
+}
+
+.install-feature p {
+  margin-top: 0.8rem;
+  color: var(--black-muted);
+  font-size: var(--step-body);
+  line-height: 1.5;
+}
+
+.install-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.install-guide__card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: clamp(1.2rem, 2.4vw, 1.65rem);
+  border-radius: var(--radius);
+  border-top: 8px solid var(--blue);
+  background: var(--black);
+  color: var(--white);
+}
+
+.install-guide__card[data-recommended="true"] {
+  border-top-color: var(--pink);
+  box-shadow: 10px 10px 0 rgba(7, 7, 7, 0.16);
+}
+
+.install-guide__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.install-guide__badge {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: var(--black-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.install-guide__card[data-recommended="true"] .install-guide__badge {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--black);
+}
+
+.install-guide__glyph {
+  color: var(--yellow);
+}
+
+.install-guide__card h3 {
+  margin-top: 1.2rem;
+  font-size: clamp(1.7rem, 2.6vw, 2.2rem);
+  line-height: 1;
+}
+
+.install-guide__card ol {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  margin: 1.1rem 0 0;
+  list-style: none;
+  counter-reset: install-step;
+}
+
+.install-guide__card li {
+  display: grid;
+  grid-template-columns: 1.7rem 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding-block: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--white);
+  font-size: var(--step-small);
+  line-height: 1.4;
+  counter-increment: install-step;
+}
+
+.install-guide__card li::before {
+  content: counter(install-step);
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--black);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.install-guide__note {
+  margin-top: auto;
+  padding-top: 1rem;
+  color: var(--blue-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.install-guide__card[data-recommended="true"] .install-guide__note {
+  color: var(--black-muted);
+}
+
+.install-guide__after {
+  max-width: none;
+  margin-top: 1.5rem;
+  color: var(--olive);
+  font-size: var(--step-small);
+}
+
+.install-cta {
+  padding-block: clamp(4rem, 8vw, 7rem);
+  border-top: 10px solid var(--yellow);
+  background: var(--blue);
+  color: var(--white);
+}
+
+.install-cta h2 {
+  max-width: 13ch;
+  font-size: clamp(3rem, 7vw, 7rem);
+  line-height: 0.84;
+  letter-spacing: -0.06em;
+}
+
+.install-cta__row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.install-cta__row p {
+  max-width: 42ch;
+  color: var(--soft-blue);
+  font-size: var(--step-body);
+  line-height: 1.55;
+}
+
+.install-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.install-cta__actions .button--dark {
+  background: var(--black);
+  color: var(--white);
+}
+
+.install-cta__actions .button--dark:hover {
+  background: var(--yellow);
+  color: var(--black);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-ticker__track {
+    animation: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .install-hero__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .install-card {
+    justify-self: start;
+  }
+
+  .install-guide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .install-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .install-features {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .install-feature {
+    min-height: 0;
+  }
+
+  .install-feature h3 {
+    margin-top: 1.1rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .install-hero h1 {
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
+  }
+
+  .install-card {
+    box-shadow: 10px 10px 0 rgba(7, 7, 7, 0.28);
+  }
+
+  .install-cta__actions {
+    width: 100%;
+  }
+
+  .install-cta__actions .button {
+    width: 100%;
+  }
+}

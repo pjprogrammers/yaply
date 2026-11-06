@@ -103,6 +103,7 @@ export default function Home() {
               <a href="#words">Words</a>
               <a href="#scoring">Scoring</a>
               <Link href="/how-to-play">How to play</Link>
+              <Link href="/install">Install app</Link>
             </nav>
 
             <div className="landing-nav-actions">
@@ -417,6 +418,7 @@ export default function Home() {
                 <a href="#scoring">Scoring</a>
                 <Link href="/how-to-play">How to play</Link>
                 <Link href="/create">Create a room</Link>
+                <Link href="/install">Install app</Link>
                 <a href={MAIN_URL}>All games</a>
               </div>
             </div>

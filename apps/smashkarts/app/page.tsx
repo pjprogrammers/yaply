@@ -43,6 +43,7 @@ export default function Home() {
           <a href="#arsenal">Arsenal</a>
           <a href="#controls">How to play</a>
           <a href="#paint">Garage</a>
+          <Link href="/install">Install</Link>
         </div>
         <Link href="/play" className="nav-action">
           Play now
@@ -352,6 +353,7 @@ export default function Home() {
             <a href="#arenas">Arenas</a>
             <a href="#arsenal">Arsenal</a>
             <a href="#controls">How to play</a>
+            <Link href="/install">Install app</Link>
           </div>
         </div>
       </footer>

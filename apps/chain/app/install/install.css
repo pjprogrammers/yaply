@@ -1,0 +1,378 @@
+/* Chain Reaction install page */
+
+.cr-install-card {
+  position: relative;
+  width: min(100%, 31rem);
+  justify-self: end;
+  overflow: hidden;
+  padding: clamp(1.35rem, 2.6vw, 2rem);
+  border: 1px solid rgba(76, 179, 240, 0.34);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(76, 179, 240, 0.16), transparent 18rem),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.045), transparent 58%),
+    var(--cr-panel);
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.cr-install-card__orb {
+  position: absolute;
+  top: -2.4rem;
+  right: -2.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.cr-install-card__orb i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff 0 7%, #9bdcff 20%, var(--cr-blue) 52%, #0b4f78 100%);
+  box-shadow: 0 0 16px rgba(76, 179, 240, 0.55);
+}
+
+.cr-install-card__orb i:nth-child(2) {
+  width: 1rem;
+  height: 1rem;
+  background: radial-gradient(circle at 32% 28%, #fff 0 7%, #ffdca0 20%, var(--cr-yellow) 52%, #7b4b06 100%);
+}
+
+.cr-install-card__orb i:nth-child(3) {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
+.cr-install-card__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cr-install-card__icon {
+  flex: none;
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 1.15rem;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.cr-install-card__kicker {
+  color: var(--cr-blue);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr-install-card__name {
+  margin-top: 0.22rem;
+  font-family: var(--cr-font-display);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.cr-install-card__meta {
+  margin-top: 0.3rem;
+  color: var(--cr-muted);
+  font-size: 12px;
+}
+
+.cr-install-card__status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--cr-line);
+  color: var(--cr-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cr-install-card__status i {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--cr-yellow);
+}
+
+.cr-install-card__status[data-state="ready"] i,
+.cr-install-card__status[data-state="installed"] i {
+  background: var(--cr-lime);
+  box-shadow: 0 0 0 4px rgba(198, 242, 78, 0.14);
+}
+
+.cr-install-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 1.1rem;
+}
+
+.cr-install-card__actions .cr-button {
+  width: 100%;
+}
+
+.cr-install-card__hint {
+  max-width: none;
+  color: var(--cr-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.cr-install-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.2rem;
+}
+
+.cr-install-card__foot span {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--cr-line);
+  border-radius: 999px;
+  color: var(--cr-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cr-install-card__message {
+  max-width: none;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid var(--cr-yellow);
+  background: rgba(242, 179, 61, 0.08);
+  color: #f6d998;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Feature cards */
+
+.cr-install-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr-install-feature {
+  min-height: 16rem;
+  padding: clamp(1.3rem, 2.6vw, 2rem);
+  border: 1px solid rgba(8, 19, 28, 0.14);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.cr-install-feature__no {
+  display: block;
+  font-family: var(--cr-font-display);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  color: var(--cr-blue-deep);
+}
+
+.cr-install-feature h3 {
+  margin: 2rem 0 0;
+  font-family: var(--cr-font-display);
+  font-size: clamp(1.4rem, 2.3vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.cr-install-feature p {
+  margin-top: 0.75rem;
+  color: var(--cr-muted-ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cr-install-feature__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.2rem;
+  color: var(--cr-blue-deep);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cr-install-feature__tag::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Guide */
+
+.cr-install-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr-install-guide__card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: clamp(1.2rem, 2.4vw, 1.7rem);
+  border: 1px solid rgba(8, 19, 28, 0.16);
+  background: rgba(255, 255, 255, 0.44);
+  color: var(--cr-ink-text);
+}
+
+.cr-install-guide__card[data-recommended="true"] {
+  border-color: var(--cr-ink);
+  background: var(--cr-ink);
+  color: #f3f8fb;
+  box-shadow: 0 18px 40px rgba(8, 19, 28, 0.14);
+}
+
+.cr-install-guide__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.cr-install-guide__badge {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(8, 19, 28, 0.22);
+  border-radius: 999px;
+  color: var(--cr-muted-ink);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cr-install-guide__card[data-recommended="true"] .cr-install-guide__badge {
+  border-color: var(--cr-blue);
+  background: var(--cr-blue);
+  color: var(--cr-ink);
+}
+
+.cr-install-guide__glyph {
+  color: var(--cr-blue-deep);
+}
+
+.cr-install-guide__card[data-recommended="true"] .cr-install-guide__glyph {
+  color: var(--cr-blue);
+}
+
+.cr-install-guide__card h3 {
+  margin: 1.15rem 0 0;
+  font-family: var(--cr-font-display);
+  font-size: clamp(1.6rem, 2.5vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.cr-install-guide__card ol {
+  display: grid;
+  padding: 0;
+  margin: 1rem 0 0;
+  list-style: none;
+  counter-reset: chain-install-step;
+}
+
+.cr-install-guide__card li {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding-block: 0.65rem;
+  border-top: 1px solid rgba(8, 19, 28, 0.14);
+  color: var(--cr-muted-ink);
+  font-size: 12px;
+  line-height: 1.45;
+  counter-increment: chain-install-step;
+}
+
+.cr-install-guide__card[data-recommended="true"] li {
+  border-top-color: var(--cr-line);
+  color: var(--cr-muted);
+}
+
+.cr-install-guide__card li::before {
+  content: counter(chain-install-step);
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--cr-blue);
+  color: var(--cr-ink);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.cr-install-guide__note {
+  margin-top: auto;
+  padding-top: 1rem;
+  color: var(--cr-muted-ink);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.cr-install-guide__card[data-recommended="true"] .cr-install-guide__note {
+  color: var(--cr-muted);
+}
+
+.cr-install-guide__after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: none;
+  margin-top: 1.4rem;
+  color: var(--cr-muted-ink);
+  font-size: 12px;
+}
+
+@media (max-width: 1080px) {
+  .cr-install-card {
+    justify-self: start;
+  }
+
+  .cr-install-guide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .cr-install-features {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cr-install-feature {
+    min-height: 0;
+  }
+
+  .cr-install-feature h3 {
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .cr-install-card {
+    padding: 1.2rem;
+  }
+}

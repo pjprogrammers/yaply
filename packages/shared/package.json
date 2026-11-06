@@ -12,6 +12,7 @@
     "./config": "./src/config.ts",
     "./chain": "./src/chain.ts",
     "./client": "./src/client.ts",
+    "./install": "./src/install.ts",
     "./react": "./src/react.ts"
   },
   "scripts": {

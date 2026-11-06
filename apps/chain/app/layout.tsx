@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
+import { PwaBridge } from "@yaply/shared/install";
 import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 import "./landing.css";
@@ -42,6 +43,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  themeColor: "#06090e",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -51,7 +54,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${display.variable}`}>
-      <body className={`${inter.className} antialiased`}>{children}</body>
+      <body className={`${inter.className} antialiased`}>
+        {children}
+        <PwaBridge />
+      </body>
     </html>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PwaBridge } from "@yaply/shared/install";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -11,6 +12,11 @@ export const metadata: Metadata = {
   description:
     "Yaply is a free browser gaming platform for game night. Play Chain Reaction and Skribbl with friends using one link or room code. No installs, no accounts.",
   applicationName: "Yaply",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Yaply",
+  },
   keywords: [
     "yaply",
     "yaply games",
@@ -87,7 +93,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PwaBridge />
+      </body>
     </html>
   );
 }

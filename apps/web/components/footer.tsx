@@ -39,6 +39,12 @@ export function Footer() {
               <Link href="/games" className="site-footer__link">
                 All games
               </Link>
+              <Link href="/apps" className="site-footer__link">
+                Install game apps
+              </Link>
+              <Link href="/install" className="site-footer__link">
+                Install Yaply
+              </Link>
               <Link href="/about" className="site-footer__link">
                 About
               </Link>
