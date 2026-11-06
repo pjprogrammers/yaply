@@ -19,6 +19,7 @@ export const CHAT_EVENT_KINDS = [
   "player_left",
   "correct_guess",
   "own_correct_guess",
+  "secret",
   "liked",
   "disliked",
   "drawing_started",

@@ -1514,93 +1514,90 @@ describe("Skribbl edge cases", () => {
     expect(sockets[0].last("game.round.ended").reason).toBe("all-guessed");
   });
 
-  it("hides a secret word typed by the drawer without hiding their normal chat", async () => {
+  it("shows drawer chat only to players who know the word", async () => {
     const { sockets, playerIds, drawerIndex, drawer, word } = await startedRound([
       "Alice",
       "Bob",
       "Carol",
     ]);
-    const others = sockets.filter((_, index) => index !== drawerIndex);
-    const secretSentence = `I think it is ${word} but maybe not`;
-
-    await drawer.message({ type: "chat.guess", text: secretSentence });
-
-    const ownMessage = drawer
-      .events("chat.message")
-      .find((event: any) => event.playerId === playerIds[drawerIndex] && event.text === secretSentence);
-    expect(ownMessage).toBeTruthy();
-    expect(ownMessage.private).toBe(true);
-
-    for (const socket of others) {
-      const messages = socket
-        .events("chat.message")
-        .filter((event: any) => event.playerId === playerIds[drawerIndex]);
-      expect(messages).toHaveLength(1);
-      expect(messages[0].text).toBe("Secret message hidden.");
-      expect(messages[0].private).toBe(true);
-      expect(
-        socket
-          .events("chat.message")
-          .filter((event: any) => !event.system)
-          .some((event: any) => event.text.toLowerCase().includes(word.toLowerCase())),
-      ).toBe(false);
-    }
-
-    await drawer.message({ type: "chat.guess", text: "haha" });
-
-    for (const socket of sockets) {
-      expect(
-        socket
-          .events("chat.message")
-          .some((event: any) => event.playerId === playerIds[drawerIndex] && event.text === "haha"),
-      ).toBe(true);
-    }
-  });
-
-  it("hides a guessed player's secret word inside a sentence but keeps normal chat public", async () => {
-    const { sockets, playerIds, drawerIndex, word } = await startedRound(["Alice", "Bob", "Carol"]);
     const guesserIndex = playerIds.findIndex((_, index) => index !== drawerIndex);
     const observerIndex = playerIds.findIndex(
       (_, index) => index !== drawerIndex && index !== guesserIndex,
     );
     const guesser = sockets[guesserIndex];
     const observer = sockets[observerIndex];
-    const secretSentence = `I knew it was ${word} all along`;
+    const secretSentence = `I think it is ${word} but maybe not`;
 
     await guesser.message({ type: "chat.guess", text: word });
-    expect(guesser.last("room.snapshot").snapshot.players.find(
-      (player: any) => player.id === playerIds[guesserIndex],
-    ).guessedCorrectly).toBe(true);
+    await drawer.message({ type: "chat.guess", text: secretSentence });
+    await drawer.message({ type: "chat.guess", text: "haha" });
 
-    await guesser.message({ type: "chat.guess", text: secretSentence });
-    await guesser.message({ type: "chat.guess", text: "nice drawing" });
+    const visibleTo = (socket: any) =>
+      socket
+        .events("chat.message")
+        .filter((event: any) => event.playerId === playerIds[drawerIndex])
+        .map((event: any) => ({ text: event.text, kind: event.kind }));
 
-    const ownSecret = guesser
-      .events("chat.message")
-      .find((event: any) => event.playerId === playerIds[guesserIndex] && event.text === secretSentence);
-    expect(ownSecret).toBeTruthy();
-
-    const observerMessages = observer
-      .events("chat.message")
-      .filter((event: any) => event.playerId === playerIds[guesserIndex]);
-    expect(observerMessages.map((event: any) => event.text)).toEqual([
-      "Secret message hidden.",
-      "nice drawing",
+    expect(visibleTo(drawer)).toEqual([
+      { text: secretSentence, kind: "secret" },
+      { text: "haha", kind: "secret" },
     ]);
+    expect(visibleTo(guesser)).toEqual([
+      { text: secretSentence, kind: "secret" },
+      { text: "haha", kind: "secret" },
+    ]);
+    expect(visibleTo(observer)).toEqual([]);
     expect(
       observer
         .events("chat.message")
         .filter((event: any) => !event.system)
         .some((event: any) => event.text.toLowerCase().includes(word.toLowerCase())),
     ).toBe(false);
+  });
 
-    const drawerMessages = sockets[drawerIndex]
-      .events("chat.message")
-      .filter((event: any) => event.playerId === playerIds[guesserIndex]);
-    expect(drawerMessages.map((event: any) => event.text)).toEqual([
-      "Secret message hidden.",
-      "nice drawing",
+  it("shows a guessed player's chat only to the drawer and other guessers", async () => {
+    const { sockets, playerIds, drawerIndex, word } = await startedRound([
+      "Alice",
+      "Bob",
+      "Carol",
+      "Dana",
     ]);
+    const guesserIndexes = playerIds
+      .map((_, index) => index)
+      .filter((index) => index !== drawerIndex);
+    const guesserIndex = guesserIndexes[0];
+    const otherGuesserIndex = guesserIndexes[1];
+    const observerIndex = guesserIndexes[2];
+    const guesser = sockets[guesserIndex];
+    const otherGuesser = sockets[otherGuesserIndex];
+    const observer = sockets[observerIndex];
+    const secretSentence = `I knew it was ${word} all along`;
+
+    await guesser.message({ type: "chat.guess", text: word });
+    await otherGuesser.message({ type: "chat.guess", text: word });
+    await guesser.message({ type: "chat.guess", text: secretSentence });
+    await guesser.message({ type: "chat.guess", text: "nice drawing" });
+
+    const visibleTo = (socket: any) =>
+      socket
+        .events("chat.message")
+        .filter((event: any) => event.playerId === playerIds[guesserIndex])
+        .map((event: any) => ({ text: event.text, kind: event.kind }));
+
+    const expected = [
+      { text: secretSentence, kind: "secret" },
+      { text: "nice drawing", kind: "secret" },
+    ];
+    expect(visibleTo(sockets[drawerIndex])).toEqual(expected);
+    expect(visibleTo(guesser)).toEqual(expected);
+    expect(visibleTo(otherGuesser)).toEqual(expected);
+    expect(visibleTo(observer)).toEqual([]);
+    expect(
+      observer
+        .events("chat.message")
+        .filter((event: any) => !event.system)
+        .some((event: any) => event.text.toLowerCase().includes(word.toLowerCase())),
+    ).toBe(false);
   });
 
   it("hides a secret word typed by a player who has not guessed yet", async () => {
@@ -1664,13 +1661,14 @@ describe("Skribbl edge cases", () => {
       const messages = socket
         .events("chat.message")
         .filter((event: any) => event.playerId === playerIds[drawerIndex]);
-      expect(messages.map((event: any) => event.text)).toEqual(["Secret message hidden."]);
+      expect(messages).toEqual([]);
     }
 
     const ownMessage = drawer
       .events("chat.message")
       .find((event: any) => event.playerId === playerIds[drawerIndex]);
     expect(ownMessage.text).toBe(message);
+    expect(ownMessage.kind).toBe("secret");
   });
 
   it("resets correct-guess status when the next round begins", async () => {

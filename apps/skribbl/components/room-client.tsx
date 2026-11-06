@@ -213,9 +213,7 @@ function ConnectedRoom({
   const handleEvent = useCallback((event: ServerEvent) => {
     switch (event.type) {
       case "chat.message": {
-        const msgType = event.system
-          ? event.kind ?? classifyChatEvent(event.text)
-          : "normal";
+        const msgType = event.kind ?? (event.system ? classifyChatEvent(event.text) : "normal");
         setMessages((previous) => [
           ...previous.slice(-90),
           {
@@ -1004,9 +1002,9 @@ function ConnectedRoom({
           placeholder={
             phase === "drawing"
               ? isDrawer
-                ? "You are drawing - chat with the room..."
+                ? "You are drawing - secret chat..."
                 : me?.guessedCorrectly
-                  ? "You guessed it - chat with the room..."
+                  ? "You guessed it - secret chat..."
                   : "Type your guess here..."
               : "Type a message..."
           }

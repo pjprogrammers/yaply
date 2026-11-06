@@ -63,13 +63,14 @@ export function Chat({ messages, onSend, disabled = false, placeholder, hint }: 
         ) : (
           messages.map((message) => {
             const msgType = resolveChatMessageType(message);
-            const isSystem = message.system || msgType !== "normal";
+            const isSystem = Boolean(message.system);
+            const isEvent = msgType !== "normal";
             return (
               <div
                 key={message.id}
                 className={[
                   "chat-line",
-                  isSystem ? `chat-line--event chat-line--${msgType}` : "",
+                  isEvent ? `chat-line--event chat-line--${msgType}` : "",
                   message.private ? "chat-line--private" : "",
                   message.correct && msgType !== "normal" ? "chat-line--correct" : "",
                 ]

@@ -1303,6 +1303,8 @@ p {
   --chat-correct-fg: #4ade80;
   --chat-own-bg: rgba(168, 85, 247, 0.16);
   --chat-own-fg: #c084fc;
+  --chat-secret-bg: rgba(63, 192, 122, 0.16);
+  --chat-secret-fg: #86efac;
   --chat-liked-bg: rgba(34, 197, 94, 0.16);
   --chat-liked-fg: #4ade80;
   --chat-disliked-bg: rgba(239, 68, 68, 0.16);
@@ -1337,6 +1339,8 @@ p {
   --chat-correct-fg: #15803d;
   --chat-own-bg: rgba(168, 85, 247, 0.13);
   --chat-own-fg: #7c3aed;
+  --chat-secret-bg: rgba(63, 192, 122, 0.2);
+  --chat-secret-fg: #1f7a4c;
   --chat-liked-bg: rgba(22, 163, 74, 0.15);
   --chat-liked-fg: #15803d;
   --chat-disliked-bg: rgba(239, 68, 68, 0.13);
@@ -2671,6 +2675,12 @@ p {
 .match-page .m--own_correct_guess {
   background: var(--chat-own-bg);
   color: var(--chat-own-fg);
+}
+
+.chat-line--secret,
+.match-page .m--secret {
+  background: var(--chat-secret-bg);
+  color: var(--chat-secret-fg);
 }
 
 .chat-line--liked,
@@ -4742,6 +4752,8 @@ p {
   --chat-correct-fg: #14663c;
   --chat-own-bg: rgba(124, 58, 237, 0.12);
   --chat-own-fg: #6b21a8;
+  --chat-secret-bg: rgba(63, 192, 122, 0.2);
+  --chat-secret-fg: #1f7a4c;
   --chat-liked-bg: rgba(31, 122, 76, 0.17);
   --chat-liked-fg: #14663c;
   --chat-disliked-bg: rgba(179, 54, 43, 0.14);
@@ -4817,6 +4829,7 @@ p {
 .match-page .m--player_left,
 .match-page .m--correct_guess,
 .match-page .m--own_correct_guess,
+.match-page .m--secret,
 .match-page .m--liked,
 .match-page .m--disliked,
 .match-page .m--drawing_started,

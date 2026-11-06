@@ -1500,8 +1500,11 @@ export class GameRoom {
     const alreadyGuessed =
       this.room.guessedPlayerIds.includes(player.id) || player.guessedCorrectly;
 
-    if (isDrawing && (isDrawer || alreadyGuessed) && matchesWord(trimmed, selectedWord)) {
-      this.sendSecretMessage(player, trimmed);
+    // Once a player knows the word, everything they type belongs to the
+    // private green channel shared by the drawer and correct guessers. Players
+    // who have not guessed yet never receive these messages.
+    if (isDrawing && (isDrawer || alreadyGuessed)) {
+      this.sendSecretChat(player, trimmed);
       return;
     }
 
@@ -1510,17 +1513,7 @@ export class GameRoom {
       return;
     }
 
-    if (isDrawer) {
-      this.broadcastChat(player, trimmed);
-      return;
-    }
-
     const correct = isExactGuess(trimmed, selectedWord);
-
-    if (alreadyGuessed) {
-      if (!correct) this.broadcastChat(player, trimmed);
-      return;
-    }
 
     if (!correct) {
       // A player who has not guessed yet can still accidentally reveal the word
@@ -1616,6 +1609,32 @@ export class GameRoom {
         private: true,
       });
     }
+  }
+
+  /**
+   * Chat from the drawer and correct guessers goes only to players who already
+   * know the word. Non-guessers do not receive the event at all, so no hidden
+   * placeholder appears in their chat.
+   */
+  private sendSecretChat(player: StoredPlayer, text: string) {
+    const createdAt = Date.now();
+    for (const [ws, playerId] of this.sockets.entries()) {
+      if (!playerId || !this.knowsSecretWord(playerId)) continue;
+      this.send(ws, {
+        type: "chat.message",
+        playerId: player.id,
+        nickname: player.nickname,
+        text,
+        createdAt,
+        kind: "secret",
+      });
+    }
+  }
+
+  private knowsSecretWord(playerId: string): boolean {
+    if (playerId === this.room.drawerId) return true;
+    if (this.room.guessedPlayerIds.includes(playerId)) return true;
+    return this.player(playerId)?.guessedCorrectly === true;
   }
 
   private broadcastChat(player: StoredPlayer, text: string) {
