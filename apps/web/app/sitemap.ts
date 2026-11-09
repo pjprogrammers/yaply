@@ -8,6 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "chain-reaction",
     "skribbl",
     "smash-karts",
+    "holeio",
     "ludo",
     "whos-the-spy",
   ];

@@ -1,0 +1,331 @@
+import Link from "next/link";
+import { CtaForm } from "@/components/cta-form";
+import { ControlShowcase } from "@/components/control-showcase";
+import { HowAccordion } from "@/components/how-accordion";
+import { MAIN_URL } from "@/lib/config";
+
+const FAQS = [
+  {
+    q: "Is Hole.io free?",
+    a: "Yes. The game runs in the browser, the whole match is free, and there is no account, no energy meter and no shop. Open the page and press play.",
+  },
+  {
+    q: "What do I actually do?",
+    a: "Steer your hole through the city and swallow things smaller than your rim. Cars, trees, people, kiosks and eventually whole buildings all count. The bigger you get, the more the street becomes food.",
+  },
+  {
+    q: "How long is a match?",
+    a: "Two minutes. There is a short countdown, then the clock runs. When it hits zero the table is final and you can restart immediately.",
+  },
+  {
+    q: "Who are the other holes?",
+    a: "Seven AI-controlled rivals with different appetites. They hunt food, avoid bigger holes, and will happily swallow a smaller one. A leaderboard tracks the whole field live.",
+  },
+  {
+    q: "Can I eat another hole?",
+    a: "If your rim is clearly bigger than theirs, yes. Catch a smaller rival and you take a cut of their score. If the other hole is bigger, run: the same rule applies to you.",
+  },
+  {
+    q: "Does it work on a phone?",
+    a: "Yes. The game uses a touch joystick on phones and tablets, with the same world and the same two-minute match. The interface is built to stay out of the way of your thumb.",
+  },
+  {
+    q: "What are the controls on desktop?",
+    a: "WASD or the arrow keys to move, or point with the mouse and the hole follows. Escape or P pauses. The match pauses by itself if you switch tabs.",
+  },
+  {
+    q: "Can I install it?",
+    a: "Yes. Hole.io installs from the browser on Android, iPhone, iPad and desktop. It opens in its own window with a home-screen icon, and there is a step-by-step install page if you need it.",
+  },
+  {
+    q: "Is this the original Hole.io?",
+    a: "This is an original browser arcade game built by Yaply: original code, original city, original art. It follows the classic swallow-the-city formula, not any company's proprietary assets.",
+  },
+];
+
+export default function HomePage() {
+  return (
+    <main id="main" className="landing">
+      <nav className="site-nav margins" aria-label="Primary">
+        <Link href="/" className="wordmark" aria-label="Hole.io home">
+          <span className="wordmark__dot" aria-hidden />
+          Hole.io
+        </Link>
+        <div className="site-nav__links">
+          <a href="#how">How it works</a>
+          <a href="#city">The city</a>
+          <a href="#control">Controls</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div className="site-nav__actions">
+          <Link href="/install" className="site-nav__install">
+            Install
+          </Link>
+          <Link href="/play" className="pill pill--lime site-nav__play">
+            Play now
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </nav>
+
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero__copy margins">
+          <p className="eyebrow">
+            <span aria-hidden />
+            Free browser arcade · Two-minute matches
+          </p>
+          <h1 id="hero-title" className="hero__title display">
+            Swallow{" "}
+            <br />
+            the city<span className="hero__title-dot">.</span>
+          </h1>
+          <p className="hero__sub">
+            You are a hole with an appetite. Take the bins, then the cars, then
+            the buildings, while seven rival holes eat the same streets.
+          </p>
+          <div className="hero__actions">
+            <Link href="/play" className="pill pill--lime pill--big">
+              Play free
+              <span aria-hidden>→</span>
+            </Link>
+            <a href="#how" className="pill pill--outline pill--big">
+              How it works
+            </a>
+          </div>
+          <ul className="hero__specs">
+            <li>No account</li>
+            <li>No download</li>
+            <li>Phone &amp; desktop</li>
+          </ul>
+        </div>
+
+        <div className="hero__art" aria-hidden>
+          <div className="hero-hole">
+            <div className="hero-hole__core">
+              <img src="/media/game-hero.png" alt="" />
+              <span className="hero-hole__shade" />
+            </div>
+            <span className="hero-hole__rim" />
+            <span className="hero-hole__rim hero-hole__rim--inner" />
+          </div>
+          <span className="hero-tag hero-tag--one">
+            <i />
+            8 holes live
+          </span>
+          <span className="hero-tag hero-tag--two">120 seconds</span>
+          <span className="hero-tag hero-tag--three">The street is food</span>
+        </div>
+      </section>
+
+      <div className="ticker" aria-hidden>
+        <div className="ticker__track">
+          {[0, 1].map((copy) => (
+            <span className="ticker__group" key={copy}>
+              <span>Cars are food</span>
+              <i />
+              <span>Buildings are food</span>
+              <i />
+              <span>Rivals are food</span>
+              <i />
+              <span>The clock is not</span>
+              <i />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <section className="statement" aria-label="The premise">
+        <p className="statement__text">
+          Two minutes. Eight holes. One city that{" "}
+          <span className="inline-thumb inline-thumb--wide">
+            <img src="/media/game-street.png" alt="The Hole.io city street" />
+          </span>{" "}
+          disappears block by block, and only the biggest hole{" "}
+          <span className="inline-thumb">
+            <img src="/media/game-swallow.png" alt="A hole swallowing a car" />
+          </span>{" "}
+          leaves a mark.
+        </p>
+      </section>
+
+      <section id="city" className="city-section" aria-labelledby="city-title">
+        <div className="city-media">
+          <div className="city-media__circle">
+            <img src="/media/game-city.png" alt="A grown hole beside a rival hole in the city" />
+          </div>
+          <span className="city-media__caption">Live city · one match</span>
+        </div>
+
+        <div className="city-copy">
+          <h2 id="city-title" className="display city-copy__title">
+            Everything
+            <br />
+            is food.
+          </h2>
+          <p className="city-copy__lede">
+            A hand-built city with six blocks, real traffic and something to
+            swallow on every corner. Growth is the only upgrade.
+          </p>
+
+          <ul className="city-points">
+            <li>
+              <span aria-hidden />
+              <b>Street furniture</b>
+              Bins, bollards, benches and hydrants get you started.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Cars &amp; buses</b>
+              Traffic keeps moving. Cut it off and it is lunch.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Trees &amp; parks</b>
+              Whole green blocks disappear if your rim is wide enough.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Small buildings</b>
+              Kiosks first, then shops, then the corner offices.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Statues</b>
+              The plaza centrepiece is worth more than a street of cars.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Rival holes</b>
+              Smaller holes are a score multiplier. Bigger holes are weather.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>Pedestrians</b>
+              They scatter when they see you. Catch them early.
+            </li>
+            <li>
+              <span aria-hidden />
+              <b>The leaderboard</b>
+              Eight names, live scores, two minutes of pressure.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="how" className="how-section" aria-labelledby="how-title">
+        <div className="how-head">
+          <h2 id="how-title" className="display how-title">
+            From pothole
+            <br />
+            to problem.
+          </h2>
+          <p className="how-lede">
+            The rules fit on a drain cover. Eat what is smaller than you, grow,
+            and be the biggest thing left when the clock stops.
+          </p>
+        </div>
+        <HowAccordion />
+      </section>
+
+      <ControlShowcase />
+
+      <section id="faq" className="faq-section margins" aria-labelledby="faq-title">
+        <div className="faq-head">
+          <h2 id="faq-title" className="display faq-title">
+            Questions
+            <br />
+            from below.
+          </h2>
+          <p>
+            Short answers to the things people ask before they drop in. If
+            something is missing, the game itself is the fastest way to find out.
+          </p>
+        </div>
+
+        <div className="faq-list">
+          {FAQS.map((item, index) => (
+            <details className="faq-item" name="holeio-faq" key={item.q}>
+              <summary>
+                <span className="faq-item__number">
+                  {(index + 1).toString().padStart(2, "0")}
+                </span>
+                <span className="faq-item__q">{item.q}</span>
+                <span className="faq-item__icon" aria-hidden>
+                  <i />
+                  <i />
+                </span>
+              </summary>
+              <p>{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="cta-section margins" aria-labelledby="cta-title">
+        <h2 id="cta-title" className="sr-only">
+          Play Hole.io
+        </h2>
+        <CtaForm />
+      </section>
+
+      <footer className="site-footer">
+        <div className="footer-mark" aria-hidden>
+          <span className="footer-mark__tile footer-mark__tile--1">
+            <i />
+          </span>
+          <span className="footer-mark__tile footer-mark__tile--2">
+            <i />
+          </span>
+          <span className="footer-mark__tile footer-mark__tile--3">
+            <i />
+          </span>
+          <span className="footer-mark__tile footer-mark__tile--4">
+            <i />
+          </span>
+          <span className="footer-mark__tile footer-mark__tile--5">
+            <i />
+          </span>
+        </div>
+
+        <div className="footer-grid margins">
+          <div className="footer-brand">
+            <p className="wordmark wordmark--footer">
+              <span className="wordmark__dot" aria-hidden />
+              Hole.io
+            </p>
+            <p>
+              An original browser arcade game from Yaply. Built with Three.js
+              and a lot of missing pavement.
+            </p>
+          </div>
+          <div className="footer-col">
+            <p className="footer-col__title">Play</p>
+            <Link href="/play">Play now</Link>
+            <Link href="/install">Install app</Link>
+            <a href="#control">Controls</a>
+          </div>
+          <div className="footer-col">
+            <p className="footer-col__title">Game</p>
+            <a href="#city">The city</a>
+            <a href="#how">How it works</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <div className="footer-col footer-col--wide">
+            <p className="footer-col__title">More from Yaply</p>
+            <a href={MAIN_URL}>All games</a>
+            <span>Made for the browser, not the app store.</span>
+            <span>© 2026 Yaply. All original assets.</span>
+          </div>
+        </div>
+
+        <div className="footer-bottom margins">
+          <span>Hole.io · Yaply Arcade</span>
+          <Link href="/play" className="pill pill--lime">
+            Open the hole
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </footer>
+    </main>
+  );
+}

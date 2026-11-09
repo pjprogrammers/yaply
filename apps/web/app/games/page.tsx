@@ -7,7 +7,7 @@ import { SITE_URL } from "@/lib/site";
 export const metadata: Metadata = {
   title: "All browser games",
   description:
-    "Browse every Yaply browser game: Chain Reaction, Skribbl, Smash Karts, Ludo and Who's the Spy. No installs, no launcher, just one link.",
+    "Browse every Yaply browser game: Chain Reaction, Skribbl, Smash Karts, Hole.io, Ludo and Who's the Spy. No installs, no launcher, just one link.",
   alternates: { canonical: "/games" },
   openGraph: {
     type: "website",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     siteName: "Yaply",
     title: "All browser games | Yaply",
     description:
-      "Five browser games for game night. Three live now, two on the way.",
+      "Six browser games for game night. Four live now, two on the way.",
     images: [
       {
         url: "/og.png",
@@ -40,8 +40,7 @@ export default function GamesPage() {
           <div className="shell">
             <h1>All games</h1>
             <p className="page-hero__lead">
-              Five browser games for the same room, the same link and the same
-              group chat.
+              Six browser games for the same link and the same group chat.
             </p>
             <p className="page-hero__meta">
               No installs. No launcher. Pick a game and send the link.

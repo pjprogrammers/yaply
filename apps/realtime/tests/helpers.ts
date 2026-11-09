@@ -101,7 +101,7 @@ export type RoomHarness = {
 };
 
 export async function makeRoom(
-  game: "skribbl" | "chain" | "smashkarts",
+  game: "skribbl" | "chain" | "smashkarts" | "holeio",
   code = "abc123",
   options: { reserve?: boolean } = {},
 ): Promise<RoomHarness> {
@@ -137,7 +137,7 @@ export async function makeRoom(
 }
 
 export async function createAndJoin(
-  game: "skribbl" | "chain" | "smashkarts",
+  game: "skribbl" | "chain" | "smashkarts" | "holeio",
   names: string[] = ["Alice", "Bob"],
   code = "abc123",
 ): Promise<{

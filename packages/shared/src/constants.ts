@@ -55,6 +55,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   mapId: "quarry-clash",
   killTarget: 20,
   durationSeconds: 300,
+  botCount: 0,
 };
 
 export const SMASH_MIN_PLAYERS = 2;
@@ -63,6 +64,20 @@ export const SMASH_KILL_TARGET_MIN = 5;
 export const SMASH_KILL_TARGET_MAX = 100;
 export const SMASH_DURATION_MIN_SECONDS = 60;
 export const SMASH_DURATION_MAX_SECONDS = 1800;
+export const HOLEIO_MAX_PLAYERS = 8;
+export const HOLEIO_BOT_MAX = 7;
+export const HOLEIO_MATCH_SECONDS = 120;
+/** Seat paints match the eight procedural hole colours in the game client. */
+export const HOLEIO_PLAYER_COLORS = [
+  "#d8ff5c",
+  "#ff6f61",
+  "#63c7ff",
+  "#ff5bb0",
+  "#ffc247",
+  "#7dffb2",
+  "#b28cff",
+  "#ff9447",
+];
 export const SMASH_MAP_IDS: SmashMapId[] = [
   "quarry-clash",
   "hollow-graveyard",

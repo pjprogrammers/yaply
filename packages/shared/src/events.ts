@@ -2,6 +2,8 @@ import type {
   ChainMove,
   GameKind,
   GameSettings,
+  HoleioInput,
+  HoleioMatchSnapshot,
   Point,
   Ranking,
   RoomSnapshot,
@@ -70,6 +72,8 @@ export type ClientEvent =
   | { type: "chain.surrender" }
   | { type: "smash.input"; input: SmashInput }
   | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
+  | { type: "holeio.input"; input: HoleioInput }
+  | { type: "holeio.snapshot"; snapshot: HoleioMatchSnapshot }
   | { type: "game.rematch" }
   | { type: "room.sync" };
 
@@ -127,6 +131,8 @@ export type ServerEvent =
   | { type: "chain.turn.timeout"; playerId: string }
   | { type: "smash.input"; playerId: string; input: SmashInput }
   | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
+  | { type: "holeio.input"; playerId: string; input: HoleioInput }
+  | { type: "holeio.snapshot"; snapshot: HoleioMatchSnapshot }
   | {
       type: "game.finished";
       rankings: Ranking[];

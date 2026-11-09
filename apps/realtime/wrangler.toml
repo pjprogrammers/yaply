@@ -6,7 +6,7 @@ compatibility_date = "2026-10-01"
 # uses the production block below instead.
 [vars]
 ENVIRONMENT = "development"
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
 
 [observability]
 enabled = true
@@ -27,7 +27,7 @@ ENVIRONMENT = "production"
 # Every deployed frontend origin allowed to call the Worker. Update this list
 # when a domain changes. Requests without an allowed Origin are rejected in
 # production, so a missing domain is a hard outage for that site.
-ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app"
 
 [env.production.durable_objects]
 bindings = [

@@ -241,6 +241,7 @@ describe("Worker production configuration", () => {
       "https://yaply-skribbl.vercel.app",
       "https://yaply-chain.vercel.app",
       "https://yaply-smashkarts.vercel.app",
+      "https://yaply-holeio.vercel.app",
     ]);
   });
 

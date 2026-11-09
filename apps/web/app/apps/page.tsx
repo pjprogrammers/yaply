@@ -10,7 +10,7 @@ import "./apps.css";
 export const metadata: Metadata = {
   title: "Install the Yaply apps",
   description:
-    "Install each Yaply browser game as its own app. Yaply, Chain Reaction, Skribbl and Smash Karts each get a separate home-screen icon and window.",
+    "Install each Yaply browser game as its own app. Yaply, Chain Reaction, Skribbl, Smash Karts and Hole.io each get a separate home-screen icon and window.",
   alternates: { canonical: `${SITE_URL}/apps` },
   openGraph: {
     type: "website",
@@ -95,7 +95,7 @@ export default function AppsPage() {
         <section className="apps-section" data-chapter="black">
           <div className="shell">
             <div className="apps-section__head">
-              <h2>Four apps. Four home screens.</h2>
+              <h2>Five apps. Five home screens.</h2>
               <p>
                 Install only what you need. Each app keeps its own origin,
                 service worker and update cycle.

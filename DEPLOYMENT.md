@@ -8,6 +8,7 @@
 | Skribbl | Vercel Hobby | `apps/skribbl` | `NEXT_PUBLIC_SKRIBBL_URL` |
 | Chain Reaction | Vercel Hobby | `apps/chain` | `NEXT_PUBLIC_CHAIN_URL` |
 | Smash Karts | Vercel Hobby | `apps/smashkarts` | `NEXT_PUBLIC_SMASHKARTS_URL` |
+| Hole.io | Vercel Hobby | `apps/holeio` | `NEXT_PUBLIC_HOLEIO_URL` |
 | Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `NEXT_PUBLIC_REALTIME_URL` in each game |
 
 Frontend deployment URLs come from the environment. The only committed
@@ -23,7 +24,7 @@ SQLite-backed Durable Objects. No paid database, Redis, VPS, or broker is needed
 
 - Node.js 22+ and npm 10+
 - A Cloudflare account with Workers enabled
-- Four Vercel projects (Hobby plan is sufficient)
+- Five Vercel projects (Hobby plan is sufficient)
 - `npx wrangler login` completed locally before deploying the Worker
 
 ## Install and verify
@@ -59,12 +60,13 @@ Terminal 2 — one or more frontends:
 npm run dev --workspace=@yaply/skribbl     # http://localhost:3001
 npm run dev --workspace=@yaply/chain       # http://localhost:3002
 npm run dev --workspace=@yaply/smashkarts  # http://localhost:3003
+npm run dev --workspace=@yaply/holeio      # http://localhost:3004
 npm run dev --workspace=@yaply/web         # http://localhost:3000
 ```
 
 Local defaults in `apps/realtime/wrangler.toml` allow origins on ports 3000,
-3001, 3002 and 3003. The game apps fall back to `ws://localhost:8787/room`
-when `NEXT_PUBLIC_REALTIME_URL` is unset.
+3001, 3002, 3003 and 3004. The online game apps fall back to
+`ws://localhost:8787/room` when `NEXT_PUBLIC_REALTIME_URL` is unset.
 
 If a game's `.env.local` points at the production Worker, override it for a
 local run (process environment wins over `.env.local`):
@@ -120,6 +122,7 @@ NEXT_PUBLIC_MAIN_URL=https://<main-project>.vercel.app
 NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
 NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
+NEXT_PUBLIC_HOLEIO_URL=https://<holeio-project>.vercel.app
 ```
 
 `NEXT_PUBLIC_MAIN_URL` is the canonical origin used by the page metadata,
@@ -128,7 +131,7 @@ variables above are required at build time. Use each project's `*.vercel.app`
 domain until a custom domain is attached, then change the variable to that
 domain.
 
-### `apps/skribbl`, `apps/chain` and `apps/smashkarts` (Vercel project settings in production)
+### `apps/skribbl`, `apps/chain`, `apps/smashkarts` and `apps/holeio` (Vercel project settings in production)
 
 ```env
 NEXT_PUBLIC_REALTIME_URL=wss://<realtime-worker-host>/room
@@ -149,16 +152,18 @@ NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
 NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 # yaply-smashkarts + yaply-web
 NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
+# yaply-holeio + yaply-web
+NEXT_PUBLIC_HOLEIO_URL=https://<holeio-project>.vercel.app
 ```
 
 For local development the URL can be omitted; the apps fall back to their Vercel
 system hostname, then to `http://localhost:3001` (Skribbl), `3002` (Chain
-Reaction) or `3003` (Smash Karts).
+Reaction), `3003` (Smash Karts) or `3004` (Hole.io).
 
-Smash Karts currently runs its arena locally against bots. Its realtime URL is
-wired through the same config and diagnostic endpoint as the other games, but
-the Worker protocol only accepts `skribbl` and `chain` rooms until online Kart
-Riot multiplayer is implemented.
+All four game apps support online rooms through the Worker: Skribbl, Chain
+Reaction, Smash Karts and Hole.io. Hole.io still offers a local “Play with bots”
+mode from its menu; online rooms are created with `POST /rooms` and use the same
+lobby, chat, rematch and reconnect protocol as the other games.
 
 The browser converts `https://` to `wss://` and appends `/room` if needed, so
 both `wss://host/room` and `https://host` are accepted. Prefer the explicit
@@ -175,8 +180,9 @@ Set each variable in the correct Vercel project:
 | `NEXT_PUBLIC_CHAIN_URL` | `yaply-web` **and** `yaply-chain` |
 | `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` **and** `yaply-skribbl` |
 | `NEXT_PUBLIC_SMASHKARTS_URL` | `yaply-web` **and** `yaply-smashkarts` |
-| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
-| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl` **and** `yaply-smashkarts` |
+| `NEXT_PUBLIC_HOLEIO_URL` | `yaply-web` **and** `yaply-holeio` |
+| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts` **and** `yaply-holeio` |
+| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts` **and** `yaply-holeio` |
 
 Adding `NEXT_PUBLIC_REALTIME_URL` to the `yaply-web` project does nothing for
 the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` or `NEXT_PUBLIC_SMASHKARTS_URL` to
@@ -191,6 +197,7 @@ curl https://<main-project>.vercel.app/api/config
 curl https://<chain-project>.vercel.app/api/config
 curl https://<skribbl-project>.vercel.app/api/config
 curl https://<smash-karts-project>.vercel.app/api/config
+curl https://<holeio-project>.vercel.app/api/config
 ```
 
 `/api/config` returns the effective main-site and game URLs, the source of each
@@ -225,14 +232,14 @@ Development (top-level `[vars]`):
 
 ```toml
 ENVIRONMENT = "development"
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
 ```
 
 Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app"
 ```
 
 Rules:
@@ -275,11 +282,11 @@ curl https://<realtime-worker-host>/version
 
 `/version` reports `protocolVersion: 1` and `environment: "production"`.
 If you attach a custom domain in the Cloudflare dashboard, update
-`NEXT_PUBLIC_REALTIME_URL` in the three game apps.
+`NEXT_PUBLIC_REALTIME_URL` in the four online game apps.
 
-## Deploy the four Vercel projects
+## Deploy the five Vercel projects
 
-Create four separate Vercel projects from the same repository so each app can
+Create five separate Vercel projects from the same repository so each app can
 ship independently.
 
 **Project 1 — `yaply-web`**
@@ -288,7 +295,7 @@ ship independently.
 - Framework Preset: Next.js
 - Install Command: `cd ../.. && npm install`
 - Build Command: `cd ../.. && npm run build --workspace=@yaply/web`
-- Environment: `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`, `NEXT_PUBLIC_SMASHKARTS_URL`
+- Environment: `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_CHAIN_URL`, `NEXT_PUBLIC_SKRIBBL_URL`, `NEXT_PUBLIC_SMASHKARTS_URL`, `NEXT_PUBLIC_HOLEIO_URL`
 
 **Project 2 — `yaply-skribbl`**
 
@@ -319,6 +326,18 @@ ship independently.
 as `metadataBase` for the Open Graph images. The same variable is set on
 `yaply-web`, where it is the Smash Karts link.
 
+**Project 5 — `yaply-holeio`**
+
+- Root Directory: `apps/holeio`
+- Framework Preset: Next.js
+- Install Command: `cd ../.. && npm install`
+- Build Command: `cd ../.. && npm run build --workspace=@yaply/holeio`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_HOLEIO_URL`
+
+`NEXT_PUBLIC_HOLEIO_URL` is the public origin of this project. Hole.io supports
+both a local match against AI holes and online rooms through the shared Worker.
+The same variable is set on `yaply-web`, where it is the Hole.io link.
+
 Installing from the repository root is required so npm workspaces can resolve
 `@yaply/shared`. If Vercel cannot read files outside the selected Root
 Directory, enable the monorepo "include source files outside the Root
@@ -339,45 +358,50 @@ then redeploy both the Worker and the affected frontend.
 ## Pre-launch checklist
 
 1. `npm run check` passes (typecheck + all workspace tests).
-2. `npm run build` passes for `apps/web`, `apps/skribbl`, `apps/chain`, and
-   `apps/smashkarts`.
+2. `npm run build` passes for `apps/web`, `apps/skribbl`, `apps/chain`,
+   `apps/smashkarts`, and `apps/holeio`.
 3. `npm run check:worker --workspace=@yaply/realtime` passes.
 4. `npx wrangler deploy --dry-run --env production` passes from `apps/realtime`.
 5. Production `ALLOWED_ORIGINS` in `wrangler.toml` contains every deployed frontend origin.
 6. `/health` and `/version` respond on the deployed Worker.
-7. Two browsers can create/join the same room in both online games (Skribbl
-   and Chain Reaction).
+7. Two browsers can create/join the same room in every online game (Skribbl,
+   Chain Reaction, Smash Karts and Hole.io).
 8. A refresh reconnects to the same seat and score.
 9. A non-host cannot start the game or change settings.
 10. Skribbl guesses, drawing, round transitions, and scores match on both clients.
 11. Chain placements, cascades, eliminations, and the winner match on both clients.
-12. A third client cannot join a full room; an invalid room code shows a clean error.
-13. Links from the main site reach all three game deployments, including
-    `/games/smash-karts` → the value of `NEXT_PUBLIC_SMASHKARTS_URL`, and the old
+12. Hole.io guest movement, swallowed-object state, match end and rematch agree
+    with the host; an eaten hole respawns in online rooms.
+13. A third client cannot join a full room; an invalid room code shows a clean error.
+14. Links from the main site reach all four game deployments, including
+    `/games/smash-karts` → the value of `NEXT_PUBLIC_SMASHKARTS_URL`,
+    `/games/holeio` → the value of `NEXT_PUBLIC_HOLEIO_URL`, and the old
     `/games/kart-riot` URL redirects to it.
-14. `npm run test:e2e` passes against a locally running Worker and both
+15. `npm run test:e2e` passes against a locally running Worker and both
     frontends (six Playwright tests, including full matches, refresh/reconnect,
     drawer disconnects, and Chain eliminations/surrenders).
-15. `npm run test:load -- --rooms 5`, then `--rooms 10`, then `--rooms 20`
+16. `npm run test:load -- --rooms 5`, then `--rooms 10`, then `--rooms 20`
     (pausing at least a minute between levels for the per-minute limits) reports
     zero failures locally. Do not run the load test against production without
     an approved maintenance window and `--allow-remote`.
-16. Repeat the browser smoke tests against the deployed fronts and Worker after
+17. Repeat the browser smoke tests against the deployed fronts and Worker after
     deploying the updated code.
 
 ## Operational notes
 
 - `POST /rooms` is the only production room-allocation path. The Worker
   generates the code, reserves it in the `${game}:${code}` Durable Object
-  before responding, and retries collisions internally. The Skribbl and Chain
-  Reaction frontends call it before navigating to `/room/[code]`. Smash Karts
-  currently runs its arena locally and does not create rooms.
+  before responding, and retries collisions internally. Every online frontend
+  calls it before navigating to `/room/[code]`, including Smash Karts and
+  Hole.io. Hole.io also keeps a local “Play with bots” mode that never touches
+  the Worker.
 - A collision during `room.create` (for example, a copied `?host=1` URL opened
   in a second tab) automatically falls back to `room.join`. When a Player
   opens their own invite link in a new tab, they join as a new player instead
   of seeing `ROOM_EXISTS`.
 - Rooms are isolated by Durable Object id `${game}:${code}`, so a Chain room and
-  a Skribbl room can never share state even with the same code.
+  a Skribbl room can never share state even with the same code. The same applies
+  to Smash Karts and Hole.io rooms.
 - Empty rooms expire after 60 seconds; inactive rooms expire after 10 minutes.
   Expiry deletes room storage and pending alarms.
 - Per-socket limits: 16 KiB frames, token-bucket message rate, 20 invalid frames

@@ -1,5 +1,6 @@
 import {
   CHAIN_REACTION_URL,
+  HOLEIO_URL,
   SKRIBBL_URL,
   SMASHKARTS_URL,
 } from "@/lib/game-urls";
@@ -67,6 +68,21 @@ export const games: GameEntry[] = [
     ink: "dark",
     poster: "/games/smash-karts.png",
     alt: "Smash Karts cover with a black kart and speed lines on green",
+  },
+  {
+    id: "holeio",
+    slug: "holeio",
+    name: "Hole.io",
+    description: "Swallow the city, one block at a time.",
+    statement: "Two minutes, seven rivals and a city small enough to eat.",
+    url: HOLEIO_URL,
+    status: "available",
+    tag: "Arcade",
+    color: "#dafa9c",
+    disc: "#0f0f0f",
+    ink: "dark",
+    poster: "/games/holeio.png",
+    alt: "Hole.io cover with a black hole swallowing buildings on a lime field",
   },
   {
     id: "ludo",

@@ -8,7 +8,7 @@ export function GameGrid() {
     <section className="games-section" data-chapter="black">
       <div className="shell">
         <div className="games-section__head">
-          <h2>Five games, one link.</h2>
+          <h2>{games.length} games, one link.</h2>
           <p className="games-section__lead">
             {live} live now. {games.length - live} on the way. Nothing to install.
           </p>

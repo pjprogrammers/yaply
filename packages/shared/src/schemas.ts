@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  HOLEIO_BOT_MAX,
+  HOLEIO_MAX_PLAYERS,
   MAX_CHAT_LENGTH,
   MAX_NICKNAME_LENGTH,
   MAX_STROKE_ID_LENGTH,
@@ -23,7 +25,7 @@ export const RoomCodeSchema = z
   .regex(/^[a-z0-9]{6}$/i, "Room codes are six letters or digits")
   .transform((value) => value.toLowerCase());
 
-export const GameKindSchema = z.enum(["skribbl", "chain", "smashkarts"]);
+export const GameKindSchema = z.enum(["skribbl", "chain", "smashkarts", "holeio"]);
 
 export const WordLanguageSchema = z.enum(["en", "tl", "ja", "ko"]);
 
@@ -86,6 +88,7 @@ export const GameSettingsSchema = z
     mapId: SmashMapSchema.optional(),
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
+    botCount: z.number().int().min(0).max(HOLEIO_BOT_MAX).optional(),
   })
   .strict();
 
@@ -227,6 +230,69 @@ export const SmashMatchSnapshotSchema = z
   })
   .strict();
 
+export const HoleioInputSchema = z
+  .object({
+    seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    x: z.number().finite().min(-1).max(1),
+    z: z.number().finite().min(-1).max(1),
+  })
+  .strict();
+
+const HoleioPositionSchema = z.number().finite().min(-512).max(512);
+
+export const HoleioHoleSnapshotSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    name: z.string().min(1).max(32),
+    color: StrokeColorSchema,
+    x: HoleioPositionSchema,
+    z: HoleioPositionSchema,
+    radius: z.number().finite().min(0).max(64),
+    score: z.number().finite().min(0).max(10_000_000),
+    alive: z.boolean(),
+    respawnIn: z.number().finite().min(0).max(60),
+    eaten: z.number().int().min(0).max(1_000_000),
+    eatenHoles: z.number().int().min(0).max(100_000).optional(),
+    eatenBy: z.string().min(1).max(64).nullable().optional(),
+  })
+  .strict();
+
+export const HoleioMatchSnapshotSchema = z
+  .object({
+    phase: z.enum(["countdown", "playing", "over"]),
+    round: z.number().int().min(0).max(1_000_000),
+    timeLeft: z.number().finite().min(0).max(600),
+    countdown: z.number().finite().min(0).max(10),
+    holes: z.array(HoleioHoleSnapshotSchema).max(HOLEIO_MAX_PLAYERS),
+    feed: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(0).max(1_000_000_000),
+            text: z.string().min(1).max(140),
+            tone: z.enum(["player", "rival", "danger", "info"]),
+            ttl: z.number().finite().min(0).max(20),
+          })
+          .strict(),
+      )
+      .max(8),
+    winner: z
+      .object({
+        id: z.string().min(1).max(64),
+        name: z.string().min(1).max(32),
+        color: StrokeColorSchema,
+        score: z.number().finite().min(0).max(10_000_000),
+      })
+      .strict()
+      .nullable(),
+    city: z
+      .string()
+      .max(4096)
+      .regex(/^[A-Za-z0-9+/]*={0,2}$/, "City state must be base64")
+      .optional(),
+  })
+  .strict();
+
 export const ClientEventSchema = z.discriminatedUnion("type", [
   z
     .object({
@@ -285,6 +351,8 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chain.surrender") }).strict(),
   z.object({ type: z.literal("smash.input"), input: SmashInputSchema }).strict(),
   z.object({ type: z.literal("smash.snapshot"), snapshot: SmashMatchSnapshotSchema }).strict(),
+  z.object({ type: z.literal("holeio.input"), input: HoleioInputSchema }).strict(),
+  z.object({ type: z.literal("holeio.snapshot"), snapshot: HoleioMatchSnapshotSchema }).strict(),
   z.object({ type: z.literal("game.rematch") }).strict(),
   z.object({ type: z.literal("room.sync") }).strict(),
 ]);
@@ -384,6 +452,7 @@ export const RoomSnapshotSchema = z.object({
     mapId: SmashMapSchema.optional(),
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
+    botCount: z.number().int().min(0).max(HOLEIO_BOT_MAX).optional(),
   }),
   roundNumber: z.number(),
   drawerId: z.string().nullable(),
@@ -455,6 +524,12 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     input: SmashInputSchema,
   }),
   z.object({ type: z.literal("smash.snapshot"), snapshot: SmashMatchSnapshotSchema }),
+  z.object({
+    type: z.literal("holeio.input"),
+    playerId: z.string(),
+    input: HoleioInputSchema,
+  }),
+  z.object({ type: z.literal("holeio.snapshot"), snapshot: HoleioMatchSnapshotSchema }),
   z.object({
     type: z.literal("game.finished"),
     rankings: z.array(RankingSchema),

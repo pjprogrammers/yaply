@@ -52,7 +52,7 @@ export function GamePage({ game }: { game: GameEntry }) {
               <p>
                 {live
                   ? `${game.name} is live now. Open the game and jump in — no installs, no account and no setup.`
-                  : "This one is still being built. It will join the shelf when it is ready to play. Chain Reaction, Skribbl and Smash Karts are live in the meantime."}
+                  : "This one is still being built. It will join the shelf when it is ready to play. Chain Reaction, Skribbl, Smash Karts and Hole.io are live in the meantime."}
               </p>
             </div>
           </div>

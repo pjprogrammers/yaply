@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   CHAIN_REACTION_URL,
   GAME_URL_SOURCES,
+  HOLEIO_URL,
   SKRIBBL_URL,
   SMASHKARTS_URL,
 } from "@/lib/game-urls";
@@ -21,6 +22,7 @@ export function GET() {
       chainUrl: CHAIN_REACTION_URL,
       skribblUrl: SKRIBBL_URL,
       smashkartsUrl: SMASHKARTS_URL,
+      holeioUrl: HOLEIO_URL,
       sources: {
         ...GAME_URL_SOURCES,
         main: process.env.NEXT_PUBLIC_MAIN_URL ? "env" : "vercel",

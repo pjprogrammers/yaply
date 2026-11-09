@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import { gameHref, games } from "../data/games";
 
 describe("game directory", () => {
-  it("lists five games", () => {
-    expect(games).toHaveLength(5);
+  it("lists six games", () => {
+    expect(games).toHaveLength(6);
   });
 
-  it("marks the three live games as available with external URLs", () => {
+  it("marks the four live games as available with external URLs", () => {
     const live = games.filter((game) => game.status === "available");
     expect(live.map((game) => game.slug).sort()).toEqual([
       "chain-reaction",
+      "holeio",
       "skribbl",
       "smash-karts",
     ]);

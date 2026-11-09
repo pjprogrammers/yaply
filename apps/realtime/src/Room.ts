@@ -4,6 +4,7 @@ import type {
   GameKind,
   GamePhase,
   GameSettings,
+  HoleioMatchSnapshot,
   Player,
   Ranking,
   RoomSnapshot,
@@ -20,6 +21,9 @@ import {
   isChainPaletteId,
   isSmashMapId,
   isWordLanguage,
+  HOLEIO_BOT_MAX,
+  HOLEIO_MAX_PLAYERS,
+  HOLEIO_PLAYER_COLORS,
   resolveChainPalette,
   sanitizeCustomColors,
   MAX_CHAT_LENGTH,
@@ -112,6 +116,8 @@ type StoredState = {
    * every lobby event. New mid-match joiners receive it once after joining.
    */
   lastSmashState: SmashMatchSnapshot | null;
+  /** Last authoritative Hole.io frame relayed by the host. */
+  lastHoleioState: HoleioMatchSnapshot | null;
   version: number;
   createdAt: number;
   lastActivity: number;
@@ -165,8 +171,20 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKind): GameSettings {
-  const maxAllowed = game === "smashkarts" ? SMASH_MAX_PLAYERS : game === "chain" ? 8 : 12;
-  const defaultMax = game === "smashkarts" ? SMASH_MAX_PLAYERS : DEFAULT_GAME_SETTINGS.maxPlayers;
+  const maxAllowed =
+    game === "smashkarts"
+      ? SMASH_MAX_PLAYERS
+      : game === "holeio"
+        ? HOLEIO_MAX_PLAYERS
+        : game === "chain"
+          ? 8
+          : 12;
+  const defaultMax =
+    game === "smashkarts"
+      ? SMASH_MAX_PLAYERS
+      : game === "holeio"
+        ? HOLEIO_MAX_PLAYERS
+        : DEFAULT_GAME_SETTINGS.maxPlayers;
   const maxPlayers = clamp(
     input?.maxPlayers ?? input?.playerCount ?? defaultMax,
     2,
@@ -216,7 +234,7 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       input?.cpuDifficulty === "easy" || input?.cpuDifficulty === "hard"
         ? input.cpuDifficulty
         : "medium",
-    mapId: isSmashMapId(input?.mapId) ? input.mapId : "foundry",
+    mapId: isSmashMapId(input?.mapId) ? input.mapId : "quarry-clash",
     killTarget: clamp(
       input?.killTarget ?? DEFAULT_GAME_SETTINGS.killTarget ?? 20,
       SMASH_KILL_TARGET_MIN,
@@ -227,6 +245,10 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       SMASH_DURATION_MIN_SECONDS,
       SMASH_DURATION_MAX_SECONDS,
     ),
+    botCount:
+      game === "holeio"
+        ? clamp(input?.botCount ?? HOLEIO_BOT_MAX, 0, HOLEIO_BOT_MAX)
+        : 0,
   };
 }
 
@@ -257,6 +279,7 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     strokes: [],
     chain: null,
     lastSmashState: null,
+    lastHoleioState: null,
     version: 0,
     createdAt: now,
     lastActivity: now,
@@ -297,7 +320,9 @@ export class GameRoom {
         ? "chain"
         : stored.game === "smashkarts"
           ? "smashkarts"
-          : "skribbl";
+          : stored.game === "holeio"
+            ? "holeio"
+            : "skribbl";
     // Merge over a fresh state so rooms written by an older build gain any
     // fields added since, instead of starting with `undefined` values.
     this.room = { ...createEmptyState(stored.code, game), ...stored, game };
@@ -384,7 +409,9 @@ export class GameRoom {
             ? "skribbl"
             : payload.game === "smashkarts"
               ? "smashkarts"
-              : null;
+              : payload.game === "holeio"
+                ? "holeio"
+                : null;
       const code = typeof payload.code === "string" ? payload.code.toLowerCase() : "";
       if (!game || !/^[a-z0-9]{6}$/.test(code)) {
         return new Response(JSON.stringify({ reserved: false, reason: "invalid" }), {
@@ -435,7 +462,12 @@ export class GameRoom {
     }
 
     const gameParam = url.searchParams.get("game");
-    if (gameParam !== "chain" && gameParam !== "skribbl" && gameParam !== "smashkarts") {
+    if (
+      gameParam !== "chain" &&
+      gameParam !== "skribbl" &&
+      gameParam !== "smashkarts" &&
+      gameParam !== "holeio"
+    ) {
       return new Response("Invalid game", { status: 400 });
     }
     const game: GameKind = gameParam;
@@ -725,6 +757,13 @@ export class GameRoom {
     this.send(ws, { type: "smash.snapshot", snapshot: this.room.lastSmashState });
   }
 
+  private sendHoleioState(ws: WebSocket) {
+    if (this.room.game !== "holeio" || !this.room.lastHoleioState) return;
+    // Guests mount their renderer from room.snapshot, so the seed frame has to
+    // arrive first; a promoted host also uses it to rebuild the simulation.
+    this.send(ws, { type: "holeio.snapshot", snapshot: this.room.lastHoleioState });
+  }
+
   private attachSocket(ws: WebSocket, player: StoredPlayer) {
     const previous = this.playerSockets.get(player.id);
     if (previous && previous !== ws) {
@@ -784,8 +823,9 @@ export class GameRoom {
   }
 
   private paletteColors(): string[] {
-    // Smash Karts has its own 40-seat grid; Chain uses player palettes.
+    // Smash Karts and Hole.io have their own seat grids; Chain uses palettes.
     if (this.room.game === "smashkarts") return SMASH_PLAYER_COLORS;
+    if (this.room.game === "holeio") return HOLEIO_PLAYER_COLORS;
     if (this.room.game !== "chain") return PLAYER_COLORS;
     return resolveChainPalette(this.room.settings.palette, this.room.settings.customColors);
   }
@@ -907,6 +947,12 @@ export class GameRoom {
       case "smash.snapshot":
         await this.handleSmashSnapshot(ws, event.snapshot);
         break;
+      case "holeio.input":
+        this.handleHoleioInput(ws, event.input);
+        break;
+      case "holeio.snapshot":
+        await this.handleHoleioSnapshot(ws, event.snapshot);
+        break;
       case "game.rematch":
         await this.handleRematch(ws);
         break;
@@ -922,6 +968,7 @@ export class GameRoom {
         }
         this.sendPrivateState(ws, this.sockets.get(ws) ?? "");
         this.sendSmashState(ws);
+        this.sendHoleioState(ws);
         this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
         break;
       }
@@ -1034,6 +1081,7 @@ export class GameRoom {
       this.sendWelcome(ws, resumed);
       this.sendPrivateState(ws, resumed.id);
       this.sendSmashState(ws);
+      this.sendHoleioState(ws);
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcastSnapshot();
       logRoom("info", "room.reconnected", {
@@ -1077,6 +1125,7 @@ export class GameRoom {
       this.sendWelcome(ws, departed);
       this.sendPrivateState(ws, departed.id);
       this.sendSmashState(ws);
+      this.sendHoleioState(ws);
       this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
       this.broadcast({ type: "room.player.joined", playerId: departed.id });
       this.broadcastSnapshot();
@@ -1122,6 +1171,7 @@ export class GameRoom {
     this.sendWelcome(ws, player);
     this.broadcast({ type: "room.player.joined", playerId: player.id });
     this.sendSmashState(ws);
+    this.sendHoleioState(ws);
     this.send(ws, { type: "room.snapshot", snapshot: this.createSnapshot() });
     this.broadcastSnapshot();
     this.broadcastSystemChat(`${player.nickname} joined the room.`, "player_joined");
@@ -1176,11 +1226,20 @@ export class GameRoom {
       return;
     }
     if (this.room.phase !== "lobby") return;
-    if (this.room.players.filter((entry) => entry.connected).length < 2) {
+    const connectedCount = this.room.players.filter((entry) => entry.connected).length;
+    const holeioSeats = connectedCount + (this.room.settings.botCount ?? 0);
+    if (
+      this.room.game === "holeio"
+        ? holeioSeats < 2
+        : connectedCount < 2
+    ) {
       this.send(ws, {
         type: "room.error",
         code: "NOT_ENOUGH_PLAYERS",
-        message: "At least two connected players are needed to start.",
+        message:
+          this.room.game === "holeio"
+            ? "Add a bot or invite a friend before starting."
+            : "At least two connected players are needed to start.",
       });
       return;
     }
@@ -1269,6 +1328,18 @@ export class GameRoom {
       this.room.phase = "playing";
       this.room.roundNumber = previousRound + 1;
       this.room.lastSmashState = null;
+      this.room.lastHoleioState = null;
+      this.room.roundOrder = this.room.players.map((player) => player.id);
+      this.broadcastSnapshot();
+      return;
+    }
+
+    if (this.room.game === "holeio") {
+      // Hole.io follows the same host-authoritative relay as Smash Karts. The
+      // host engine owns the city and every hole, including bots.
+      this.room.phase = "playing";
+      this.room.roundNumber = previousRound + 1;
+      this.room.lastHoleioState = null;
       this.room.roundOrder = this.room.players.map((player) => player.id);
       this.broadcastSnapshot();
       return;
@@ -2040,6 +2111,116 @@ export class GameRoom {
     this.broadcastSnapshot();
   }
 
+  private handleHoleioInput(
+    ws: WebSocket,
+    input: Extract<ClientEvent, { type: "holeio.input" }>["input"],
+  ) {
+    const player = this.socketPlayer(ws);
+    if (!player || this.room.game !== "holeio" || this.room.phase !== "playing") return;
+    // The host already owns its own hole; relaying its input back would apply
+    // the same stick twice.
+    if (player.id === this.room.hostId) return;
+
+    const hostSocket = this.playerSockets.get(this.room.hostId);
+    if (!hostSocket) return;
+    this.send(hostSocket, { type: "holeio.input", playerId: player.id, input });
+  }
+
+  private async handleHoleioSnapshot(ws: WebSocket, snapshot: HoleioMatchSnapshot) {
+    const player = this.socketPlayer(ws);
+    if (
+      !player ||
+      player.id !== this.room.hostId ||
+      this.room.game !== "holeio" ||
+      this.room.phase !== "playing"
+    ) {
+      return;
+    }
+    if (snapshot.round !== this.room.roundNumber) return;
+
+    const seated = new Map(this.room.players.map((entry) => [entry.id, entry]));
+    const seen = new Set<string>();
+    const holes = snapshot.holes
+      .filter((hole) => {
+        if (seen.has(hole.id)) return false;
+        seen.add(hole.id);
+        return true;
+      })
+      .slice(0, HOLEIO_MAX_PLAYERS)
+      .map((hole) => {
+        const roomPlayer = seated.get(hole.id);
+        // Humans take their nickname and paint from the room, never from a
+        // relayed frame. Bots keep the host's generated names.
+        return roomPlayer
+          ? { ...hole, name: roomPlayer.nickname, color: roomPlayer.color }
+          : hole;
+      });
+
+    if (holes.length === 0) return;
+
+    for (const hole of holes) {
+      const roomPlayer = seated.get(hole.id);
+      if (roomPlayer) roomPlayer.score = Math.round(hole.score);
+    }
+
+    const sorted = [...holes].sort((a, b) => b.score - a.score);
+    const top = sorted[0];
+    const winner: HoleioMatchSnapshot["winner"] = top
+      ? { id: top.id, name: top.name, color: top.color, score: Math.round(top.score) }
+      : null;
+
+    const sanitized: HoleioMatchSnapshot = {
+      ...snapshot,
+      holes,
+      winner,
+    };
+
+    this.room.lastHoleioState = sanitized;
+    this.room.lastActivity = Date.now();
+    this.broadcast({ type: "holeio.snapshot", snapshot: sanitized });
+
+    if (sanitized.phase === "over") {
+      this.finishHoleio(sanitized);
+    }
+
+    // The host publishes around 10 Hz. Persist at a lower rate, but always
+    // keep the final frame so a hibernating room can seed late joiners.
+    const now = Date.now();
+    if (sanitized.phase === "over" || now - this.lastSmashPersistAt >= 2_000) {
+      this.lastSmashPersistAt = now;
+      await this.persist();
+      await this.scheduleAlarm();
+    }
+  }
+
+  private finishHoleio(snapshot: HoleioMatchSnapshot) {
+    if (this.room.game !== "holeio" || this.room.phase !== "playing") return;
+
+    const holes = new Map(snapshot.holes.map((hole) => [hole.id, hole]));
+    const rankings: Ranking[] = this.room.players
+      .map((player) => {
+        const hole = holes.get(player.id);
+        const score = Math.max(0, Math.round(hole?.score ?? player.score));
+        player.score = score;
+        return {
+          playerId: player.id,
+          nickname: player.nickname,
+          score,
+          joinedAt: player.joinedAt,
+        };
+      })
+      .sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt)
+      .map(({ playerId, nickname, score }) => ({ playerId, nickname, score }));
+
+    this.room.phase = "game-over";
+    this.room.endsAt = null;
+    const winnerId = rankings[0]?.playerId ?? null;
+    const winner = this.player(winnerId);
+    if (winner) this.broadcastSystemChat(`${winner.nickname} won the match.`, "announcement");
+    this.broadcast({ type: "game.finished", rankings, winnerId: winnerId ?? undefined });
+    this.broadcastSnapshot();
+  }
+
   private async handleRematch(ws: WebSocket) {
     const player = this.socketPlayer(ws);
     if (!player || player.id !== this.room.hostId) {
@@ -2047,11 +2228,16 @@ export class GameRoom {
       return;
     }
     if (this.room.phase !== "game-over") return;
-    if (this.room.players.filter((entry) => entry.connected).length < 2) {
+    const connectedCount = this.room.players.filter((entry) => entry.connected).length;
+    const holeioSeats = connectedCount + (this.room.settings.botCount ?? 0);
+    if (this.room.game === "holeio" ? holeioSeats < 2 : connectedCount < 2) {
       this.send(ws, {
         type: "room.error",
         code: "NOT_ENOUGH_PLAYERS",
-        message: "At least two connected players are needed for a rematch.",
+        message:
+          this.room.game === "holeio"
+            ? "Add a bot or invite a friend before the rematch."
+            : "At least two connected players are needed for a rematch.",
       });
       return;
     }
@@ -2079,6 +2265,15 @@ export class GameRoom {
       this.room.lastSmashState = {
         ...this.room.lastSmashState,
         karts: this.room.lastSmashState.karts.filter((kart) => kart.id !== playerId),
+      };
+    }
+
+    if (this.room.game === "holeio" && this.room.lastHoleioState) {
+      const holes = this.room.lastHoleioState.holes.filter((hole) => hole.id !== playerId);
+      this.room.lastHoleioState = {
+        ...this.room.lastHoleioState,
+        holes,
+        winner: this.room.lastHoleioState.winner?.id === playerId ? null : this.room.lastHoleioState.winner,
       };
     }
 
@@ -2125,6 +2320,7 @@ export class GameRoom {
     if (
       this.room.players.length < 2 &&
       this.room.game !== "smashkarts" &&
+      this.room.game !== "holeio" &&
       this.room.phase !== "lobby" &&
       this.room.phase !== "game-over"
     ) {
@@ -2214,7 +2410,7 @@ export class GameRoom {
     }
 
     if (
-      this.room.game === "smashkarts" &&
+      (this.room.game === "smashkarts" || this.room.game === "holeio") &&
       (this.room.phase === "playing" || this.room.phase === "game-over")
     ) {
       const host = this.player(this.room.hostId);
@@ -2369,7 +2565,7 @@ export class GameRoom {
         changed = true;
       }
     } else if (
-      this.room.game === "smashkarts" &&
+      (this.room.game === "smashkarts" || this.room.game === "holeio") &&
       (this.room.phase === "playing" || this.room.phase === "game-over")
     ) {
       const host = this.player(this.room.hostId);

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import GameLink from "@/components/game-link";
-import { gameStatusLabel, games } from "@/data/games";
+import { availableGames, gameStatusLabel, games } from "@/data/games";
 
 const deckGames = [
   { game: games[2], slot: -2, delay: "1.1s" },
@@ -67,7 +67,7 @@ export default function Hero() {
                 Browse the games
               </a>
               <span className="hero__note">
-                No installs. One link. Three games live now.
+                No installs. One link. {availableGames.length} games live now.
               </span>
             </div>
           </div>

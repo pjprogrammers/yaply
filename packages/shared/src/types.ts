@@ -1,6 +1,6 @@
 export type PlayerId = string;
 export type RoomCode = string;
-export type GameKind = "skribbl" | "chain" | "smashkarts";
+export type GameKind = "skribbl" | "chain" | "smashkarts" | "holeio";
 
 /**
  * Word pools supported by the Skribbl dictionary. `tl` is Tagalog/Filipino,
@@ -123,6 +123,8 @@ export type GameSettings = {
   killTarget?: number;
   /** Smash Karts match clock in seconds. */
   durationSeconds?: number;
+  /** Hole.io bots used to fill empty seats in an online room (0–7). */
+  botCount?: number;
 };
 
 export type ChainCell = {
@@ -260,6 +262,64 @@ export type SmashMatchSnapshot = {
   traps: SmashTrapSnapshot[];
   feed: SmashFeedEntry[];
   winner: SmashWinner | null;
+};
+
+/** Direction a Hole.io guest sends to the authoritative host. */
+export type HoleioInput = {
+  /** Monotonic client sequence. The host drops stale packets. */
+  seq?: number;
+  /** World-space X direction, -1..1. */
+  x: number;
+  /** World-space Z direction, -1..1. */
+  z: number;
+};
+
+export type HoleioHoleSnapshot = {
+  id: PlayerId;
+  name: string;
+  color: string;
+  x: number;
+  z: number;
+  radius: number;
+  score: number;
+  alive: boolean;
+  respawnIn: number;
+  eaten: number;
+  /** Rival holes swallowed this match. */
+  eatenHoles?: number;
+  /** Id of the hole that swallowed this one, when it is currently down. */
+  eatenBy?: PlayerId | null;
+};
+
+export type HoleioFeedEntry = {
+  id: number;
+  text: string;
+  tone: "player" | "rival" | "danger" | "info";
+  /** Seconds this line should stay on screen from the moment it is received. */
+  ttl: number;
+};
+
+export type HoleioWinner = {
+  id: PlayerId;
+  name: string;
+  color: string;
+  score: number;
+};
+
+/**
+ * Authoritative Hole.io match state relayed by the host. `city` is a base64
+ * bitset over the deterministic city object list, so guests can hide exactly
+ * the props the host has swallowed without relaying hundreds of ids.
+ */
+export type HoleioMatchSnapshot = {
+  phase: "countdown" | "playing" | "over";
+  round: number;
+  timeLeft: number;
+  countdown: number;
+  holes: HoleioHoleSnapshot[];
+  feed: HoleioFeedEntry[];
+  winner: HoleioWinner | null;
+  city?: string;
 };
 
 export type RoomSnapshot = {
