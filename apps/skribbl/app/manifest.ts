@@ -3,10 +3,10 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/?app=skribbl",
-    name: "Yaply Skribbl",
+    name: "Skribbl by Yaply",
     short_name: "Skribbl",
     description:
-      "A private drawing and guessing game for 2–12 players. Create a room, share the code, and try to draw a word nobody can guess.",
+      "A free online drawing and guessing game for 2–12 players. Create a private room, share the code, and try to draw a word nobody can guess.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -2,20 +2,37 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
 import { ArrowRightIcon, PlayIcon, SkribblMark } from "@/components/icons";
+import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION } from "@/lib/content";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
 import "./install.css";
 
 export const metadata: Metadata = {
   title: "Install Skribbl",
   description:
-    "Install Skribbl on your phone, tablet or desktop. The drawing and guessing game gets its own home-screen icon with no app store and no account.",
+    "Install Skribbl on your phone, tablet or desktop. The free online drawing and guessing game gets its own home-screen icon with no app store and no account.",
+  keywords: GAME_KEYWORDS,
   alternates: { canonical: `${SITE_URL}/install` },
   openGraph: {
     type: "website",
+    locale: "en_US",
     url: `${SITE_URL}/install`,
-    title: "Install Skribbl",
-    description:
-      "Put the pen on your home screen. Skribbl installs in seconds and opens in its own window.",
+    siteName: "Yaply",
+    title: "Install Skribbl — put the drawing game on your home screen",
+    description: GAME_SHORT_DESCRIPTION,
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Skribbl — a doodled cat on a paper game card with a hidden word and a correct guess",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Install Skribbl — put the drawing game on your home screen",
+    description: GAME_SHORT_DESCRIPTION,
+    images: ["/twitter-image.png"],
   },
 };
 

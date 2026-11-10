@@ -2,9 +2,14 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { RoomClient } from "@/components/room-client";
 import { Topbar } from "@/components/topbar";
+import { SITE_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: "Room | Skribbl",
+  title: "Skribbl room",
+  description:
+    "Join a private Skribbl drawing and guessing room. Share the six-letter code with friends and start the next round.",
+  alternates: { canonical: `${SITE_URL}/join` },
+  robots: { index: false, follow: false },
 };
 
 export default async function RoomPage({

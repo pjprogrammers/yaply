@@ -1,33 +1,29 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { MAIN_URL } from "@/lib/config";
+import { MAIN_URL, SITE_URL } from "@/lib/config";
+import {
+  ABOUT_SECTIONS,
+  FAQS,
+  GAME_DESCRIPTION,
+  GAME_KEYWORDS,
+  STEPS,
+} from "@/lib/content";
 import { CatDoodle } from "@/components/doodle";
 import { HomePreview } from "@/components/home-preview";
 import { Reveal } from "@/components/reveal";
 import { ArrowRightIcon, CheckIcon, ClockIcon, PlayIcon, SkribblMark } from "@/components/icons";
+import { SeoSchema } from "@/components/seo-schema";
 import { WordMask } from "@/components/word-mask";
+
+export const metadata: Metadata = {
+  description: GAME_DESCRIPTION,
+  keywords: GAME_KEYWORDS,
+  alternates: { canonical: `${SITE_URL}/` },
+};
 
 const SPECS = ["2–12 players", "60–120s rounds", "4 word languages", "No signup"];
 
 const TICKER = ["Draw", "Guess", "Score", "Repeat", "Every player draws", "Same cat, four languages"];
-
-const STEPS = [
-  {
-    title: "Pick a word",
-    body: "The drawer gets three private words and twenty seconds to choose. If the clock runs out, the first word is picked automatically.",
-  },
-  {
-    title: "Draw it badly",
-    body: "Ink, size, undo and clear. Letters and numbers are off-limits. Confidence is not.",
-  },
-  {
-    title: "Guess in chat",
-    body: "Everyone types guesses into the room. A correct guess is announced and locks in points; wrong guesses stay in the chat.",
-  },
-  {
-    title: "Pass the pen",
-    body: "The word is revealed, scores move, and the next player takes over. Every player gets the pen once per round.",
-  },
-];
 
 const LANGUAGES = [
   { label: "English", word: "cat" },
@@ -51,42 +47,10 @@ const SETTINGS = [
   { label: "Max players", value: "4, 8 or 12" },
 ];
 
-const FAQS = [
-  {
-    question: "Do I need an account?",
-    answer:
-      "No. Pick a nickname, create a room or enter a six-letter code. Your nickname is saved in this browser for next time.",
-  },
-  {
-    question: "How many people can play?",
-    answer:
-      "Two to twelve players in a room. Every player draws once per round, so a full room keeps the pen moving.",
-  },
-  {
-    question: "What happens if someone disconnects?",
-    answer:
-      "Their seat is held for 30 seconds. Refresh in that window and the same seat, score and resume token come back.",
-  },
-  {
-    question: "Does it work on a phone?",
-    answer:
-      "Yes. The canvas accepts touch input and the room stacks into one column. A bigger screen makes drawing easier, but it is not required.",
-  },
-  {
-    question: "Who controls the room settings?",
-    answer:
-      "The host sets the word pack, rounds, draw time, word choices and player cap in the lobby. Settings lock when the game starts and can change again before a rematch.",
-  },
-  {
-    question: "When does a round end?",
-    answer:
-      "When everyone has guessed or the clock hits zero. The word is revealed, the drawer scores for the guesses they earned, and the next player takes the pen.",
-  },
-];
-
 export default function Home() {
   return (
     <>
+      <SeoSchema />
       <a href="#main" className="landing-skip">
         Skip to content
       </a>
@@ -348,6 +312,52 @@ export default function Home() {
                     ))}
                   </dl>
                 </Reveal>
+              </div>
+            </div>
+          </section>
+
+          <section
+            id="about-skribbl"
+            className="landing-section landing-section--paper"
+            aria-labelledby="about-skribbl-title"
+          >
+            <div className="landing-margins">
+              <Reveal className="landing-section-head">
+                <h2 id="about-skribbl-title" className="landing-h2">
+                  The drawing game,
+                  <br />
+                  in plain words.
+                </h2>
+                <p className="landing-lede">
+                  Skribbl is a free online drawing and guessing game for game night, a
+                  group chat or a classroom. Two to twelve players, one canvas and no
+                  download.
+                </p>
+              </Reveal>
+
+              <div className="landing-split">
+                {ABOUT_SECTIONS.map((section) => (
+                  <Reveal className="landing-section-copy" key={section.id}>
+                    <h3 className="landing-step-title">{section.title}</h3>
+                    {section.paragraphs.map((paragraph) => (
+                      <p className="landing-lede" key={paragraph}>
+                        {paragraph}
+                      </p>
+                    ))}
+                  </Reveal>
+                ))}
+              </div>
+
+              <div className="landing-actions" style={{ marginTop: 30 }}>
+                <Link href="/create" className="landing-button">
+                  Create a private room
+                </Link>
+                <Link href="/how-to-play" className="landing-button landing-button--ghost">
+                  How to play
+                </Link>
+                <a href={MAIN_URL} className="landing-button landing-button--ghost">
+                  All Yaply games
+                </a>
               </div>
             </div>
           </section>

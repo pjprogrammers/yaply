@@ -14,6 +14,12 @@ export function GET() {
       siteUrl: SITE_URL,
       realtimeUrl: REALTIME_URL,
       mainUrl: MAIN_URL,
+      seo: {
+        sitemap: `${SITE_URL}/sitemap.xml`,
+        robots: `${SITE_URL}/robots.txt`,
+        llms: `${SITE_URL}/llms.txt`,
+        llmsFull: `${SITE_URL}/llms-full.txt`,
+      },
       sources: {
         site: process.env.NEXT_PUBLIC_SKRIBBL_URL ? "env" : "default",
         realtime: process.env.NEXT_PUBLIC_REALTIME_URL ? "env" : "default",

@@ -2,12 +2,71 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon, ClockIcon, PencilIcon, UsersIcon } from "@/components/icons";
 import { Topbar } from "@/components/topbar";
+import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION, STEPS } from "@/lib/content";
+import { SITE_URL } from "@/lib/config";
+import { breadcrumbSchema } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  title: "How to play | Skribbl",
+  title: "How to play Skribbl",
+  description:
+    "Learn the rules, scoring and controls for Skribbl, the free online drawing and guessing game for 2–12 players. No account or download.",
+  keywords: GAME_KEYWORDS,
+  alternates: { canonical: `${SITE_URL}/how-to-play` },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: `${SITE_URL}/how-to-play`,
+    siteName: "Yaply",
+    title: "How to play Skribbl | Rules and scoring",
+    description: GAME_SHORT_DESCRIPTION,
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Skribbl — a doodled cat on a paper game card with a hidden word and a correct guess",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How to play Skribbl | Rules and scoring",
+    description: GAME_SHORT_DESCRIPTION,
+    images: ["/twitter-image.png"],
+  },
 };
 
-const STEPS = [
+const howToSchema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    breadcrumbSchema([
+      { name: "Skribbl", path: "/" },
+      { name: "How to play", path: "/how-to-play" },
+    ]),
+    {
+      "@type": "HowTo",
+      "@id": `${SITE_URL}/how-to-play#howto`,
+      name: "How to play Skribbl",
+      description:
+        "Create or join a private room, take the pen, draw the secret word without letters or numbers, and guess other players' drawings in chat.",
+      totalTime: "PT2M",
+      estimatedCost: {
+        "@type": "MonetaryAmount",
+        currency: "USD",
+        value: "0",
+      },
+      step: STEPS.map((step, index) => ({
+        "@type": "HowToStep",
+        position: index + 1,
+        name: step.title,
+        text: step.body,
+        url: `${SITE_URL}/how-to-play`,
+      })),
+    },
+  ],
+};
+
+const HOW_TO_STEPS = [
   {
     number: "01",
     title: "One player takes the pen",
@@ -33,6 +92,10 @@ const STEPS = [
 export default function HowToPlay() {
   return (
     <div className="app-shell">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
       <Topbar />
       <main className="page page--narrow">
         <div className="page-head">
@@ -68,7 +131,7 @@ export default function HowToPlay() {
         <div className="stack">
           <section className="card">
             <div className="help-list">
-              {STEPS.map((step) => (
+              {HOW_TO_STEPS.map((step) => (
                 <div className="help-section" key={step.number}>
                   <p className="eyebrow">{step.number}</p>
                   <h2>{step.title}</h2>
