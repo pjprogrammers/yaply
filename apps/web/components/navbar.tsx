@@ -21,6 +21,18 @@ export function Navbar({
   const [chapter, setChapter] = useState<Chapter>(
     initialChapter ?? (pathname === "/" ? "blue" : "black"),
   );
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   useEffect(() => {
     const sections = Array.from(
@@ -89,6 +101,46 @@ export function Navbar({
         </nav>
 
         <Link href="/#play" className="site-header__action">
+          Play now
+        </Link>
+
+        <button
+          type="button"
+          className={`site-header__menu-toggle${menuOpen ? " is-open" : ""}`}
+          aria-expanded={menuOpen}
+          aria-controls="site-menu"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        id="site-menu"
+        className={`site-header__menu${menuOpen ? " is-open" : ""}`}
+        onClick={() => setMenuOpen(false)}
+      >
+        <nav className="site-header__menu-nav" aria-label="Mobile">
+          <Link href="/games" className="site-header__menu-link">
+            Games
+          </Link>
+          <Link href="/install" className="site-header__menu-link">
+            Install
+          </Link>
+          <Link href="/#how" className="site-header__menu-link">
+            How it works
+          </Link>
+          <Link href="/#faq" className="site-header__menu-link">
+            FAQ
+          </Link>
+          <Link href="/about" className="site-header__menu-link">
+            About
+          </Link>
+        </nav>
+        <Link href="/#play" className="site-header__menu-action">
           Play now
         </Link>
       </div>

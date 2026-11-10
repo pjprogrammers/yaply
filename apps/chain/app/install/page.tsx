@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
-import { ArrowRightIcon, ChainMark, PlayIcon } from "@/components/icons";
+import { ArrowRightIcon, PlayIcon } from "@/components/icons";
+import { LandingNav } from "@/components/landing-nav";
 import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION } from "@/lib/content";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
 import { installSchema } from "@/lib/structured-data";
@@ -80,32 +81,7 @@ export default function InstallPage() {
       </a>
 
       <div className="cr">
-        <header className="cr-nav">
-          <div className="cr-margins cr-nav-inner">
-            <Link href="/" className="cr-brand" aria-label="Yaply Chain Reaction home">
-              <ChainMark />
-              <span>
-                Chain <span>Reaction</span>
-              </span>
-            </Link>
-
-            <nav className="cr-nav-links" aria-label="Primary">
-              <Link href="/#how-it-works">How it works</Link>
-              <Link href="/#rules">Critical mass</Link>
-              <Link href="/#boards">The board</Link>
-              <Link href="/install">Install</Link>
-            </nav>
-
-            <div className="cr-nav-actions">
-              <Link href="/join" className="cr-nav-join">
-                Join a room
-              </Link>
-              <Link href="/create" className="cr-button cr-button--nav">
-                Start a game
-              </Link>
-            </div>
-          </div>
-        </header>
+        <LandingNav variant="install" />
 
         <main id="main">
           <section className="cr-hero" aria-labelledby="install-title">

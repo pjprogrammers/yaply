@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
+import { SiteNav } from "@/components/site-nav";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
 import "./install.css";
 
@@ -51,22 +52,7 @@ const BENEFITS = [
 export default function InstallPage() {
   return (
     <main id="main">
-      <nav className="nav margins" aria-label="Primary">
-        <Link href="/" className="nav-word">
-          Smash Karts
-        </Link>
-        <div className="nav-links">
-          <Link href="/#arenas">Arenas</Link>
-          <Link href="/#arsenal">Arsenal</Link>
-          <Link href="/#controls">How to play</Link>
-          <Link href="/#paint">Garage</Link>
-          <Link href="/install">Install</Link>
-        </div>
-        <Link href="/play" className="nav-action">
-          Play now
-          <span aria-hidden="true">→</span>
-        </Link>
-      </nav>
+      <SiteNav variant="install" />
 
       <section className="hero sm-install-hero" aria-labelledby="install-title">
         <div className="hero-grid">

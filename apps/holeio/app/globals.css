@@ -287,6 +287,93 @@ img {
 
 .site-nav__play {
   padding: 12px 21px;
+  white-space: nowrap;
+}
+
+.site-nav__menu-toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--bone);
+}
+
+.site-nav__menu-toggle span {
+  display: block;
+  width: 1.05rem;
+  height: 2px;
+  background: currentColor;
+  transition: transform 180ms var(--ease), opacity 180ms var(--ease);
+}
+
+.site-nav__menu-toggle.is-open span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.site-nav__menu-toggle.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.site-nav__menu-toggle.is-open span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.site-nav__menu-toggle:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.site-nav__menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  padding: 8px var(--page) 20px;
+  background: var(--soot-2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.site-nav__menu.is-open {
+  display: block;
+}
+
+.site-nav__menu-links {
+  display: grid;
+}
+
+.site-nav__menu-links a {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--display);
+  font-size: 15px;
+  color: var(--bone);
+}
+
+.site-nav__menu-links a:hover {
+  color: var(--lime);
+}
+
+.site-nav__menu-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.site-nav__menu-actions .pill {
+  justify-content: center;
+  width: 100%;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ hero */
@@ -3199,9 +3286,19 @@ img {
   }
 }
 
+@media (min-width: 981px) {
+  .site-nav__menu {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
   .site-nav__links {
     display: none;
+  }
+
+  .site-nav__menu-toggle {
+    display: inline-flex;
   }
 
   .hero {

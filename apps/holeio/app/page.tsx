@@ -3,6 +3,7 @@ import { CtaForm } from "@/components/cta-form";
 import { ControlShowcase } from "@/components/control-showcase";
 import { HowAccordion } from "@/components/how-accordion";
 import { SeoSchema } from "@/components/seo-schema";
+import { SiteNav } from "@/components/site-nav";
 import { ABOUT_SECTIONS, FAQS, TIPS } from "@/lib/content";
 import { MAIN_URL } from "@/lib/config";
 
@@ -10,27 +11,7 @@ export default function HomePage() {
   return (
     <main id="main" className="landing">
       <SeoSchema />
-      <nav className="site-nav margins" aria-label="Primary">
-        <Link href="/" className="wordmark" aria-label="Hole.io home">
-          <span className="wordmark__dot" aria-hidden />
-          Hole.io
-        </Link>
-        <div className="site-nav__links">
-          <a href="#how">How it works</a>
-          <a href="#city">The city</a>
-          <a href="#control">Controls</a>
-          <a href="#faq">FAQ</a>
-        </div>
-        <div className="site-nav__actions">
-          <Link href="/install" className="site-nav__install">
-            Install
-          </Link>
-          <Link href="/play" className="pill pill--lime site-nav__play">
-            Play now
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-      </nav>
+      <SiteNav />
 
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero__copy margins">

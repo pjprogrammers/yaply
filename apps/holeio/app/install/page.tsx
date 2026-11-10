@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
+import { SiteNav } from "@/components/site-nav";
 import { GAME_KEYWORDS } from "@/lib/content";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
 import { breadcrumbSchema } from "@/lib/structured-data";
@@ -79,27 +80,7 @@ export default function InstallPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }}
       />
-      <nav className="site-nav margins" aria-label="Primary">
-        <Link href="/" className="wordmark" aria-label="Hole.io home">
-          <span className="wordmark__dot" aria-hidden />
-          Hole.io
-        </Link>
-        <div className="site-nav__links">
-          <Link href="/#how">How it works</Link>
-          <Link href="/#city">The city</Link>
-          <Link href="/#control">Controls</Link>
-          <Link href="/#faq">FAQ</Link>
-        </div>
-        <div className="site-nav__actions">
-          <Link href="/install" className="site-nav__install">
-            Install
-          </Link>
-          <Link href="/play" className="pill pill--lime site-nav__play">
-            Play now
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-      </nav>
+      <SiteNav variant="install" />
 
       <section className="install-hero" aria-labelledby="install-title">
         <div className="install-hero__copy margins">

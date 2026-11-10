@@ -4,10 +4,11 @@ import {
   CHAIN_BOARD_PRESETS,
   PLAYER_COLORS,
 } from "@yaply/shared/constants";
-import { ArrowRightIcon, ChainMark, PlayIcon } from "@/components/icons";
+import { ArrowRightIcon, PlayIcon } from "@/components/icons";
 import { ChainHeroBoard } from "@/components/hero-board";
 import { HeroJellyfish } from "@/components/hero-jellyfish";
 import { HeroStarfield } from "@/components/hero-starfield";
+import { LandingNav } from "@/components/landing-nav";
 import { MiniBoard } from "@/components/mini-board";
 import { MotionDirector } from "@/components/motion-director";
 import { Reveal } from "@/components/reveal";
@@ -144,33 +145,7 @@ export default function Home() {
         Skip to content
       </a>
       <div className="cr">
-        <header className="cr-nav">
-          <div className="cr-margins cr-nav-inner">
-            <Link href="/" className="cr-brand" aria-label="Yaply Chain Reaction home">
-              <ChainMark />
-              <span>
-                Chain <span>Reaction</span>
-              </span>
-            </Link>
-
-            <nav className="cr-nav-links" aria-label="Primary">
-              <a href="#how-it-works">How it works</a>
-              <a href="#rules">Critical mass</a>
-              <a href="#boards">The board</a>
-              <Link href="/how-to-play">How to play</Link>
-              <Link href="/install">Install app</Link>
-            </nav>
-
-            <div className="cr-nav-actions">
-              <Link href="/join" className="cr-nav-join">
-                Join a room
-              </Link>
-              <Link href="/create" className="cr-button cr-button--nav">
-                Start a game
-              </Link>
-            </div>
-          </div>
-        </header>
+        <LandingNav />
 
         <main id="main">
           <section className="cr-hero" aria-labelledby="hero-title" data-hero-parallax>

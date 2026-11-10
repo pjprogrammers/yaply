@@ -5,6 +5,7 @@ import type { WeaponId } from "@/game/types";
 import { ColorLab } from "@/components/color-lab";
 import { MapPreview } from "@/components/map-preview";
 import { Reveal } from "@/components/reveal";
+import { SiteNav } from "@/components/site-nav";
 import { WeaponGlyph } from "@/components/weapon-glyph";
 
 const TICKER_WORDS = [
@@ -34,22 +35,7 @@ const WEAPON_ORDER: WeaponId[] = [
 export default function Home() {
   return (
     <main id="main">
-      <nav className="nav margins" aria-label="Primary">
-        <Link href="/" className="nav-word">
-          Smash Karts
-        </Link>
-        <div className="nav-links">
-          <a href="#arenas">Arenas</a>
-          <a href="#arsenal">Arsenal</a>
-          <a href="#controls">How to play</a>
-          <a href="#paint">Garage</a>
-          <Link href="/install">Install</Link>
-        </div>
-        <Link href="/play" className="nav-action">
-          Play now
-          <span aria-hidden="true">→</span>
-        </Link>
-      </nav>
+      <SiteNav />
 
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-grid">

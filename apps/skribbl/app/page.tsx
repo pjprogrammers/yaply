@@ -10,8 +10,9 @@ import {
 } from "@/lib/content";
 import { CatDoodle } from "@/components/doodle";
 import { HomePreview } from "@/components/home-preview";
+import { LandingNav } from "@/components/landing-nav";
 import { Reveal } from "@/components/reveal";
-import { ArrowRightIcon, CheckIcon, ClockIcon, PlayIcon, SkribblMark } from "@/components/icons";
+import { ArrowRightIcon, CheckIcon, ClockIcon, PlayIcon } from "@/components/icons";
 import { SeoSchema } from "@/components/seo-schema";
 import { WordMask } from "@/components/word-mask";
 
@@ -55,31 +56,7 @@ export default function Home() {
         Skip to content
       </a>
       <div className="landing">
-        <header className="landing-nav">
-          <div className="landing-margins landing-nav-inner">
-            <Link href="/" className="landing-brand" aria-label="Yaply Skribbl home">
-              <SkribblMark />
-              <span>Skribbl</span>
-            </Link>
-
-            <nav className="landing-links" aria-label="Primary">
-              <a href="#how-it-works">How it works</a>
-              <a href="#words">Words</a>
-              <a href="#scoring">Scoring</a>
-              <Link href="/how-to-play">How to play</Link>
-              <Link href="/install">Install app</Link>
-            </nav>
-
-            <div className="landing-nav-actions">
-              <Link href="/join" className="landing-nav-join">
-                Join a room
-              </Link>
-              <Link href="/create" className="landing-button">
-                Create a room
-              </Link>
-            </div>
-          </div>
-        </header>
+        <LandingNav />
 
         <main id="main">
           <section className="landing-hero" aria-labelledby="hero-title">
