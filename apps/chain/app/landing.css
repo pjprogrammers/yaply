@@ -1768,6 +1768,38 @@
 }
 
 /* --------------------------------------------------------------------------
+   About / SEO copy
+   -------------------------------------------------------------------------- */
+
+.cr-about-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(18px, 3vw, 28px);
+}
+
+.cr-about-card {
+  padding: clamp(24px, 4vw, 38px);
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(8, 19, 28, 0.12);
+}
+
+.cr-about-card h3 {
+  font-family: var(--cr-font-display);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.cr-about-card p {
+  max-width: 64ch;
+  margin-top: 14px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--cr-muted-ink);
+}
+
+/* --------------------------------------------------------------------------
    FAQ
    -------------------------------------------------------------------------- */
 
@@ -2437,6 +2469,10 @@
 
   .cr-faq-grid {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  .cr-about-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cr-boards {

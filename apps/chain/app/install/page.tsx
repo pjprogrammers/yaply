@@ -2,20 +2,39 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
 import { ArrowRightIcon, ChainMark, PlayIcon } from "@/components/icons";
+import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION } from "@/lib/content";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
+import { installSchema } from "@/lib/structured-data";
 import "./install.css";
 
 export const metadata: Metadata = {
-  title: "Install Chain Reaction",
+  title: { absolute: "Install Chain Reaction | Yaply" },
   description:
-    "Install Chain Reaction on your phone, tablet or desktop. The turn-based board game opens in its own window with no app store and no account.",
+    "Install Chain Reaction on your phone, tablet or desktop. The free online chain reaction game opens in its own window with no app store and no account.",
+  keywords: GAME_KEYWORDS,
   alternates: { canonical: `${SITE_URL}/install` },
+  robots: { index: true, follow: true },
   openGraph: {
     type: "website",
+    locale: "en_US",
     url: `${SITE_URL}/install`,
-    title: "Install Chain Reaction",
-    description:
-      "Put the board on your home screen. Chain Reaction installs in seconds and opens in its own window.",
+    siteName: "Yaply Chain Reaction",
+    title: "Install Chain Reaction | Free online board game",
+    description: GAME_SHORT_DESCRIPTION,
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Chain Reaction — a glowing blue jellyfish above a dark electric game table with stacked orbs",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Install Chain Reaction | Free online board game",
+    description: GAME_SHORT_DESCRIPTION,
+    images: ["/twitter-image.png"],
   },
 };
 
@@ -52,6 +71,10 @@ const BENEFITS = [
 export default function InstallPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(installSchema()) }}
+      />
       <a href="#main" className="cr-skip">
         Skip to content
       </a>
@@ -108,10 +131,13 @@ export default function InstallPage() {
                 </p>
                 <h1 id="install-title" className="cr-title">
                   <span className="cr-title-line">
-                    <span>Put the board</span>
+                    <span>Install</span>
                   </span>
                   <span className="cr-title-line">
-                    <span>on your home screen.</span>
+                    <span>Chain</span>
+                  </span>
+                  <span className="cr-title-line">
+                    <span>Reaction</span>
                   </span>
                 </h1>
                 <p className="cr-lede">

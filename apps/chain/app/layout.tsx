@@ -1,7 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { PwaBridge } from "@yaply/shared/install";
-import { SITE_URL } from "@/lib/config";
+import {
+  GAME_DESCRIPTION,
+  GAME_KEYWORDS,
+  GAME_NAME,
+  GAME_SHORT_DESCRIPTION,
+} from "@/lib/content";
+import { MAIN_URL, SITE_URL } from "@/lib/config";
 import "./globals.css";
 import "./landing.css";
 
@@ -24,26 +30,66 @@ export const metadata: Metadata = {
   verification: {
     google: googleVerification,
   },
-  title: "Chain Reaction — one orb, whole board",
-  description:
-    "A turn-based board game for 2–8 players. Claim cells, stack orbs past their critical mass and watch the chain flip the table. Play online, pass-and-play or against CPUs.",
-  applicationName: "Chain Reaction",
+  title: {
+    default: "Chain Reaction — free online chain reaction game by Yaply",
+    template: `%s | ${GAME_NAME} by Yaply`,
+  },
+  description: GAME_DESCRIPTION,
+  applicationName: GAME_NAME,
+  keywords: GAME_KEYWORDS,
+  authors: [{ name: "Yaply", url: MAIN_URL }],
+  creator: "Yaply",
+  publisher: "Yaply",
+  category: "games",
+  classification: "Chain reaction game, board game, turn-based strategy game, orb strategy game",
+  manifest: "/manifest.webmanifest",
+  referrer: "origin-when-cross-origin",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  alternates: {
+    canonical: `${SITE_URL}/`,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Chain Reaction",
+    title: GAME_NAME,
   },
   openGraph: {
-    title: "Chain Reaction — one orb, whole board",
-    description:
-      "Claim cells, stack orbs past their critical mass and let the cascade take the board. Two to eight players, online or on one device.",
     type: "website",
+    locale: "en_US",
+    url: `${SITE_URL}/`,
+    siteName: `Yaply ${GAME_NAME}`,
+    title: "Chain Reaction — free online chain reaction game by Yaply",
+    description: `${GAME_SHORT_DESCRIPTION} Play online, pass-and-play or against CPUs.`,
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Chain Reaction — a glowing blue jellyfish above a dark electric game table with stacked orbs",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chain Reaction — one orb, whole board",
+    title: "Chain Reaction — free online chain reaction game by Yaply",
     description:
       "Claim cells, stack orbs past their critical mass and let the cascade take the board. Two to eight players, online or on one device.",
+    images: ["/twitter-image.png"],
   },
 };
 
@@ -63,6 +109,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${display.variable}`}>
+      <head>
+        <link
+          rel="alternate"
+          type="text/plain"
+          href="/llms.txt"
+          title="Chain Reaction LLM summary"
+        />
+        <link
+          rel="alternate"
+          type="text/plain"
+          href="/llms-full.txt"
+          title="Chain Reaction full LLM reference"
+        />
+        <link
+          rel="alternate"
+          type="text/plain"
+          href="/ai.txt"
+          title="Chain Reaction AI usage policy"
+        />
+        <link
+          rel="sitemap"
+          type="application/xml"
+          href="/sitemap.xml"
+          title="Chain Reaction sitemap"
+        />
+      </head>
       <body className={`${inter.className} antialiased`}>
         {children}
         <PwaBridge />

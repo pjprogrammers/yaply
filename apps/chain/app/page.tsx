@@ -11,7 +11,9 @@ import { HeroStarfield } from "@/components/hero-starfield";
 import { MiniBoard } from "@/components/mini-board";
 import { MotionDirector } from "@/components/motion-director";
 import { Reveal } from "@/components/reveal";
+import { ABOUT_SECTIONS, FAQS } from "@/lib/content";
 import { MAIN_URL } from "@/lib/config";
+import { homeSchema } from "@/lib/structured-data";
 
 const SPECS = [
   { label: "2–8 players", color: PLAYER_COLORS[0] },
@@ -126,39 +128,6 @@ const SETTINGS: Array<{ label: string; value: string; swatches?: string[] }> = [
   { label: "CPU seats", value: "Easy, medium or hard" },
 ];
 
-const FAQS = [
-  {
-    question: "Do I need an account?",
-    answer:
-      "No. Pick a nickname, create a room or join with a six-character code. Your name is saved in this browser for next time.",
-  },
-  {
-    question: "What is critical mass?",
-    answer:
-      "The number of orbs a cell can hold before it pops: corners 2, edges 3 and the middle 4. Add one more orb and it bursts into its orthogonal neighbours.",
-  },
-  {
-    question: "Can I place an orb on an opponent's cell?",
-    answer:
-      "No. You can only place on an empty cell or one you already own. Cells change hands when a chain wave hits them, not when you tap them.",
-  },
-  {
-    question: "What happens when my turn clock runs out?",
-    answer:
-      "The game auto-plays a legal cell for you, preferring one of your own cells that is one orb from popping. The clock keeps the table moving.",
-  },
-  {
-    question: "How do I win?",
-    answer:
-      "Leave every opponent with zero orbs. The last colour on the board wins. If a chain takes the last orb from several players at once, the surviving player takes it.",
-  },
-  {
-    question: "Can I change the table after the game starts?",
-    answer:
-      "Settings lock while a game is running. The host can reopen them before a rematch without rebuilding the room.",
-  },
-];
-
 export const viewport: Viewport = {
   themeColor: "#06090e",
   colorScheme: "dark",
@@ -167,6 +136,10 @@ export const viewport: Viewport = {
 export default function Home() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeSchema()) }}
+      />
       <a href="#main" className="cr-skip">
         Skip to content
       </a>
@@ -226,16 +199,16 @@ export default function Home() {
                 </p>
                 <h1 id="hero-title" className="cr-title">
                   <span className="cr-title-line">
-                    <span>One orb.</span>
+                    <span>Chain</span>
                   </span>
                   <span className="cr-title-line">
-                    <span>Whole board.</span>
+                    <span>Reaction</span>
                   </span>
                 </h1>
                 <p className="cr-lede">
-                  Chain Reaction is a game about pressure. Claim cells, stack orbs past their limit
-                  and let the cascade do the rest. Every orb can flip the table — or hand it to
-                  somebody else.
+                  One orb. Whole board. Chain Reaction is a free online chain reaction game for
+                  2–8 players. Claim cells, stack orbs past their critical mass and let the cascade
+                  do the rest. Every orb can flip the table — or hand it to somebody else.
                 </p>
                 <div className="cr-actions">
                   <Link href="/create" className="cr-button cr-button--lg">
@@ -537,17 +510,48 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="cr-section cr-section--coal">
+          <section className="cr-section cr-section--paper" aria-labelledby="about-game-title">
+            <div className="cr-margins">
+              <Reveal className="cr-section-head" stagger>
+                <div>
+                  <p className="cr-kicker">Yaply Chain Reaction</p>
+                  <h2 id="about-game-title" className="cr-h2">
+                    What is
+                    <br />
+                    Chain Reaction?
+                  </h2>
+                </div>
+                <p className="cr-lede">
+                  A free online chain reaction game for 2–8 players. One board, one orb per turn
+                  and a cascade that can change every colour on the table.
+                </p>
+              </Reveal>
+
+              <div className="cr-about-grid">
+                {ABOUT_SECTIONS.map((section) => (
+                  <article className="cr-about-card" key={section.id}>
+                    <h3>{section.title}</h3>
+                    {section.paragraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="cr-section cr-section--coal" aria-labelledby="faq-title">
             <div className="cr-margins cr-faq-grid">
               <Reveal className="cr-section-copy" stagger>
                 <p className="cr-kicker">Before you ask</p>
-                <h2 className="cr-h2">
-                  Before
+                <h2 id="faq-title" className="cr-h2">
+                  Chain Reaction
                   <br />
-                  you fire.
+                  FAQ.
                 </h2>
                 <p className="cr-lede">
-                  Short answers to the things every new table asks before the first orb lands.
+                  Short answers for anyone searching for the chain reaction game, yaply chain
+                  reaction or a free online board game for game night.
                 </p>
               </Reveal>
 

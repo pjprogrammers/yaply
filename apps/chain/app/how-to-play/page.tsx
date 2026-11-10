@@ -3,20 +3,54 @@ import Link from "next/link";
 import { ArrowLeftIcon, ClockIcon, UsersIcon, WifiIcon } from "@/components/icons";
 import { MiniBoard } from "@/components/mini-board";
 import { Topbar } from "@/components/topbar";
+import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION } from "@/lib/content";
+import { SITE_URL } from "@/lib/config";
+import { howToPlaySchema } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  title: "How to play | Chain Reaction",
+  title: { absolute: "How to play Chain Reaction | Yaply" },
+  description:
+    "Learn how to play Chain Reaction, the free online chain reaction game: placing orbs, critical mass, chain cascades, eliminations, scoring and rematches.",
+  keywords: GAME_KEYWORDS,
+  alternates: { canonical: `${SITE_URL}/how-to-play` },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: `${SITE_URL}/how-to-play`,
+    siteName: "Yaply Chain Reaction",
+    title: "How to play Chain Reaction | Rules and critical mass",
+    description: GAME_SHORT_DESCRIPTION,
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Chain Reaction — a glowing blue jellyfish above a dark electric game table with stacked orbs",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How to play Chain Reaction | Rules and critical mass",
+    description: GAME_SHORT_DESCRIPTION,
+    images: ["/twitter-image.png"],
+  },
 };
 
 export default function HowToPlay() {
   return (
     <div className="app-shell">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToPlaySchema()) }}
+      />
       <Topbar />
       <main className="page page--narrow">
         <div className="page-head">
           <div className="page-head-copy">
             <p className="eyebrow">Chain Reaction</p>
-            <h1 className="home-title">How to play</h1>
+            <h1 className="home-title">How to play Chain Reaction</h1>
             <p className="subline">
               A turn-based board game of pressure. Every orb you place is a threat, and every
               full cell is a chain waiting to happen.

@@ -160,9 +160,9 @@ export function CreateRoom() {
           <section className="home-copy">
             <p className="eyebrow">Room setup · Chain Reaction</p>
             <h1 className="home-title">
-              Set the table.
+              Create a
               <br />
-              Pick your pressure.
+              Chain Reaction game.
             </h1>
             <p className="subline">
               Choose a board, a clock and a palette. Play straight away with CPUs or pass-and-play,

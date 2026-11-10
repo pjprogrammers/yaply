@@ -5,6 +5,7 @@ import { Topbar } from "@/components/topbar";
 
 export const metadata: Metadata = {
   title: "Room | Chain Reaction",
+  robots: { index: false, follow: false },
 };
 
 export default async function RoomPage({
