@@ -1613,6 +1613,108 @@ button {
   text-underline-offset: 0.25em;
 }
 
+.game-page__seo,
+.game-page__faq {
+  border-top: 1px solid #1c1c1c;
+  background: var(--black);
+  color: var(--white);
+  padding-block: clamp(3.5rem, 7vw, 6.5rem);
+}
+
+.game-page__seo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(2rem, 7vw, 7rem);
+  align-items: start;
+}
+
+.game-page__seo h2,
+.game-page__faq h2 {
+  max-width: 10ch;
+  font-size: var(--step-head);
+  line-height: 0.88;
+}
+
+.game-page__eyebrow {
+  margin-bottom: 0.9rem;
+  color: var(--yellow);
+  font-size: var(--step-small);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-page__seo-copy p {
+  max-width: 40rem;
+  color: #e8e8e8;
+  font-size: var(--step-body);
+  line-height: 1.55;
+}
+
+.game-page__seo-copy p + p {
+  margin-top: 1.1rem;
+}
+
+.game-page__seo-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.4rem;
+  padding-top: 0.6rem;
+}
+
+.game-page__seo-links a {
+  color: var(--yellow);
+  text-underline-offset: 0.25em;
+}
+
+.game-page__seo-links a:hover {
+  color: var(--white);
+}
+
+.game-page__faq-list {
+  border-top: 1px solid #262626;
+}
+
+.game-page__faq details {
+  border-bottom: 1px solid #262626;
+  padding: 1.1rem 0;
+}
+
+.game-page__faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: var(--step-lead);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.game-page__faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.game-page__faq summary::after {
+  content: "+";
+  color: var(--yellow);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.game-page__faq details[open] summary::after {
+  content: "–";
+}
+
+.game-page__faq p {
+  max-width: 40rem;
+  margin-top: 0.8rem;
+  color: #e8e8e8;
+  font-size: var(--step-body);
+  line-height: 1.55;
+}
+
 /* Motion */
 
 @keyframes deck-float {
@@ -1902,7 +2004,8 @@ button {
   }
 
   .about-grid,
-  .game-page__body-grid {
+  .game-page__body-grid,
+  .game-page__seo-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

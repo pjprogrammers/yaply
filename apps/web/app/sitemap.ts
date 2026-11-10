@@ -1,54 +1,59 @@
 import type { MetadataRoute } from "next";
+import { games } from "@/data/games";
 import { SITE_URL } from "@/lib/site";
 
 const baseUrl = SITE_URL;
+const lastModified = new Date();
+
+function absolute(path: string) {
+  return new URL(path, baseUrl).toString();
+}
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const gamePages = [
-    "chain-reaction",
-    "skribbl",
-    "smash-karts",
-    "holeio",
-    "ludo",
-    "whos-the-spy",
-  ];
+  const mainImage = absolute("/og.png");
 
   return [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "weekly",
       priority: 1,
+      images: [mainImage],
     },
     {
       url: `${baseUrl}/games`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "weekly",
       priority: 0.9,
+      images: [mainImage, ...games.map((game) => absolute(game.poster))],
     },
     {
       url: `${baseUrl}/install`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "monthly",
       priority: 0.8,
+      images: [mainImage],
     },
     {
       url: `${baseUrl}/apps`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "monthly",
       priority: 0.8,
+      images: [mainImage],
     },
     {
       url: `${baseUrl}/about`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "monthly",
       priority: 0.6,
+      images: [mainImage],
     },
-    ...gamePages.map((slug) => ({
-      url: `${baseUrl}/games/${slug}`,
-      lastModified: new Date(),
+    ...games.map((game) => ({
+      url: `${baseUrl}/games/${game.slug}`,
+      lastModified,
       changeFrequency: "monthly" as const,
-      priority: 0.7,
+      priority: game.status === "available" ? 0.8 : 0.5,
+      images: [absolute(game.ogImage?.src ?? game.poster)],
     })),
   ];
 }
