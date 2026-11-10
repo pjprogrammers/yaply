@@ -9,6 +9,7 @@
 | Chain Reaction | Vercel Hobby | `apps/chain` | `NEXT_PUBLIC_CHAIN_URL` |
 | Smash Karts | Vercel Hobby | `apps/smashkarts` | `NEXT_PUBLIC_SMASHKARTS_URL` |
 | Hole.io | Vercel Hobby | `apps/holeio` | `NEXT_PUBLIC_HOLEIO_URL` |
+| Who's the Spy | Vercel Hobby | `apps/whos-the-spy` | `NEXT_PUBLIC_WHOS_THE_SPY_URL` |
 | Realtime | Cloudflare Workers + Durable Objects | `apps/realtime` | `NEXT_PUBLIC_REALTIME_URL` in each game |
 
 Frontend deployment URLs come from the environment. The only committed
@@ -24,7 +25,7 @@ SQLite-backed Durable Objects. No paid database, Redis, VPS, or broker is needed
 
 - Node.js 22+ and npm 10+
 - A Cloudflare account with Workers enabled
-- Five Vercel projects (Hobby plan is sufficient)
+- Six Vercel projects (Hobby plan is sufficient)
 - `npx wrangler login` completed locally before deploying the Worker
 
 ## Install and verify
@@ -61,11 +62,12 @@ npm run dev --workspace=@yaply/skribbl     # http://localhost:3001
 npm run dev --workspace=@yaply/chain       # http://localhost:3002
 npm run dev --workspace=@yaply/smashkarts  # http://localhost:3003
 npm run dev --workspace=@yaply/holeio      # http://localhost:3004
+npm run dev --workspace=@yaply/whos-the-spy # http://localhost:3005
 npm run dev --workspace=@yaply/web         # http://localhost:3000
 ```
 
 Local defaults in `apps/realtime/wrangler.toml` allow origins on ports 3000,
-3001, 3002, 3003 and 3004. The online game apps fall back to
+3001, 3002, 3003, 3004 and 3005. The online game apps fall back to
 `ws://localhost:8787/room` when `NEXT_PUBLIC_REALTIME_URL` is unset.
 
 If a game's `.env.local` points at the production Worker, override it for a
@@ -123,6 +125,7 @@ NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 NEXT_PUBLIC_SKRIBBL_URL=https://<skribbl-project>.vercel.app
 NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
 NEXT_PUBLIC_HOLEIO_URL=https://<holeio-project>.vercel.app
+NEXT_PUBLIC_WHOS_THE_SPY_URL=https://<whos-the-spy-project>.vercel.app
 ```
 
 `NEXT_PUBLIC_MAIN_URL` is the canonical origin used by the page metadata,
@@ -131,7 +134,7 @@ variables above are required at build time. Use each project's `*.vercel.app`
 domain until a custom domain is attached, then change the variable to that
 domain.
 
-### `apps/skribbl`, `apps/chain`, `apps/smashkarts` and `apps/holeio` (Vercel project settings in production)
+### `apps/skribbl`, `apps/chain`, `apps/smashkarts`, `apps/holeio` and `apps/whos-the-spy` (Vercel project settings in production)
 
 ```env
 NEXT_PUBLIC_REALTIME_URL=wss://<realtime-worker-host>/room
@@ -154,16 +157,17 @@ NEXT_PUBLIC_CHAIN_URL=https://<chain-project>.vercel.app
 NEXT_PUBLIC_SMASHKARTS_URL=https://<smash-karts-project>.vercel.app
 # yaply-holeio + yaply-web
 NEXT_PUBLIC_HOLEIO_URL=https://<holeio-project>.vercel.app
+NEXT_PUBLIC_WHOS_THE_SPY_URL=https://<whos-the-spy-project>.vercel.app
 ```
 
 For local development the URL can be omitted; the apps fall back to their Vercel
 system hostname, then to `http://localhost:3001` (Skribbl), `3002` (Chain
-Reaction), `3003` (Smash Karts) or `3004` (Hole.io).
+Reaction), `3003` (Smash Karts), `3004` (Hole.io) or `3005` (Who's the Spy).
 
-All four game apps support online rooms through the Worker: Skribbl, Chain
-Reaction, Smash Karts and Hole.io. Hole.io still offers a local “Play with bots”
-mode from its menu; online rooms are created with `POST /rooms` and use the same
-lobby, chat, rematch and reconnect protocol as the other games.
+All five game apps support online rooms through the Worker: Skribbl, Chain
+Reaction, Smash Karts, Hole.io and Who's the Spy. Hole.io still offers a local
+“Play with bots” mode from its menu; online rooms are created with `POST /rooms`
+and use the same lobby, chat, rematch and reconnect protocol as the other games.
 
 The browser converts `https://` to `wss://` and appends `/room` if needed, so
 both `wss://host/room` and `https://host` are accepted. Prefer the explicit
@@ -181,12 +185,38 @@ Set each variable in the correct Vercel project:
 | `NEXT_PUBLIC_SKRIBBL_URL` | `yaply-web` **and** `yaply-skribbl` |
 | `NEXT_PUBLIC_SMASHKARTS_URL` | `yaply-web` **and** `yaply-smashkarts` |
 | `NEXT_PUBLIC_HOLEIO_URL` | `yaply-web` **and** `yaply-holeio` |
-| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts` **and** `yaply-holeio` |
-| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts` **and** `yaply-holeio` |
+| `NEXT_PUBLIC_WHOS_THE_SPY_URL` | `yaply-web` **and** `yaply-whos-the-spy` |
+| `NEXT_PUBLIC_ICE_SERVERS` | `yaply-whos-the-spy` (optional, recommended for production voice) |
+| `NEXT_PUBLIC_REALTIME_URL` | `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts`, `yaply-holeio` **and** `yaply-whos-the-spy` |
+| `NEXT_PUBLIC_MAIN_URL` | `yaply-web`, `yaply-chain`, `yaply-skribbl`, `yaply-smashkarts`, `yaply-holeio` **and** `yaply-whos-the-spy` |
 
 Adding `NEXT_PUBLIC_REALTIME_URL` to the `yaply-web` project does nothing for
 the games. Adding `NEXT_PUBLIC_SKRIBBL_URL` or `NEXT_PUBLIC_SMASHKARTS_URL` to
 a game project does nothing for the main site.
+
+### Who's the Spy voice (WebRTC)
+
+Voice is a peer-to-peer audio mesh. The Worker only relays SDP offers/answers
+and ICE candidates between room members; no audio passes through Cloudflare.
+The client defaults to `stun:stun.l.google.com:19302`. Symmetric NATs and some
+mobile networks require TURN, so production rooms should configure at least one
+TURN server in the `yaply-whos-the-spy` project:
+
+```env
+NEXT_PUBLIC_ICE_SERVERS=[{"urls":"turn:turn.example.com:3478","username":"<user>","credential":"<pass>"}]
+```
+
+`NEXT_PUBLIC_*` values are baked into the client at build time, so redeploy
+after changing ICE servers. These credentials are visible to every visitor; use
+short-lived credentials from your TURN provider instead of a long-lived shared
+secret. Voice is only offered in Who's the Spy rooms. Microphones close during
+voting and revote, eliminated players can listen but not transmit until the
+results screen, and the host can mute all or disable voice for the room.
+
+The client builds a full peer-to-peer mesh: each participant uploads one audio
+track to every other participant. That is appropriate for the 3–12 player room
+cap, but if you raise the cap substantially, move audio to an SFU instead of
+increasing the mesh size.
 
 ### Verify which values a deployment actually built
 
@@ -198,6 +228,7 @@ curl https://<chain-project>.vercel.app/api/config
 curl https://<skribbl-project>.vercel.app/api/config
 curl https://<smash-karts-project>.vercel.app/api/config
 curl https://<holeio-project>.vercel.app/api/config
+curl https://<whos-the-spy-project>.vercel.app/api/config
 ```
 
 `/api/config` returns the effective main-site and game URLs, the source of each
@@ -232,14 +263,14 @@ Development (top-level `[vars]`):
 
 ```toml
 ENVIRONMENT = "development"
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005"
 ```
 
 Production (`[env.production.vars]`):
 
 ```toml
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://skribbl.yaplygames.vercel.app,https://chain.yaplygames.vercel.app,https://holeio.yaplygames.vercel.app,https://smashkarts.yaplygames.vercel.app,https://spy.yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app,https://yaply-whos-the-spy.vercel.app"
 ```
 
 Rules:
@@ -338,6 +369,20 @@ as `metadataBase` for the Open Graph images. The same variable is set on
 both a local match against AI holes and online rooms through the shared Worker.
 The same variable is set on `yaply-web`, where it is the Hole.io link.
 
+**Project 6 — `yaply-whos-the-spy`**
+
+- Root Directory: `apps/whos-the-spy`
+- Framework Preset: Next.js
+- Install Command: `cd ../.. && npm install`
+- Build Command: `cd ../.. && npm run build --workspace=@yaply/whos-the-spy`
+- Environment: `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_MAIN_URL`, `NEXT_PUBLIC_WHOS_THE_SPY_URL`, optional `NEXT_PUBLIC_ICE_SERVERS`
+
+`NEXT_PUBLIC_WHOS_THE_SPY_URL` is the public origin of this project. The same
+variable is set on `yaply-web`, where it is the Who's the Spy link. The game
+uses the shared Worker for authoritative roles, words, votes, timers and chat.
+Voice is WebRTC peer-to-peer; `NEXT_PUBLIC_ICE_SERVERS` adds TURN for restrictive
+networks (see the voice section above).
+
 Installing from the repository root is required so npm workspaces can resolve
 `@yaply/shared`. If Vercel cannot read files outside the selected Root
 Directory, enable the monorepo "include source files outside the Root
@@ -359,13 +404,13 @@ then redeploy both the Worker and the affected frontend.
 
 1. `npm run check` passes (typecheck + all workspace tests).
 2. `npm run build` passes for `apps/web`, `apps/skribbl`, `apps/chain`,
-   `apps/smashkarts`, and `apps/holeio`.
+   `apps/smashkarts`, `apps/holeio`, and `apps/whos-the-spy`.
 3. `npm run check:worker --workspace=@yaply/realtime` passes.
 4. `npx wrangler deploy --dry-run --env production` passes from `apps/realtime`.
 5. Production `ALLOWED_ORIGINS` in `wrangler.toml` contains every deployed frontend origin.
 6. `/health` and `/version` respond on the deployed Worker.
 7. Two browsers can create/join the same room in every online game (Skribbl,
-   Chain Reaction, Smash Karts and Hole.io).
+   Chain Reaction, Smash Karts, Hole.io and Who's the Spy).
 8. A refresh reconnects to the same seat and score.
 9. A non-host cannot start the game or change settings.
 10. Skribbl guesses, drawing, round transitions, and scores match on both clients.
@@ -373,10 +418,11 @@ then redeploy both the Worker and the affected frontend.
 12. Hole.io guest movement, swallowed-object state, match end and rematch agree
     with the host; an eaten hole respawns in online rooms.
 13. A third client cannot join a full room; an invalid room code shows a clean error.
-14. Links from the main site reach all four game deployments, including
+14. Links from the main site reach all five game deployments, including
     `/games/smash-karts` → the value of `NEXT_PUBLIC_SMASHKARTS_URL`,
-    `/games/holeio` → the value of `NEXT_PUBLIC_HOLEIO_URL`, and the old
-    `/games/kart-riot` URL redirects to it.
+    `/games/holeio` → the value of `NEXT_PUBLIC_HOLEIO_URL`,
+    `/games/whos-the-spy` → the value of `NEXT_PUBLIC_WHOS_THE_SPY_URL`, and
+    the old `/games/kart-riot` URL redirects to it.
 15. `npm run test:e2e` passes against a locally running Worker and both
     frontends (six Playwright tests, including full matches, refresh/reconnect,
     drawer disconnects, and Chain eliminations/surrenders).
@@ -401,7 +447,7 @@ then redeploy both the Worker and the affected frontend.
   of seeing `ROOM_EXISTS`.
 - Rooms are isolated by Durable Object id `${game}:${code}`, so a Chain room and
   a Skribbl room can never share state even with the same code. The same applies
-  to Smash Karts and Hole.io rooms.
+  to Smash Karts, Hole.io and Who's the Spy rooms.
 - Empty rooms expire after 60 seconds; inactive rooms expire after 10 minutes.
   Expiry deletes room storage and pending alarms.
 - Per-socket limits: 16 KiB frames, token-bucket message rate, 20 invalid frames
