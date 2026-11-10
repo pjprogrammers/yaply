@@ -1,21 +1,46 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallCard, InstallGuide } from "@/components/install-experience";
+import { GAME_KEYWORDS } from "@/lib/content";
 import { MAIN_URL, SITE_URL } from "@/lib/config";
+import { breadcrumbSchema } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  title: "Install Hole.io",
+  title: { absolute: "Install Hole.io — add the hole game to your home screen" },
   description:
-    "Install Hole.io on your phone, tablet or desktop. The browser arcade game gets its own home-screen icon and full-screen window with no app store.",
+    "Install Hole.io on your phone, tablet or desktop. The free browser hole game gets its own home-screen icon and full-screen window with no app store, no download queue and no account.",
+  keywords: GAME_KEYWORDS,
   alternates: { canonical: `${SITE_URL}/install` },
   openGraph: {
     type: "website",
+    locale: "en_US",
     url: `${SITE_URL}/install`,
-    title: "Install Hole.io",
+    siteName: "Yaply",
+    title: "Install Hole.io — add the hole game to your home screen",
     description:
       "Put the hole on your home screen. Hole.io installs in seconds and opens in its own window.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Hole.io — a black hole swallowing a city block on a lime field",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Install Hole.io — add the hole game to your home screen",
+    description:
+      "Install once and keep the city one tap away. No store, no download queue, no account.",
+    images: ["/og.png"],
   },
 };
+
+const breadcrumbs = breadcrumbSchema([
+  { name: "Hole.io", path: "/" },
+  { name: "Install Hole.io", path: "/install" },
+]);
 
 const BENEFITS = [
   {
@@ -50,6 +75,10 @@ const TICKER = [
 export default function InstallPage() {
   return (
     <main id="main" className="install-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }}
+      />
       <nav className="site-nav margins" aria-label="Primary">
         <Link href="/" className="wordmark" aria-label="Hole.io home">
           <span className="wordmark__dot" aria-hidden />

@@ -2,50 +2,14 @@ import Link from "next/link";
 import { CtaForm } from "@/components/cta-form";
 import { ControlShowcase } from "@/components/control-showcase";
 import { HowAccordion } from "@/components/how-accordion";
+import { SeoSchema } from "@/components/seo-schema";
+import { ABOUT_SECTIONS, FAQS, TIPS } from "@/lib/content";
 import { MAIN_URL } from "@/lib/config";
-
-const FAQS = [
-  {
-    q: "Is Hole.io free?",
-    a: "Yes. The game runs in the browser, the whole match is free, and there is no account, no energy meter and no shop. Open the page and press play.",
-  },
-  {
-    q: "What do I actually do?",
-    a: "Steer your hole through the city and swallow things smaller than your rim. Cars, trees, people, kiosks and eventually whole buildings all count. The bigger you get, the more the street becomes food.",
-  },
-  {
-    q: "How long is a match?",
-    a: "Two minutes. There is a short countdown, then the clock runs. When it hits zero the table is final and you can restart immediately.",
-  },
-  {
-    q: "Who are the other holes?",
-    a: "Seven AI-controlled rivals with different appetites. They hunt food, avoid bigger holes, and will happily swallow a smaller one. A leaderboard tracks the whole field live.",
-  },
-  {
-    q: "Can I eat another hole?",
-    a: "If your rim is clearly bigger than theirs, yes. Catch a smaller rival and you take a cut of their score. If the other hole is bigger, run: the same rule applies to you.",
-  },
-  {
-    q: "Does it work on a phone?",
-    a: "Yes. The game uses a touch joystick on phones and tablets, with the same world and the same two-minute match. The interface is built to stay out of the way of your thumb.",
-  },
-  {
-    q: "What are the controls on desktop?",
-    a: "WASD or the arrow keys to move, or point with the mouse and the hole follows. Escape or P pauses. The match pauses by itself if you switch tabs.",
-  },
-  {
-    q: "Can I install it?",
-    a: "Yes. Hole.io installs from the browser on Android, iPhone, iPad and desktop. It opens in its own window with a home-screen icon, and there is a step-by-step install page if you need it.",
-  },
-  {
-    q: "Is this the original Hole.io?",
-    a: "This is an original browser arcade game built by Yaply: original code, original city, original art. It follows the classic swallow-the-city formula, not any company's proprietary assets.",
-  },
-];
 
 export default function HomePage() {
   return (
     <main id="main" className="landing">
+      <SeoSchema />
       <nav className="site-nav margins" aria-label="Primary">
         <Link href="/" className="wordmark" aria-label="Hole.io home">
           <span className="wordmark__dot" aria-hidden />
@@ -75,13 +39,14 @@ export default function HomePage() {
             Free browser arcade · Two-minute matches
           </p>
           <h1 id="hero-title" className="hero__title display">
-            Swallow{" "}
+            Hole.io<span className="hero__title-dot">.</span>
             <br />
-            the city<span className="hero__title-dot">.</span>
+            swallow the city<span className="hero__title-dot">.</span>
           </h1>
           <p className="hero__sub">
-            You are a hole with an appetite. Take the bins, then the cars, then
-            the buildings, while seven rival holes eat the same streets.
+            Hole.io is a free browser game: you are a hole with an appetite.
+            Take the bins, then the cars, then the buildings, while seven rival
+            holes eat the same streets.
           </p>
           <div className="hero__actions">
             <Link href="/play" className="pill pill--lime pill--big">
@@ -261,6 +226,56 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section
+        id="about"
+        className="seo-section margins"
+        aria-labelledby="about-title"
+      >
+        <div className="how-head seo-head">
+          <div>
+            <p className="eyebrow">
+              <span aria-hidden />
+              Hole.io · Yaply browser arcade
+            </p>
+            <h2 id="about-title" className="display how-title">
+              The hole game,
+              <br />
+              in plain words.
+            </h2>
+          </div>
+          <p className="how-lede">
+            Hole.io is a free two-minute arcade game for a phone, tablet or
+            desktop. It is also the easiest game to send when the group chat
+            wants something to play with friends right now.
+          </p>
+        </div>
+
+        <div className="seo-grid">
+          {ABOUT_SECTIONS.map((section) => (
+            <article className="seo-card" key={section.id}>
+              <h3>{section.title}</h3>
+              {section.paragraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </article>
+          ))}
+          <article className="seo-card seo-card--tips">
+            <h3>Hole.io tips for a bigger score</h3>
+            <ol className="seo-tips">
+              {TIPS.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ol>
+          </article>
+        </div>
+
+        <p className="seo-links">
+          Ready to play? <Link href="/play">Play Hole.io free</Link>,{" "}
+          <Link href="/install">install Hole.io</Link> for a home-screen icon,
+          or browse <a href={MAIN_URL}>more browser games from Yaply</a>.
+        </p>
+      </section>
+
       <section className="cta-section margins" aria-labelledby="cta-title">
         <h2 id="cta-title" className="sr-only">
           Play Hole.io
@@ -308,6 +323,7 @@ export default function HomePage() {
             <p className="footer-col__title">Game</p>
             <a href="#city">The city</a>
             <a href="#how">How it works</a>
+            <a href="#about">About Hole.io</a>
             <a href="#faq">FAQ</a>
           </div>
           <div className="footer-col footer-col--wide">

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hole.io">
+  <rect width="1024" height="1024" rx="232" fill="#dafa9c"/>
+  <g>
+    <!-- office block falling in -->
+    <g transform="translate(786 238) rotate(26)">
+      <rect x="-78" y="-104" width="156" height="208" rx="5" fill="#0a0b09"/>
+      <g fill="#dafa9c">
+        <rect x="-44" y="-70" width="22" height="30" rx="2"/>
+        <rect x="2" y="-70" width="22" height="30" rx="2"/>
+        <rect x="-44" y="-18" width="22" height="30" rx="2"/>
+        <rect x="2" y="-18" width="22" height="30" rx="2"/>
+        <rect x="-44" y="34" width="22" height="30" rx="2"/>
+        <rect x="2" y="34" width="22" height="30" rx="2"/>
+      </g>
+    </g>
+    <!-- car falling in -->
+    <g transform="translate(236 754) rotate(-16)">
+      <rect x="-84" y="-41" width="168" height="82" rx="18" fill="#0a0b09"/>
+      <rect x="-38" y="-71" width="80" height="46" rx="12" fill="#0a0b09"/>
+      <circle cx="-48" cy="43" r="17" fill="#dafa9c"/>
+      <circle cx="48" cy="43" r="17" fill="#dafa9c"/>
+    </g>
+    <!-- tree falling in -->
+    <g transform="translate(796 786) rotate(10)" fill="#0a0b09">
+      <rect x="-10" y="3" width="20" height="53" rx="7"/>
+      <circle cx="0" cy="-2" r="54"/>
+      <circle cx="-38" cy="10" r="28"/>
+      <circle cx="38" cy="8" r="28"/>
+    </g>
+    <!-- debris -->
+    <g fill="#0a0b09">
+      <circle cx="330" cy="322" r="12"/>
+      <circle cx="410" cy="250" r="7"/>
+      <circle cx="700" cy="830" r="8"/>
+      <circle cx="560" cy="862" r="6"/>
+    </g>
+    <!-- the hole -->
+    <circle cx="512" cy="512" r="334" fill="#52287b"/>
+    <circle cx="512" cy="512" r="314" fill="#0a0b09"/>
+    <circle cx="512" cy="512" r="252" fill="none" stroke="#201430" stroke-width="5"/>
+    <circle cx="512" cy="512" r="170" fill="none" stroke="#161616" stroke-width="3"/>
+    <path d="M218 428 A306 306 0 0 1 417 221" fill="none" stroke="#684292" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>

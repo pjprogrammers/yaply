@@ -4,7 +4,7 @@ import { RoomClient } from "@/components/room-client";
 import { SITE_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: "Online room | Hole.io",
+  title: { absolute: "Online room | Hole.io" },
   description:
     "Join a Hole.io room, invite friends, and fill the empty seats with bots for a two-minute city-eating match.",
   alternates: { canonical: `${SITE_URL}/play` },
