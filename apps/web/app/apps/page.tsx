@@ -10,7 +10,7 @@ import "./apps.css";
 export const metadata: Metadata = {
   title: "Install the Yaply apps",
   description:
-    "Install each Yaply browser game as its own app. Yaply, Chain Reaction, Skribbl, Smash Karts and Hole.io each get a separate home-screen icon and window.",
+    "Install each Yaply browser game as its own app. Yaply, Chain Reaction, Skribbl, Smash Karts, Hole.io and Who's the Spy each get a separate home-screen icon and window.",
   alternates: { canonical: `${SITE_URL}/apps` },
   openGraph: {
     type: "website",
@@ -69,6 +69,22 @@ const apps: InstallableApp[] = [
   }),
 ];
 
+const COUNT_WORDS = [
+  "Zero",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+] as const;
+
 export default function AppsPage() {
   return (
     <>
@@ -77,7 +93,11 @@ export default function AppsPage() {
       </a>
       <Navbar initialChapter="blue" />
       <main id="main">
-        <section className="apps-hero" data-chapter="blue">
+        <section
+          className="apps-hero"
+          data-chapter="blue"
+          style={{ "--apps-count": `"${apps.length}"` } as CSSProperties}
+        >
           <div className="shell">
             <p className="apps-eyebrow">
               <span aria-hidden />
@@ -95,7 +115,10 @@ export default function AppsPage() {
         <section className="apps-section" data-chapter="black">
           <div className="shell">
             <div className="apps-section__head">
-              <h2>Five apps. Five home screens.</h2>
+              <h2>
+                {COUNT_WORDS[apps.length] ?? apps.length} apps.{" "}
+                {COUNT_WORDS[apps.length] ?? apps.length} home screens.
+              </h2>
               <p>
                 Install only what you need. Each app keeps its own origin,
                 service worker and update cycle.

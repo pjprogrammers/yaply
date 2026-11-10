@@ -3,6 +3,7 @@ import {
   HOLEIO_URL,
   SKRIBBL_URL,
   SMASHKARTS_URL,
+  WHOS_THE_SPY_URL,
 } from "@/lib/game-urls";
 
 export type GameStatus = "available" | "coming-soon";
@@ -105,8 +106,8 @@ export const games: GameEntry[] = [
     name: "Who's the Spy?",
     description: "Bluff, deduce, and expose the impostor.",
     statement: "Everyone has a word. One player is bluffing.",
-    url: null,
-    status: "coming-soon",
+    url: WHOS_THE_SPY_URL,
+    status: "available",
     tag: "Mystery",
     color: "#070707",
     disc: "#1fc27a",

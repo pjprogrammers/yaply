@@ -150,7 +150,7 @@ function stageList(siteHost: string) {
   return [
     {
       name: "Pick a game",
-      body: "Six games sit on one shelf. Chain Reaction, Skribbl, Smash Karts and Hole.io are ready now; the others are close behind.",
+      body: "Six games sit on one shelf. Chain Reaction, Skribbl, Smash Karts, Hole.io and Who's the Spy are ready now; Ludo is close behind.",
       fragment: <PickFragment />,
     },
     {

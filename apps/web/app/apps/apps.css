@@ -12,7 +12,7 @@
 }
 
 .apps-hero::after {
-  content: "5";
+  content: var(--apps-count, "6");
   position: absolute;
   right: clamp(1rem, 6vw, 7rem);
   bottom: -0.22em;

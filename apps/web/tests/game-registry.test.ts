@@ -6,13 +6,14 @@ describe("game directory", () => {
     expect(games).toHaveLength(6);
   });
 
-  it("marks the four live games as available with external URLs", () => {
+  it("marks the five live games as available with external URLs", () => {
     const live = games.filter((game) => game.status === "available");
     expect(live.map((game) => game.slug).sort()).toEqual([
       "chain-reaction",
       "holeio",
       "skribbl",
       "smash-karts",
+      "whos-the-spy",
     ]);
     for (const game of live) {
       expect(game.url).toMatch(/^https:\/\//);
@@ -22,7 +23,7 @@ describe("game directory", () => {
 
   it("keeps coming-soon games on internal preview pages", () => {
     const upcoming = games.filter((game) => game.status === "coming-soon");
-    expect(upcoming).toHaveLength(2);
+    expect(upcoming).toHaveLength(1);
     for (const game of upcoming) {
       expect(game.url).toBeNull();
       expect(gameHref(game)).toBe(`/games/${game.slug}`);

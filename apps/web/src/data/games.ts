@@ -1,4 +1,10 @@
-import { CHAIN_REACTION_URL, SKRIBBL_URL, SMASHKARTS_URL } from "@/lib/game-urls";
+import {
+  CHAIN_REACTION_URL,
+  HOLEIO_URL,
+  SKRIBBL_URL,
+  SMASHKARTS_URL,
+  WHOS_THE_SPY_URL,
+} from "@/lib/game-urls";
 
 export type GameStatus = "available" | "coming-soon";
 
@@ -37,6 +43,14 @@ export const games: GameEntry[] = [
     tag: "Arena",
   },
   {
+    id: "holeio",
+    name: "Hole.io",
+    description: "Swallow the city, one block at a time.",
+    url: HOLEIO_URL,
+    status: "available",
+    tag: "Arcade",
+  },
+  {
     id: "ludo",
     name: "Ludo",
     description: "A classic board game with friends.",
@@ -48,8 +62,8 @@ export const games: GameEntry[] = [
     id: "whos-the-spy",
     name: "Who's the Spy?",
     description: "Bluff, deduce, and expose the impostor.",
-    url: null,
-    status: "coming-soon",
+    url: WHOS_THE_SPY_URL,
+    status: "available",
     tag: "Mystery",
   },
 ];

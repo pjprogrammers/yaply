@@ -5,6 +5,7 @@ import {
   HOLEIO_URL,
   SKRIBBL_URL,
   SMASHKARTS_URL,
+  WHOS_THE_SPY_URL,
 } from "@/lib/game-urls";
 import { SITE_URL } from "@/lib/site";
 
@@ -23,6 +24,7 @@ export function GET() {
       skribblUrl: SKRIBBL_URL,
       smashkartsUrl: SMASHKARTS_URL,
       holeioUrl: HOLEIO_URL,
+      whosTheSpyUrl: WHOS_THE_SPY_URL,
       sources: {
         ...GAME_URL_SOURCES,
         main: process.env.NEXT_PUBLIC_MAIN_URL ? "env" : "vercel",

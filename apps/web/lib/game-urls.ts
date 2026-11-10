@@ -33,10 +33,16 @@ export const HOLEIO_URL = requireHttpUrl(
   "NEXT_PUBLIC_HOLEIO_URL",
 );
 
+export const WHOS_THE_SPY_URL = requireHttpUrl(
+  process.env.NEXT_PUBLIC_WHOS_THE_SPY_URL,
+  "NEXT_PUBLIC_WHOS_THE_SPY_URL",
+);
+
 /** Where each game URL came from. */
 export const GAME_URL_SOURCES = {
   chain: process.env.NEXT_PUBLIC_CHAIN_URL ? "env" : "missing",
   skribbl: process.env.NEXT_PUBLIC_SKRIBBL_URL ? "env" : "missing",
   smashkarts: process.env.NEXT_PUBLIC_SMASHKARTS_URL ? "env" : "missing",
   holeio: process.env.NEXT_PUBLIC_HOLEIO_URL ? "env" : "missing",
+  whosTheSpy: process.env.NEXT_PUBLIC_WHOS_THE_SPY_URL ? "env" : "missing",
 } as const;

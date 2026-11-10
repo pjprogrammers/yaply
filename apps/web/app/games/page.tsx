@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     siteName: "Yaply",
     title: "All browser games | Yaply",
     description:
-      "Six browser games for game night. Four live now, two on the way.",
+      "Six browser games for game night. Five live now, one on the way.",
     images: [
       {
         url: "/og.png",

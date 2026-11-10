@@ -16,6 +16,7 @@ describe("game URL environment variables", () => {
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "");
     vi.stubEnv("NEXT_PUBLIC_HOLEIO_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_WHOS_THE_SPY_URL", "");
 
     await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_CHAIN_URL");
   });
@@ -25,12 +26,14 @@ describe("game URL environment variables", () => {
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "https://draw.example.com/");
     vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "https://karts.example.com/");
     vi.stubEnv("NEXT_PUBLIC_HOLEIO_URL", "https://hole.example.com/");
+    vi.stubEnv("NEXT_PUBLIC_WHOS_THE_SPY_URL", "https://spy.example.com/");
 
     const {
       CHAIN_REACTION_URL,
       SKRIBBL_URL,
       SMASHKARTS_URL,
       HOLEIO_URL,
+      WHOS_THE_SPY_URL,
       GAME_URL_SOURCES,
     } = await loadGameUrls();
 
@@ -38,11 +41,13 @@ describe("game URL environment variables", () => {
     expect(SKRIBBL_URL).toBe("https://draw.example.com");
     expect(SMASHKARTS_URL).toBe("https://karts.example.com");
     expect(HOLEIO_URL).toBe("https://hole.example.com");
+    expect(WHOS_THE_SPY_URL).toBe("https://spy.example.com");
     expect(GAME_URL_SOURCES).toEqual({
       chain: "env",
       skribbl: "env",
       smashkarts: "env",
       holeio: "env",
+      whosTheSpy: "env",
     });
   });
 
@@ -51,6 +56,7 @@ describe("game URL environment variables", () => {
     vi.stubEnv("NEXT_PUBLIC_SKRIBBL_URL", "skribbl.example.com");
     vi.stubEnv("NEXT_PUBLIC_SMASHKARTS_URL", "https://karts.example.com");
     vi.stubEnv("NEXT_PUBLIC_HOLEIO_URL", "https://hole.example.com");
+    vi.stubEnv("NEXT_PUBLIC_WHOS_THE_SPY_URL", "https://spy.example.com");
 
     await expect(loadGameUrls()).rejects.toThrow("NEXT_PUBLIC_SKRIBBL_URL");
   });
