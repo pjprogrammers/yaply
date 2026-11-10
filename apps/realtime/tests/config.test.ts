@@ -238,10 +238,16 @@ describe("Worker production configuration", () => {
     // Keep this list in sync with the current Vercel project domains.
     expect(allowedOrigins).toEqual([
       "https://yaplygames.vercel.app",
+      "https://skribbl.yaplygames.vercel.app",
+      "https://chain.yaplygames.vercel.app",
+      "https://holeio.yaplygames.vercel.app",
+      "https://smashkarts.yaplygames.vercel.app",
+      "https://spy.yaplygames.vercel.app",
       "https://yaply-skribbl.vercel.app",
       "https://yaply-chain.vercel.app",
       "https://yaply-smashkarts.vercel.app",
       "https://yaply-holeio.vercel.app",
+      "https://yaply-whos-the-spy.vercel.app",
     ]);
   });
 

@@ -6,7 +6,7 @@ compatibility_date = "2026-10-01"
 # uses the production block below instead.
 [vars]
 ENVIRONMENT = "development"
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005"
 
 [observability]
 enabled = true
@@ -24,10 +24,12 @@ new_sqlite_classes = ["GameRoom"]
 
 [env.production.vars]
 ENVIRONMENT = "production"
-# Every deployed frontend origin allowed to call the Worker. Update this list
-# when a domain changes. Requests without an allowed Origin are rejected in
+# Every deployed frontend origin allowed to call the Worker. Both the new
+# *.yaplygames.vercel.app subdomains and the legacy project domains are kept
+# until every Vercel project has fully moved over. Update this list when a
+# domain changes. Requests without an allowed Origin are rejected in
 # production, so a missing domain is a hard outage for that site.
-ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app"
+ALLOWED_ORIGINS = "https://yaplygames.vercel.app,https://skribbl.yaplygames.vercel.app,https://chain.yaplygames.vercel.app,https://holeio.yaplygames.vercel.app,https://smashkarts.yaplygames.vercel.app,https://spy.yaplygames.vercel.app,https://yaply-skribbl.vercel.app,https://yaply-chain.vercel.app,https://yaply-smashkarts.vercel.app,https://yaply-holeio.vercel.app,https://yaply-whos-the-spy.vercel.app"
 
 [env.production.durable_objects]
 bindings = [
