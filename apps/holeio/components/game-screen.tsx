@@ -222,6 +222,29 @@ export function GameScreen() {
     >
       <div className="game-canvas" ref={containerRef} aria-hidden />
 
+      {snapshot && snapshot.fallProgress > 0 ? (
+        <div
+          className="fall-veil"
+          style={{
+            // MoveCameraIntoHole enters the interior at 0.7833 s and reaches
+            // black just before OnEnd at 1.1667 s.
+            opacity: Math.min(
+              1,
+              Math.max(
+                0,
+                (snapshot.fallProgress - 0.7833 / 1.1667) /
+                  (0.97 - 0.7833 / 1.1667),
+              ),
+            ),
+          }}
+          aria-hidden
+        >
+          <span>
+            Swallowed by {snapshot.swallowedBy ?? "a bigger hole"}
+          </span>
+        </div>
+      ) : null}
+
       {!ready && !error ? (
         <div className="game-loading">
           <span className="game-loading__hole" aria-hidden />

@@ -68,6 +68,8 @@ export interface GameSnapshot {
   tierLabel: string;
   tierProgress: number;
   totalRivals: number;
+  /** 0 when alive, ramps to 1 while the camera dives into the winning hole. */
+  fallProgress: number;
 }
 
 export interface MatchResult {

@@ -29,6 +29,12 @@ import type {
 
 const PLAYER_ID = "player";
 const BEST_KEY = "holeio:best";
+/** MoveCameraIntoHole: 72 frames @ 60 fps, OnEnd at 1.1667 s. */
+const FALL_CAMERA_SECONDS = 1.1667;
+/** OnEnterInteriorEvent from the same reference clip. */
+const FALL_INTERIOR_SECONDS = 0.7833;
+/** BlackHoleTop frame count / sample rate (67 frames @ 60 fps). */
+const HOLE_COLLAPSE_SECONDS = 67 / 60;
 
 interface AiState {
   cooldown: number;
@@ -65,6 +71,8 @@ interface HoleActor {
   discUniforms: { uColor: { value: THREE.Color }; uTime: { value: number } };
   swirl: THREE.Mesh;
   rim: THREE.Mesh;
+  rimUnder: THREE.Mesh;
+  centerRing: THREE.Mesh;
   label: THREE.Sprite;
   labelMaterial: THREE.SpriteMaterial;
   labelCanvas: HTMLCanvasElement;
@@ -152,7 +160,21 @@ export class HoleEngine {
   private snapCamera = true;
   private shake = 0;
   private lastPlayerFeed = 0;
+  private playerTier = -1;
+  private fallDive: {
+    x: number;
+    z: number;
+    radius: number;
+    time: number;
+    duration: number;
+    fromX: number;
+    fromY: number;
+    fromZ: number;
+  } | null = null;
   private readonly swirlTexture: THREE.CanvasTexture;
+  private readonly holeRimTop: THREE.Texture;
+  private readonly holeRimBottom: THREE.Texture;
+  private readonly holeCenter: THREE.Texture;
   private disposed = false;
   private inputAccumulator = 0;
   private inputSeq = 0;
@@ -198,6 +220,9 @@ export class HoleEngine {
     this.city = new City(this.scene, options.assets, 20261108);
     this.effects = new Effects(this.scene);
     this.swirlTexture = this.createSwirlTexture();
+    this.holeRimTop = this.loadHoleTexture("rim-top");
+    this.holeRimBottom = this.loadHoleTexture("rim-bottom");
+    this.holeCenter = this.loadHoleTexture("center-ring");
     this.audio.setMuted(options.muted);
 
     this.holes.push(...this.createInitialHoles());
@@ -260,6 +285,7 @@ export class HoleEngine {
     this.muted = muted;
     this.audio.setMuted(muted);
     this.audio.unlock();
+    this.audio.playMusic();
     this.resetMatch();
     this.phase = "countdown";
     this.countdown = COUNTDOWN_SECONDS;
@@ -272,6 +298,7 @@ export class HoleEngine {
   /** Host engine entry point for a fresh online match. */
   startOnlineMatch() {
     this.audio.unlock();
+    this.audio.playMusic();
     this.resetMatch();
     this.phase = "countdown";
     this.countdown = COUNTDOWN_SECONDS;
@@ -288,6 +315,7 @@ export class HoleEngine {
    */
   startOnlineHost(seed?: HoleioMatchSnapshot | null) {
     this.audio.unlock();
+    this.audio.playMusic();
     if (seed && seed.round === this.round) {
       this.applySnapshotState(seed);
       this.snapCamera = true;
@@ -338,6 +366,7 @@ export class HoleEngine {
         existing.discUniforms.uColor.value.set(player.color);
         (existing.swirl.material as THREE.MeshBasicMaterial).color.set(player.color);
         (existing.rim.material as THREE.MeshBasicMaterial).color.set(player.color);
+        (existing.rimUnder.material as THREE.MeshBasicMaterial).color.set(player.color);
         this.drawLabel(existing);
         continue;
       }
@@ -378,9 +407,14 @@ export class HoleEngine {
     this.swallowedBy = null;
     this.winnerName = null;
     this.feed.length = 0;
+    this.fallDive = null;
+    this.audio.stopMusic();
+    this.audio.setMoving(false);
     this.city.reset();
     this.setHolesVisible(false);
     this.cameraAngle = 0.6;
+    this.camera.fov = this.camera.aspect < 0.9 ? 58 : 50;
+    this.camera.updateProjectionMatrix();
     this.publish();
   }
 
@@ -392,6 +426,7 @@ export class HoleEngine {
     this.clearKeys();
     this.stickX = 0;
     this.stickY = 0;
+    this.audio.setMoving(false);
     this.publish();
   }
 
@@ -438,7 +473,11 @@ export class HoleEngine {
     for (const hole of this.holes) this.disposeHole(hole);
     this.city.dispose();
     this.effects.dispose();
+    this.audio.dispose();
     this.swirlTexture.dispose();
+    this.holeRimTop.dispose();
+    this.holeRimBottom.dispose();
+    this.holeCenter.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
@@ -710,14 +749,52 @@ export class HoleEngine {
     swirl.renderOrder = 2;
     group.add(swirl);
 
+    const ringGeometry = new THREE.PlaneGeometry(1, 1);
+    const ringMaterial = (
+      map: THREE.Texture,
+      tint: THREE.ColorRepresentation,
+    ) =>
+      new THREE.MeshBasicMaterial({
+        map,
+        color: tint,
+        transparent: true,
+        alphaTest: 0.01,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
+      });
+
+    // Prefab BlackHole/Skin: Bottom (5.252 x 5.369 * 0.335), Up
+    // (4.601 x 4.671 * 0.335) and Center (2 x 2 * 0.096).
     const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(1.008, 0.032, 8, 64),
-      new THREE.MeshBasicMaterial({ color }),
+      ringGeometry,
+      ringMaterial(this.holeRimTop, color),
     );
     rim.rotation.x = -Math.PI / 2;
-    rim.position.y = 0.07;
-    rim.renderOrder = 3;
+    rim.position.y = 0.075;
+    rim.scale.set(1.54149, 1.56481, 1);
+    rim.renderOrder = 4;
     group.add(rim);
+
+    const rimUnder = new THREE.Mesh(
+      ringGeometry,
+      ringMaterial(this.holeRimBottom, color),
+    );
+    rimUnder.rotation.x = -Math.PI / 2;
+    rimUnder.position.y = 0.068;
+    rimUnder.scale.set(1.75951, 1.79897, 1);
+    rimUnder.renderOrder = 3;
+    group.add(rimUnder);
+
+    const centerRing = new THREE.Mesh(
+      ringGeometry,
+      ringMaterial(this.holeCenter, new THREE.Color(0.149, 0.063, 0.275)),
+    );
+    centerRing.rotation.x = -Math.PI / 2;
+    centerRing.position.y = 0.1;
+    centerRing.scale.setScalar(0.192568);
+    centerRing.renderOrder = 5;
+    group.add(centerRing);
 
     group.visible = false;
     this.scene.add(group);
@@ -765,6 +842,8 @@ export class HoleEngine {
       discUniforms,
       swirl,
       rim,
+      rimUnder,
+      centerRing,
       label,
       labelMaterial,
       labelCanvas,
@@ -815,6 +894,20 @@ export class HoleEngine {
     ctx.fillText(text, w / 2, 58, boxWidth - pad);
     const texture = hole.labelMaterial.map;
     if (texture) texture.needsUpdate = true;
+  }
+
+  /**
+   * Exact BlackHole sprite layers. The reference prefab uses two ring sprites
+   * plus a small centre ring (SharedAssets1: trou noir dessus/dessous,
+   * CircleBig) around an inverted black cylinder.
+   */
+  private loadHoleTexture(name: string): THREE.Texture {
+    const texture = new THREE.TextureLoader().load(`/assets/hole/${name}.png`);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true;
+    return texture;
   }
 
   private createSwirlTexture(): THREE.CanvasTexture {
@@ -939,6 +1032,10 @@ export class HoleEngine {
     this.feed.length = 0;
     this.lastPlayerFeed = 0;
     this.shake = 0;
+    this.playerTier = -1;
+    this.fallDive = null;
+    this.camera.fov = this.camera.aspect < 0.9 ? 58 : 50;
+    this.camera.updateProjectionMatrix();
     this.setHolesVisible(true);
     for (const hole of this.holes) {
       hole.group.visible = true;
@@ -1131,6 +1228,7 @@ export class HoleEngine {
         hole.discUniforms.uColor.value.set(entry.color);
         (hole.swirl.material as THREE.MeshBasicMaterial).color.set(entry.color);
         (hole.rim.material as THREE.MeshBasicMaterial).color.set(entry.color);
+        (hole.rimUnder.material as THREE.MeshBasicMaterial).color.set(entry.color);
         this.drawLabel(hole);
       }
       hole.x = entry.x;
@@ -1147,7 +1245,7 @@ export class HoleEngine {
       if (entry.alive) {
         hole.collapse = 0;
       } else {
-        hole.collapse = Math.max(hole.collapse, 0.6);
+        hole.collapse = Math.max(hole.collapse, HOLE_COLLAPSE_SECONDS);
       }
     }
   }
@@ -1286,6 +1384,12 @@ export class HoleEngine {
     this.updateFalling(dt);
     this.updateRespawns(dt);
     this.effects.update(dt);
+    if (this.fallDive) {
+      this.fallDive.time = Math.min(
+        this.fallDive.duration,
+        this.fallDive.time + clockDt,
+      );
+    }
     this.updateFeed();
     this.publishIfDue();
 
@@ -1323,6 +1427,7 @@ export class HoleEngine {
         continue;
       }
       if (hole.spawnGuard > 0) hole.spawnGuard = Math.max(0, hole.spawnGuard - dt);
+      if (hole.isPlayer && this.phase === "playing") this.syncPlayerTier(hole);
 
       if (this.phase === "playing") {
         const desired = hole.isPlayer
@@ -1369,6 +1474,13 @@ export class HoleEngine {
 
       this.updateHoleVisual(hole, dt);
     }
+
+    const player = this.holes.find((hole) => hole.isPlayer);
+    this.audio.setMoving(
+      this.phase === "playing" &&
+        Boolean(player?.alive) &&
+        Math.hypot(player?.vx ?? 0, player?.vz ?? 0) > 0.7,
+    );
 
     if (this.phase === "playing") {
       this.resolveHoleCollisions();
@@ -1567,16 +1679,12 @@ export class HoleEngine {
       if (largest && largest.value >= 6) this.audio.swallow(largest.value);
       if (largest && largest.value >= 80) {
         this.shake = Math.min(0.5, this.shake + 0.22);
-        this.effects.ring(hole.x, hole.z, hole.color, hole.radius * 1.8);
-      }
-      if (largest && largest.value >= 160) {
-        this.effects.burst(
-          largest.x,
-          1,
-          largest.z,
-          largest.color,
-          22,
-          Math.min(9, largest.value / 30),
+        this.effects.swallow(
+          hole.x,
+          hole.z,
+          hole.color,
+          Math.max(2, hole.radius * 1.6),
+          largest.value >= 160,
         );
       }
       if (largest && largest.value >= 220 && this.wallTime - this.lastPlayerFeed > 1.1) {
@@ -1584,6 +1692,7 @@ export class HoleEngine {
         this.addFeed(`Swallowed a ${largest.label} +${largest.value}`, "player");
       }
     } else if (largest && largest.value >= 200 && this.rng() < 0.25) {
+      this.effects.smoke(largest.x, largest.y + 0.5, largest.z, largest.color, 6, 2);
       this.addFeed(`${hole.name} swallowed a ${largest.label}`, "rival");
     }
     void dt;
@@ -1594,12 +1703,17 @@ export class HoleEngine {
     obj.fall = 0;
     obj.fallX = hole.x;
     obj.fallZ = hole.z;
+    // The reference leans every swallowed prop into the drain: it arcs around
+    // the rim, tumbles faster as it is pulled down, and shrinks out of sight.
+    obj.fallAngle = Math.atan2(obj.z - hole.z, obj.x - hole.x);
+    obj.fallRadius = Math.hypot(obj.x - hole.x, obj.z - hole.z);
+    obj.fallSpin = (this.rng() - 0.5) * 5.5;
+    obj.fallTilt = (this.rng() - 0.5) * 0.6;
     if (obj.windowIndices.length > 0) this.city.hideWindows();
     if (hole.isPlayer) {
-      this.effects.burst(obj.x, obj.y + 0.3, obj.z, obj.color, 6, 3);
-      if (obj.value >= 60) this.audio.swallow(obj.value);
+      this.effects.smoke(obj.x, obj.y + 0.25, obj.z, obj.color, 3, 1.6, 1.4);
     } else if (obj.value >= 120 && this.rng() < 0.2) {
-      this.effects.burst(obj.x, obj.y + 0.3, obj.z, obj.color, 4, 2.5);
+      this.effects.smoke(obj.x, obj.y + 0.25, obj.z, obj.color, 2, 1.4, 1.2);
     }
   }
 
@@ -1616,11 +1730,21 @@ export class HoleEngine {
         continue;
       }
       const t = obj.fall;
-      if (obj.fallX !== undefined) obj.x += (obj.fallX - obj.x) * Math.min(1, dt * 4);
-      if (obj.fallZ !== undefined) obj.z += (obj.fallZ - obj.z) * Math.min(1, dt * 4);
-      const drop = easeIn(t) * (obj.height + 4);
-      const scale = 1 - t * 0.9;
-      writeObject(obj, drop, t * 3.6, Math.max(0.05, scale), t * 0.55);
+      const pull = easeIn(t);
+      const holeX = obj.fallX ?? obj.x;
+      const holeZ = obj.fallZ ?? obj.z;
+      if (obj.fallRadius !== undefined) {
+        const radius = obj.fallRadius * (1 - pull);
+        const angle =
+          (obj.fallAngle ?? 0) + pull * (Math.PI * 1.15 + Math.abs(obj.fallSpin ?? 0) * 0.12);
+        obj.x = holeX + Math.cos(angle) * radius;
+        obj.z = holeZ + Math.sin(angle) * radius;
+      }
+      const drop = pull * (obj.height + 5.5);
+      const scale = Math.max(0.035, 1 - pull * 0.95);
+      const spin = (obj.fallSpin ?? 2.4) * t + t * 4.2;
+      const tilt = (obj.fallTilt ?? 0.35) * t + t * 0.35;
+      writeObject(obj, drop, spin, scale, tilt);
     }
   }
 
@@ -1694,7 +1818,7 @@ export class HoleEngine {
 
   private eatHole(big: HoleActor, small: HoleActor) {
     small.alive = false;
-    small.collapse = 0.75;
+    small.collapse = HOLE_COLLAPSE_SECONDS;
     small.respawnIn = 5;
     small.vx = 0;
     small.vz = 0;
@@ -1702,24 +1826,43 @@ export class HoleEngine {
     big.eatenHoles += 1;
     big.score += Math.round(small.score * 0.5 + 100);
     big.radius = radiusForScore(big.score);
-    this.effects.ring(small.x, small.z, big.color, Math.max(4, big.radius * 2));
-    this.effects.burst(small.x, 0.5, small.z, small.color, 26, 8);
-    this.audio.holeEaten();
+    this.effects.swallow(
+      small.x,
+      small.z,
+      small.color,
+      Math.max(3, big.radius * 1.5),
+      true,
+    );
+    this.effects.swirl(small.x, small.z, big.color, Math.max(2.5, big.radius));
     if (big.isPlayer) {
       this.botsEaten += 1;
       this.shake = Math.min(0.6, this.shake + 0.45);
       this.addFeed(`You swallowed ${small.name}`, "player");
-      this.audio.bigEat();
+      this.audio.holeEaten();
+      this.audio.killOpponent();
     } else if (small.isPlayer) {
       this.swallowedBy = big.name;
       this.playerEaten += 1;
       this.addFeed(`${big.name} swallowed you`, "danger");
       this.audio.bigEat();
+      // The reference camera dives into the winning hole and fades out while
+      // the swallowed hole collapses, then the death/results screen appears.
+      this.fallDive = {
+        x: small.x,
+        z: small.z,
+        radius: Math.max(3, small.radius),
+        time: 0,
+        duration: FALL_CAMERA_SECONDS,
+        fromX: this.camera.position.x,
+        fromY: this.camera.position.y,
+        fromZ: this.camera.position.z,
+      };
       // Solo runs are over the moment the player is eaten. Online holes come
       // back like every other seat so the match keeps its full two minutes.
-      if (this.role === "local") this.finishTimer = 1.25;
+      if (this.role === "local") this.finishTimer = FALL_CAMERA_SECONDS + 0.18;
       this.shake = 0.7;
     } else {
+      this.audio.holeEaten();
       this.addFeed(`${big.name} swallowed ${small.name}`, "rival");
     }
   }
@@ -1749,7 +1892,13 @@ export class HoleEngine {
     hole.eatenBy = null;
     hole.vx = 0;
     hole.vz = 0;
-    if (hole.isPlayer) this.swallowedBy = null;
+    if (hole.isPlayer) {
+      this.swallowedBy = null;
+      this.fallDive = null;
+      this.snapCamera = true;
+      this.camera.fov = this.camera.aspect < 0.9 ? 58 : 50;
+      this.camera.updateProjectionMatrix();
+    }
     if (hole.ai) {
       hole.ai.target = null;
       hole.ai.targetHole = null;
@@ -1758,6 +1907,17 @@ export class HoleEngine {
     this.audio.respawn();
     this.effects.ring(hole.x, hole.z, hole.color, hole.radius * 1.8);
     this.effects.burst(hole.x, 0.5, hole.z, hole.color, 10, 4);
+  }
+
+  /** Plays the reference size-up sting the moment the hole crosses a tier. */
+  private syncPlayerTier(hole: HoleActor) {
+    const index = tierForRadius(hole.radius).index;
+    if (index <= this.playerTier) return;
+    if (this.playerTier >= 0) {
+      this.audio.sizeUp();
+      this.effects.swallow(hole.x, hole.z, hole.color, hole.radius * 1.35, true);
+    }
+    this.playerTier = index;
   }
 
   private updateHoleVisual(hole: HoleActor, dt: number) {
@@ -1770,7 +1930,7 @@ export class HoleEngine {
 
     let scale = hole.radius;
     if (!hole.alive) {
-      const t = Math.max(0, hole.collapse) / 0.75;
+      const t = Math.max(0, hole.collapse) / HOLE_COLLAPSE_SECONDS;
       scale = Math.max(0.001, hole.radius * t);
     }
     hole.group.position.set(hole.x, 0, hole.z);
@@ -1778,7 +1938,6 @@ export class HoleEngine {
     hole.discUniforms.uTime.value += dt;
     (hole.swirl.material as THREE.MeshBasicMaterial).opacity = 0.28 + Math.sin(this.elapsed * 2.2 + hole.x) * 0.06;
     hole.swirl.rotation.z += dt * 0.75;
-    hole.rim.rotation.z -= dt * 0.25;
 
     if (hole.label.visible) {
       const labelScale = 0.78 + Math.min(1.1, hole.radius * 0.085);
@@ -1788,7 +1947,9 @@ export class HoleEngine {
         2.2 + Math.max(1.5, hole.radius * 0.62),
         hole.z,
       );
-      hole.labelMaterial.opacity = hole.alive ? 1 : Math.max(0, hole.collapse / 0.75);
+      hole.labelMaterial.opacity = hole.alive
+        ? 1
+        : Math.max(0, hole.collapse / HOLE_COLLAPSE_SECONDS);
     }
   }
 
@@ -1815,13 +1976,48 @@ export class HoleEngine {
         // private mode still plays.
       }
     }
+    this.audio.setMoving(false);
     this.audio.finish(Boolean(player && top === player && player.alive));
     this.publish();
   }
 
   // ------------------------------------------------------------------ camera
 
+  /**
+   * Hole Arena's MoveCameraIntoHole: the camera spirals from its follow offset
+   * into the winning hole while the FOV opens up and the screen drops to black.
+   */
+  private updateFallCamera() {
+    const dive = this.fallDive;
+    if (!dive) return;
+    const t = Math.min(1, dive.time / dive.duration);
+    const e = t * t * (3 - 2 * t);
+    const startRadius = Math.max(
+      2, Math.hypot(dive.fromX - dive.x, dive.fromZ - dive.z),
+    );
+    const startAngle = Math.atan2(dive.fromZ - dive.z, dive.fromX - dive.x);
+    const radius = startRadius * (1 - e * e);
+    const angle = startAngle + e * Math.PI * 1.45;
+    this.camera.position.set(
+      dive.x + Math.cos(angle) * radius,
+      dive.fromY + (-2.4 - dive.fromY) * e * e,
+      dive.z + Math.sin(angle) * radius,
+    );
+    this.camera.lookAt(dive.x, -3 * e, dive.z);
+    this.camera.fov = (this.camera.aspect < 0.9 ? 58 : 50) + e * 26;
+    this.camera.updateProjectionMatrix();
+  }
+
   private updateCamera(dt: number) {
+    if (this.fallDive) {
+      this.updateFallCamera();
+      return;
+    }
+    const baseFov = this.camera.aspect < 0.9 ? 58 : 50;
+    if (Math.abs(this.camera.fov - baseFov) > 0.01) {
+      this.camera.fov = baseFov;
+      this.camera.updateProjectionMatrix();
+    }
     if (this.phase === "menu" || this.phase === "boot") {
       this.cameraAngle += dt * 0.045;
       const { minX, maxX, minZ, maxZ } = this.city.bounds;
@@ -1930,6 +2126,9 @@ export class HoleEngine {
       tierLabel: tier.label,
       tierProgress: tier.progress,
       totalRivals: Math.max(0, holes.length - 1),
+      fallProgress: this.fallDive
+        ? Math.min(1, this.fallDive.time / this.fallDive.duration)
+        : 0,
     };
     this.options.onSnapshot(snapshot);
     this.publishMatch();

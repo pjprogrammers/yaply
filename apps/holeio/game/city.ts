@@ -41,6 +41,9 @@ export interface WorldObject {
   homeX: number;
   homeY: number;
   homeZ: number;
+  homeRotation: number;
+  /** True for characters placed exactly where the reference scene has them. */
+  anchored: boolean;
   rotation: number;
   width: number;
   depth: number;
@@ -61,6 +64,10 @@ export interface WorldObject {
   /** Set when the object starts falling into a hole. */
   fallX?: number;
   fallZ?: number;
+  fallAngle?: number;
+  fallRadius?: number;
+  fallSpin?: number;
+  fallTilt?: number;
 }
 
 const PALETTE = [
@@ -255,6 +262,8 @@ export class City {
         homeX: source.x,
         homeY: source.y,
         homeZ: source.z,
+        homeRotation: 0,
+        anchored: false,
         rotation: 0,
         width: source.w,
         depth: source.d,
@@ -284,6 +293,11 @@ export class City {
     layout: BigCityLayout,
     variants: BigCityAssets["variants"],
   ) {
+    if (layout.people && layout.people.length > 0) {
+      this.buildExactPeople(layout, variants);
+      return;
+    }
+
     const groups = layout.pedMeshes.filter(
       (entry) => (variants[entry.index]?.length ?? 0) > 0,
     );
@@ -318,6 +332,7 @@ export class City {
         homeZ: z,
         range: range(this.rng, 4, 12),
       };
+      const rotation = range(this.rng, 0, Math.PI * 2);
       const object: WorldObject = {
         id: this.nextId++,
         kind: "person",
@@ -328,7 +343,9 @@ export class City {
         homeX: x,
         homeY: 0.08,
         homeZ: z,
-        rotation: range(this.rng, 0, Math.PI * 2),
+        homeRotation: rotation,
+        anchored: false,
+        rotation,
         width: 0.7,
         depth: 0.7,
         height: 1.8,
@@ -350,6 +367,98 @@ export class City {
         respawnable: true,
         respawnDelay: 14,
         motion,
+        color: new THREE.Color(pick(this.rng, SHIRTS)),
+      };
+      target.used += 1;
+      this.objects.push(object);
+      writeObject(object);
+    }
+  }
+
+  /**
+   * Reference scene characters. Unlike the procedural crowd these keep the
+   * exact position and facing stored in the Arena level: 81 idle pedestrians,
+   * 27 random dancers, 9 nurses and 6 police dancers.
+   */
+  private buildExactPeople(
+    layout: BigCityLayout,
+    variants: BigCityAssets["variants"],
+  ) {
+    const people = layout.people ?? [];
+    const meshes = layout.pedMeshes.filter(
+      (entry) => (variants[entry.index]?.length ?? 0) > 0,
+    );
+    if (meshes.length === 0) return;
+
+    const counts = new Map<number, number>();
+    for (const person of people) {
+      const entry =
+        meshes.find((candidate) => candidate.index === person.m) ?? meshes[0];
+      counts.set(entry.index, (counts.get(entry.index) ?? 0) + 1);
+    }
+
+    const pools = new Map<
+      number,
+      { pool: PrimitivePool; entry: (typeof meshes)[number]; used: number }
+    >();
+    for (const entry of meshes) {
+      const count = counts.get(entry.index) ?? 0;
+      if (count === 0) continue;
+      const pool = new PrimitivePool(
+        variants[entry.index],
+        count,
+        this.group,
+        false,
+        true,
+      );
+      this.pools.push(pool);
+      this.pedPools.push({ pool, used: 0, capacity: count });
+      pools.set(entry.index, { pool, entry, used: 0 });
+    }
+
+    for (const person of people) {
+      const entry =
+        meshes.find((candidate) => candidate.index === person.m) ?? meshes[0];
+      const target = pools.get(entry.index);
+      if (!target || target.used >= (counts.get(entry.index) ?? 0)) continue;
+      const label =
+        person.g === "cops" || person.g === "nurses" || person.g === "dance"
+          ? "dancer"
+          : "pedestrian";
+      const object: WorldObject = {
+        id: this.nextId++,
+        kind: "person",
+        label,
+        x: person.x,
+        y: person.y,
+        z: person.z,
+        homeX: person.x,
+        homeY: person.y,
+        homeZ: person.z,
+        homeRotation: person.r,
+        anchored: true,
+        rotation: person.r,
+        width: 0.7,
+        depth: 0.7,
+        height: target.entry.height || 1.8,
+        value: 3,
+        need: 0.4,
+        parts: [
+          {
+            pool: target.pool,
+            index: target.used,
+            local: new THREE.Matrix4(),
+          },
+        ],
+        mesh: null,
+        windowIndices: [],
+        state: "idle",
+        fall: 0,
+        fallDuration: 0.45,
+        respawn: 0,
+        respawnable: true,
+        respawnDelay: 14,
+        motion: null,
         color: new THREE.Color(pick(this.rng, SHIRTS)),
       };
       target.used += 1;
@@ -429,12 +538,20 @@ export class City {
     object.x = object.homeX;
     object.z = object.homeZ;
     object.y = object.homeY;
-    object.rotation = 0;
+    object.rotation = object.homeRotation;
     object.motion = null;
     writeObject(object);
   }
 
   respawnPerson(object: WorldObject) {
+    if (object.anchored) {
+      object.x = object.homeX;
+      object.y = object.homeY;
+      object.z = object.homeZ;
+      object.rotation = object.homeRotation;
+      writeObject(object);
+      return;
+    }
     const spawn = pick(this.rng, this.pedSpawns);
     const x = spawn.x + range(this.rng, -2.5, 2.5);
     const z = spawn.z + range(this.rng, -2.5, 2.5);
@@ -515,6 +632,7 @@ export class City {
           object.x = object.homeX;
           object.y = object.homeY;
           object.z = object.homeZ;
+          object.rotation = object.homeRotation;
           writeObject(object);
         }
         if (object.mesh) object.mesh.visible = true;
@@ -531,7 +649,7 @@ export class City {
       object.x = object.homeX;
       object.z = object.homeZ;
       object.y = object.homeY;
-      object.rotation = 0;
+      object.rotation = object.homeRotation;
       if (object.kind === "person") {
         this.respawnPerson(object);
       } else {

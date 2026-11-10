@@ -31,6 +31,22 @@ export interface BigCityLayout {
     r: number[];
   }[];
   pedMeshes: { name: string; index: number; height: number }[];
+  /**
+   * Exact character placements from the reference Arena scene. The Unity
+   * export maps world space as x' = 0.6x - 15.252, z' = -0.6z - 0.216 and
+   * flips Y rotation so these entries can be dropped straight into the game.
+   */
+  people?: {
+    x: number;
+    y: number;
+    z: number;
+    /** Y rotation in radians. */
+    r: number;
+    /** Mesh variant index from pedMeshes. */
+    m: number;
+    /** Reference group: idle, cops, nurses or dance. */
+    g?: string;
+  }[];
   carMeshes: number[];
 }
 
