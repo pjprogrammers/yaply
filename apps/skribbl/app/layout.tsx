@@ -22,7 +22,7 @@ const sketch = Shantell_Sans({
 // Search Console verification for the yaplygames.vercel.app property. The env
 // var can override it for other deployments.
 const DEFAULT_GOOGLE_SITE_VERIFICATION =
-  "lrihOhmRTJmkRzSy5Pv3_Fe36k_dGKd23rPrL7ftpv8";
+  "QAhEX042VQs3NTq6wQ37xejkP5ySnigtDpIA0IY4EgY";
 
 const googleVerification =
   process.env.GOOGLE_SITE_VERIFICATION?.trim() ||

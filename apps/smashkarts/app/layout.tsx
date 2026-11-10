@@ -21,7 +21,7 @@ const body = Inter({
 // var can override it for other deployments.
 const googleVerification =
   process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
-  "lrihOhmRTJmkRzSy5Pv3_Fe36k_dGKd23rPrL7ftpv8";
+  "QAhEX042VQs3NTq6wQ37xejkP5ySnigtDpIA0IY4EgY";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
