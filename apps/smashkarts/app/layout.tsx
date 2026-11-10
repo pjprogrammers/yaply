@@ -17,8 +17,17 @@ const body = Inter({
   display: "swap",
 });
 
+// Search Console verification for the yaplygames.vercel.app property. The env
+// var can override it for other deployments.
+const googleVerification =
+  process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
+  "lrihOhmRTJmkRzSy5Pv3_Fe36k_dGKd23rPrL7ftpv8";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  verification: {
+    google: googleVerification,
+  },
   title: "Smash Karts — a browser kart arena",
   description:
     "Smash Karts is a free-for-all kart arena in your browser. Three scrap-built maps, eleven weapons, and up to seven bots. Drift, fire, repeat.",
