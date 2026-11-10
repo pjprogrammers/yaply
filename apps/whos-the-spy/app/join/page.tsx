@@ -27,11 +27,7 @@ function JoinContent() {
       setError("Room codes are six characters.");
       return;
     }
-    const name = nickname.trim();
-    if (!name) {
-      setError("Add the nickname the table should see.");
-      return;
-    }
+    const name = nickname.trim() || "Player";
     storeNickname(name);
     router.push(`/room/${code}?name=${encodeURIComponent(name)}`);
   };

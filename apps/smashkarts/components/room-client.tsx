@@ -20,7 +20,7 @@ import { useGameRoom } from "@yaply/shared/react";
 import type { ConnectionStatus } from "@yaply/shared/client";
 import type { GameEngine } from "@/game/engine";
 import { DEFAULT_MAP, MAP_LIST } from "@/game/maps";
-import { DURATION_OPTIONS, KILL_OPTIONS } from "@/lib/settings";
+import { DEFAULT_SETTINGS, DURATION_OPTIONS, KILL_OPTIONS } from "@/lib/settings";
 import {
   REALTIME_URL,
   inviteUrl,
@@ -97,28 +97,24 @@ export function RoomClient({ code }: { code: string }) {
   const nameParam = (searchParams.get("name") ?? "").trim().slice(0, MAX_NICKNAME_LENGTH);
   const [joined, setJoined] = useState(nameParam.length > 0);
   const [gateName, setGateName] = useState(nameParam);
-  const [gateError, setGateError] = useState("");
   const createdByHost = searchParams.get("host") === "1";
 
   const settings = useMemo(() => readHostSettings(searchParams), [searchParams]);
 
   useEffect(() => {
-    if (joined || gateName) return;
     const stored = readStoredNickname();
+    if (!stored) return;
     // localStorage is unavailable during hydration; fill the field once the
     // client has mounted instead of forcing a hydration-mismatched input value.
+    // Clearing the field afterwards must stay empty, so hydrate only on mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (stored) setGateName(stored.slice(0, MAX_NICKNAME_LENGTH));
-  }, [gateName, joined]);
+    setGateName((current) => current || stored.slice(0, MAX_NICKNAME_LENGTH));
+  }, []);
 
   if (!joined) {
     const submit = (event: React.FormEvent) => {
       event.preventDefault();
-      const next = gateName.trim();
-      if (!next) {
-        setGateError("Add a nickname first.");
-        return;
-      }
+      const next = gateName.trim() || DEFAULT_SETTINGS.name;
       storeNickname(next);
       setGateName(next);
       setJoined(true);
@@ -148,7 +144,6 @@ export function RoomClient({ code }: { code: string }) {
                   value={gateName}
                   onChange={(event) => {
                     setGateName(event.target.value);
-                    setGateError("");
                   }}
                   maxLength={MAX_NICKNAME_LENGTH}
                   placeholder="Your driver name"
@@ -156,11 +151,6 @@ export function RoomClient({ code }: { code: string }) {
                   autoComplete="nickname"
                 />
               </label>
-              {gateError ? (
-                <p className="text-sm font-bold text-[var(--signal)]" role="alert">
-                  {gateError}
-                </p>
-              ) : null}
               <button type="submit" className="button button-primary mt-2 w-full">
                 Join room
                 <span aria-hidden="true">→</span>

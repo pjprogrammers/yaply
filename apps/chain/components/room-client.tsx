@@ -63,14 +63,15 @@ export function RoomClient({ code }: { code: string }) {
   const nameParam = (searchParams.get("name") ?? "").trim();
   const [joined, setJoined] = useState(nameParam.length > 0);
   const [gateName, setGateName] = useState(nameParam);
-  const [gateError, setGateError] = useState("");
 
   useEffect(() => {
-    if (joined || gateName) return;
     const stored = readStoredNickname();
+    if (!stored) return;
+    // Hydrate the saved name once. Clearing the field afterwards must stay
+    // empty instead of being refilled on every render.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate stored name
-    if (stored) setGateName(stored);
-  }, [gateName, joined]);
+    setGateName((current) => current || stored);
+  }, []);
 
   const isHost = searchParams.get("host") === "1";
   const query = searchParams.toString();
@@ -82,11 +83,7 @@ export function RoomClient({ code }: { code: string }) {
   if (!joined) {
     const submit = (event: React.FormEvent) => {
       event.preventDefault();
-      const next = gateName.trim();
-      if (next.length < 1) {
-        setGateError("Add a nickname first.");
-        return;
-      }
+      const next = gateName.trim() || "Player";
       storeNickname(next);
       setGateName(next);
       setJoined(true);
@@ -106,16 +103,12 @@ export function RoomClient({ code }: { code: string }) {
                 <input
                   className="input"
                   value={gateName}
-                  onChange={(event) => {
-                    setGateName(event.target.value);
-                    setGateError("");
-                  }}
+                  onChange={(event) => setGateName(event.target.value)}
                   maxLength={MAX_NICKNAME_LENGTH}
                   placeholder="Your name"
                   autoFocus
                 />
               </label>
-              {gateError && <p className="small" style={{ color: "var(--negative)" }}>{gateError}</p>}
               <button className="btn btn--primary btn--block" type="submit">
                 Join room
               </button>

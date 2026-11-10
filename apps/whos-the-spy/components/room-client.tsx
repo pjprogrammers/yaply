@@ -80,23 +80,20 @@ export function RoomClient({ code }: { code: string }) {
   const nameParam = (searchParams.get("name") ?? "").trim();
   const [joined, setJoined] = useState(nameParam.length > 0);
   const [gateName, setGateName] = useState(nameParam);
-  const [gateError, setGateError] = useState("");
 
   useEffect(() => {
-    if (joined || gateName) return;
     const stored = readStoredNickname();
+    if (!stored) return;
+    // Hydrate the saved name once. Clearing the field afterwards must stay
+    // empty instead of being refilled on every render.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate the saved nickname
-    if (stored) setGateName(stored);
-  }, [gateName, joined]);
+    setGateName((current) => current || stored);
+  }, []);
 
   if (!joined) {
     const submit = (event: React.FormEvent) => {
       event.preventDefault();
-      const next = gateName.trim();
-      if (!next) {
-        setGateError("Add a nickname first.");
-        return;
-      }
+      const next = gateName.trim() || "Player";
       storeNickname(next);
       setGateName(next);
       setJoined(true);
@@ -119,17 +116,13 @@ export function RoomClient({ code }: { code: string }) {
                 <input
                   className="input"
                   value={gateName}
-                  onChange={(event) => {
-                    setGateName(event.target.value);
-                    setGateError("");
-                  }}
+                  onChange={(event) => setGateName(event.target.value)}
                   maxLength={MAX_NICKNAME_LENGTH}
                   placeholder="Your name"
                   autoComplete="nickname"
                   autoFocus
                 />
               </label>
-              {gateError && <p className="form-error">{gateError}</p>}
               <button className="button button--large" type="submit">
                 <PlayIcon size={16} />
                 Join room
