@@ -1,6 +1,6 @@
 export type PlayerId = string;
 export type RoomCode = string;
-export type GameKind = "skribbl" | "chain" | "smashkarts" | "holeio";
+export type GameKind = "skribbl" | "chain" | "smashkarts" | "holeio" | "whos-the-spy";
 
 /**
  * Word pools supported by the Skribbl dictionary. `tl` is Tagalog/Filipino,
@@ -69,7 +69,27 @@ export type GamePhase =
   | "drawing"
   | "round-result"
   | "playing"
-  | "game-over";
+  | "game-over"
+  | "role-reveal"
+  | "clue"
+  | "discussion"
+  | "voting"
+  | "revote"
+  | "elimination"
+  | "final-guess"
+  | "results";
+
+/** The two secret teams in Who's the Spy. */
+export type SpyRole = "civilian" | "spy";
+export type SpyTeam = "civilians" | "spies";
+export type SpyDifficulty = "easy" | "normal" | "hard";
+export type SpyClueFormat = "voice" | "text" | "both";
+export type SpyResultReason =
+  | "all-spies-eliminated"
+  | "spies-reached-parity"
+  | "final-guess-correct"
+  | "final-guess-wrong"
+  | "final-guess-timeout";
 
 export type Player = {
   id: PlayerId;
@@ -81,6 +101,29 @@ export type Player = {
   guessedCorrectly: boolean;
   joinedAt: number;
 };
+
+/**
+ * WebRTC signaling payloads relayed by the room. Audio never travels over the
+ * WebSocket; the server only forwards offers, answers and ICE candidates
+ * between the two peers.
+ */
+export type VoiceSignal =
+  | { type: "offer" | "answer"; sdp: string }
+  | {
+      type: "candidate";
+      candidate: string;
+      sdpMid?: string | null;
+      sdpMLineIndex?: number | null;
+      usernameFragment?: string | null;
+    };
+
+/** Ephemeral voice-room membership and microphone state for one player. */
+export type VoiceParticipant = {
+  playerId: PlayerId;
+  micMuted: boolean;
+  speaking: boolean;
+};
+
 
 export type Point = {
   x: number;
@@ -125,6 +168,22 @@ export type GameSettings = {
   durationSeconds?: number;
   /** Hole.io bots used to fill empty seats in an online room (0–7). */
   botCount?: number;
+  /** Who's the Spy: requested spies. 0 means automatic for the player count. */
+  spyCount?: number;
+  /** Selected word-bank categories. An empty list means Mixed. */
+  spyCategories?: string[];
+  spyDifficulty?: SpyDifficulty;
+  /** Seconds each active speaker has to submit a clue. */
+  spyClueSeconds?: number;
+  spyDiscussionSeconds?: number;
+  spyVotingSeconds?: number;
+  spyFinalGuess?: boolean;
+  spyRoleReveal?: boolean;
+  spyTextChat?: boolean;
+  spyVoiceChat?: boolean;
+  /** Let eliminated players talk in a separate spectator-only channel. */
+  spySpectatorChat?: boolean;
+  spyClueFormat?: SpyClueFormat;
 };
 
 export type ChainCell = {
@@ -322,6 +381,61 @@ export type HoleioMatchSnapshot = {
   city?: string;
 };
 
+/** A clue that has been made public for the current Spy round. */
+export type SpyClue = {
+  playerId: PlayerId;
+  text: string;
+  round: number;
+  createdAt: number;
+};
+
+export type SpyElimination = {
+  playerId: PlayerId;
+  round: number;
+  tied: boolean;
+  viaRevote: boolean;
+  /** Null before the result screen when role reveal is disabled. */
+  role: SpyRole | null;
+};
+
+export type SpyVoteRecord = {
+  voterId: PlayerId;
+  targetId: PlayerId;
+  round: number;
+  revote: boolean;
+};
+
+/**
+ * Public Who's the Spy state. Secrets (assignments and both words) are not
+ * present here; the server sends them only through private events or after the
+ * result screen has been reached.
+ */
+export type SpyPublicState = {
+  round: number;
+  /** The number of spies in this match, never who they are. */
+  spyCount: number;
+  activePlayerIds: PlayerId[];
+  turnOrder: PlayerId[];
+  activeSpeakerId: PlayerId | null;
+  clues: SpyClue[];
+  readyPlayerIds: PlayerId[];
+  votesCast: number;
+  eligibleVoters: number;
+  tiedPlayerIds: PlayerId[];
+  lastElimination: SpyElimination | null;
+  finalGuessPlayerId: PlayerId | null;
+  finalGuessResult: { playerId: PlayerId; correct: boolean } | null;
+  winnerTeam: SpyTeam | null;
+  resultReason: SpyResultReason | null;
+  categoryId: string | null;
+  categoryLabel: string | null;
+  civilianWord: string | null;
+  spyWord: string | null;
+  /** Populated only on the result screen. */
+  roles: Record<PlayerId, SpyRole> | null;
+  votes: SpyVoteRecord[] | null;
+};
+
 export type RoomSnapshot = {
   code: RoomCode;
   game: GameKind;
@@ -335,6 +449,7 @@ export type RoomSnapshot = {
   endsAt: number | null;
   strokes: Stroke[];
   chain: ChainState | null;
+  spy: SpyPublicState | null;
   rankings?: Ranking[];
   winnerId?: PlayerId | null;
   version: number;

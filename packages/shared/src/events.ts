@@ -1,14 +1,22 @@
 import type {
   ChainMove,
   GameKind,
+  GamePhase,
   GameSettings,
   HoleioInput,
   HoleioMatchSnapshot,
+  PlayerId,
   Point,
   Ranking,
   RoomSnapshot,
   SmashInput,
   SmashMatchSnapshot,
+  SpyElimination,
+  SpyResultReason,
+  SpyRole,
+  SpyTeam,
+  VoiceParticipant,
+  VoiceSignal,
 } from "./types";
 
 /**
@@ -32,6 +40,11 @@ export const CHAT_EVENT_KINDS = [
   "reconnected",
   "announcement",
   "error",
+  "clue",
+  "vote",
+  "elimination",
+  "phase",
+  "spectator",
 ] as const;
 
 export type ChatEventKind = (typeof CHAT_EVENT_KINDS)[number];
@@ -55,6 +68,8 @@ export type ClientEvent =
   | { type: "room.leave" }
   | { type: "room.start" }
   | { type: "room.settings.update"; settings: Partial<GameSettings> }
+  /** Host only: permanently remove another seat from the room. */
+  | { type: "room.player.remove"; playerId: PlayerId }
   | { type: "game.word.choose"; wordId: string }
   | {
       type: "drawing.stroke";
@@ -74,7 +89,24 @@ export type ClientEvent =
   | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
   | { type: "holeio.input"; input: HoleioInput }
   | { type: "holeio.snapshot"; snapshot: HoleioMatchSnapshot }
+  | { type: "spy.clue"; text: string }
+  | { type: "spy.ready" }
+  | { type: "spy.vote"; targetId: string }
+  | { type: "spy.final.guess"; word: string }
+  | { type: "voice.join" }
+  | { type: "voice.leave" }
+  | { type: "voice.mute"; muted: boolean }
+  | { type: "voice.speaking"; speaking: boolean }
+  | {
+      type: "voice.signal";
+      targetId: PlayerId;
+      signal: VoiceSignal;
+    }
+  /** Host only: override the room's voice channel. */
+  | { type: "voice.host"; muteAll?: boolean; disabled?: boolean }
   | { type: "game.rematch" }
+  /** Host only: return the finished room to its lobby instead of rematching. */
+  | { type: "game.lobby" }
   | { type: "room.sync" };
 
 export type ServerEvent =
@@ -114,6 +146,8 @@ export type ServerEvent =
       kind?: ChatEventKind;
       /** True when the server applied secret-word visibility to this message. */
       private?: boolean;
+      /** True for the eliminated-players-only spectator channel. */
+      spectator?: boolean;
     }
   | {
       type: "game.correct-guess";
@@ -133,6 +167,43 @@ export type ServerEvent =
   | { type: "smash.snapshot"; snapshot: SmashMatchSnapshot }
   | { type: "holeio.input"; playerId: string; input: HoleioInput }
   | { type: "holeio.snapshot"; snapshot: HoleioMatchSnapshot }
+  | {
+      /** Private: only the addressed player receives their own role and word. */
+      type: "spy.role";
+      role: SpyRole;
+      word: string;
+      categoryId: string;
+      categoryLabel: string;
+      round: number;
+    }
+  | { type: "spy.clue"; playerId: string; text: string; round: number; createdAt: number }
+  | { type: "spy.ready"; playerId: string; readyCount: number; total: number }
+  | { type: "spy.vote.progress"; cast: number; total: number }
+  | { type: "spy.elimination"; elimination: SpyElimination }
+  | {
+      type: "spy.phase";
+      phase: GamePhase;
+      round: number;
+      endsAt: number | null;
+      activeSpeakerId: string | null;
+    }
+  | { type: "spy.final-guess.result"; playerId: string; correct: boolean }
+  | {
+      type: "spy.results";
+      winnerTeam: SpyTeam;
+      reason: SpyResultReason;
+      civilianWord: string;
+      spyWord: string;
+      roles: Record<string, SpyRole>;
+      rankings: Ranking[];
+    }
+  | {
+      type: "voice.state";
+      participants: VoiceParticipant[];
+      muteAll: boolean;
+      disabled: boolean;
+    }
+  | { type: "voice.signal"; fromId: PlayerId; signal: VoiceSignal }
   | {
       type: "game.finished";
       rankings: Ranking[];

@@ -7,6 +7,8 @@ import type {
   GameSettings,
   SmashMapId,
   SmashWeaponId,
+  SpyClueFormat,
+  SpyDifficulty,
   WordLanguage,
 } from "./types";
 
@@ -56,6 +58,18 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   killTarget: 20,
   durationSeconds: 300,
   botCount: 0,
+  spyCount: 0,
+  spyCategories: ["mixed"],
+  spyDifficulty: "normal",
+  spyClueSeconds: 45,
+  spyDiscussionSeconds: 45,
+  spyVotingSeconds: 30,
+  spyFinalGuess: true,
+  spyRoleReveal: true,
+  spyTextChat: true,
+  spyVoiceChat: true,
+  spySpectatorChat: false,
+  spyClueFormat: "both",
 };
 
 export const SMASH_MIN_PLAYERS = 2;
@@ -78,6 +92,127 @@ export const HOLEIO_PLAYER_COLORS = [
   "#b28cff",
   "#ff9447",
 ];
+/* ------------------------------------------------------------------------- */
+/* Who's the Spy                                                             */
+/* ------------------------------------------------------------------------- */
+
+export const SPY_MIN_PLAYERS = 3;
+export const SPY_MAX_PLAYERS = 12;
+export const SPY_DEFAULT_PLAYERS = 6;
+export const SPY_MAX_SPIES = 3;
+/** Seat colours for up to twelve players; amber and violet lead the palette. */
+export const SPY_PLAYER_COLORS = [
+  "#f2b33d",
+  "#b28cff",
+  "#63c7ff",
+  "#ff7a90",
+  "#7dffb2",
+  "#ff9447",
+  "#f472b6",
+  "#a3e635",
+  "#facc15",
+  "#38bdf8",
+  "#c084fc",
+  "#f97316",
+];
+
+export type SpyCategoryOption = {
+  id: string;
+  label: string;
+  hint: string;
+};
+
+/**
+ * The twenty curated word-bank categories. `mixed` is both a real pool and a
+ * shorthand for "draw from every category"; the server treats it as the union
+ * so selecting it never narrows the game down to one small list.
+ */
+export const SPY_CATEGORIES: SpyCategoryOption[] = [
+  { id: "food-drinks", label: "Food & Drinks", hint: "Recipes, restaurants and what is in the fridge" },
+  { id: "animals", label: "Animals", hint: "Pets, wildlife and everything with fur or scales" },
+  { id: "countries-cities", label: "Countries & Cities", hint: "Places on the map and the people in them" },
+  { id: "places-buildings", label: "Places & Buildings", hint: "Rooms, landmarks and the places in between" },
+  { id: "technology", label: "Technology", hint: "Devices, software and the internet" },
+  { id: "sports", label: "Sports", hint: "Fields, rules and last-minute winners" },
+  { id: "movies-entertainment", label: "Movies & Entertainment", hint: "Screens, stages and stories" },
+  { id: "professions", label: "Professions", hint: "Jobs, uniforms and what people actually do" },
+  { id: "school-education", label: "School & Education", hint: "Classrooms, subjects and study rituals" },
+  { id: "household-items", label: "Household Items", hint: "Things found in drawers, cupboards and corners" },
+  { id: "vehicles-transport", label: "Vehicles & Transport", hint: "Wheels, rails, wings and traffic" },
+  { id: "nature", label: "Nature", hint: "Weather, landscapes and the living world" },
+  { id: "clothing-fashion", label: "Clothing & Fashion", hint: "Wardrobes, styles and getting dressed" },
+  { id: "famous-people", label: "Famous People", hint: "Public figures and the names everyone knows" },
+  { id: "brands", label: "Brands", hint: "Logos, slogans and shopping aisles" },
+  { id: "games", label: "Games", hint: "Boards, cards, controllers and playground rules" },
+  { id: "everyday-life", label: "Everyday Life", hint: "Small routines that make up a day" },
+  { id: "music", label: "Music", hint: "Instruments, genres and songs stuck in your head" },
+  { id: "internet-social-media", label: "Internet & Social Media", hint: "Feeds, memes and online habits" },
+  { id: "mixed", label: "Mixed / Random", hint: "A surprise draw from every category" },
+];
+
+export const SPY_CATEGORY_IDS = SPY_CATEGORIES.map((category) => category.id);
+
+export function isSpyCategoryId(value: unknown): value is string {
+  return typeof value === "string" && SPY_CATEGORY_IDS.includes(value);
+}
+
+export type SpyDifficultyOption = {
+  id: SpyDifficulty;
+  label: string;
+  hint: string;
+};
+
+export const SPY_DIFFICULTIES: SpyDifficultyOption[] = [
+  { id: "easy", label: "Easy", hint: "The two words are clearly different" },
+  { id: "normal", label: "Normal", hint: "Close enough to bluff, far enough to catch" },
+  { id: "hard", label: "Hard", hint: "Tiny distinctions and very confident spies" },
+];
+
+export const SPY_DIFFICULTY_IDS = SPY_DIFFICULTIES.map((difficulty) => difficulty.id);
+
+export function isSpyDifficulty(value: unknown): value is SpyDifficulty {
+  return typeof value === "string" && SPY_DIFFICULTY_IDS.includes(value as SpyDifficulty);
+}
+
+export type SpyClueFormatOption = {
+  id: SpyClueFormat;
+  label: string;
+  hint: string;
+};
+
+export const SPY_CLUE_FORMATS: SpyClueFormatOption[] = [
+  { id: "both", label: "Voice + text", hint: "Talk out loud or type a clue" },
+  { id: "text", label: "Text only", hint: "Every clue is written in the room" },
+  { id: "voice", label: "Voice first", hint: "Speak naturally; text chat stays open" },
+];
+
+export const SPY_CLUE_FORMAT_IDS = SPY_CLUE_FORMATS.map((format) => format.id);
+
+export function isSpyClueFormat(value: unknown): value is SpyClueFormat {
+  return typeof value === "string" && SPY_CLUE_FORMAT_IDS.includes(value as SpyClueFormat);
+}
+
+/** Automatic spy count from the recommended table (3–8 → 1, 9–12 → 2). */
+export function autoSpyCount(playerCount: number): number {
+  return playerCount >= 9 ? 2 : 1;
+}
+
+/** The largest spy team that still leaves civilians with a strict majority. */
+export function maxSpyCount(playerCount: number): number {
+  return Math.max(1, Math.min(SPY_MAX_SPIES, Math.floor((Math.max(1, playerCount) - 1) / 2)));
+}
+
+export const SPY_CLUE_SECONDS = { min: 30, max: 90, default: 45 } as const;
+export const SPY_DISCUSSION_SECONDS = { min: 30, max: 120, default: 45 } as const;
+export const SPY_VOTING_SECONDS = { min: 15, max: 45, default: 30 } as const;
+export const SPY_REVOTE_SECONDS = 15;
+export const SPY_ROLE_REVEAL_MS = 25_000;
+export const SPY_ELIMINATION_MS = 6_000;
+export const SPY_FINAL_GUESS_SECONDS = 30;
+export const MAX_SPY_CLUE_LENGTH = 80;
+export const MAX_SPY_FINAL_GUESS_LENGTH = 48;
+export const SPY_RECENT_PAIR_LIMIT = 18;
+
 export const SMASH_MAP_IDS: SmashMapId[] = [
   "quarry-clash",
   "hollow-graveyard",

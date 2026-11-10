@@ -4,13 +4,52 @@ import {
   HOLEIO_MAX_PLAYERS,
   MAX_CHAT_LENGTH,
   MAX_NICKNAME_LENGTH,
+  MAX_SPY_CLUE_LENGTH,
+  MAX_SPY_FINAL_GUESS_LENGTH,
   MAX_STROKE_ID_LENGTH,
   MAX_STROKE_POINTS_PER_MESSAGE,
   SMASH_MAX_PLAYERS,
+  SPY_MAX_PLAYERS,
+  SPY_MAX_SPIES,
+  SPY_VOTING_SECONDS,
 } from "./constants";
 import { CHAT_EVENT_KINDS } from "./events";
 
 const noControlCharacters = (value: string) => !/[\u0000-\u001f\u007f]/.test(value);
+// Keep an SDP signal inside the room's 16 KiB frame cap once JSON overhead is
+// added. Audio-only offers and answers are normally well under 4 KiB.
+const MAX_VOICE_SDP_LENGTH = 12_000;
+const MAX_VOICE_CANDIDATE_LENGTH = 4_000;
+
+/**
+ * The room only relays WebRTC signaling. Audio itself is always peer-to-peer;
+ * these caps keep a malicious client from turning the relay into a file dump.
+ */
+export const VoiceSignalSchema = z.union([
+  z
+    .object({
+      type: z.enum(["offer", "answer"]),
+      sdp: z.string().min(1).max(MAX_VOICE_SDP_LENGTH),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("candidate"),
+      candidate: z.string().min(1).max(MAX_VOICE_CANDIDATE_LENGTH),
+      sdpMid: z.string().max(256).nullable().optional(),
+      sdpMLineIndex: z.number().int().min(0).max(64).nullable().optional(),
+      usernameFragment: z.string().max(256).nullable().optional(),
+    })
+    .strict(),
+]);
+
+export const VoiceParticipantSchema = z
+  .object({
+    playerId: z.string().min(1).max(64),
+    micMuted: z.boolean(),
+    speaking: z.boolean(),
+  })
+  .strict();
 
 export const NicknameSchema = z
   .string()
@@ -25,7 +64,31 @@ export const RoomCodeSchema = z
   .regex(/^[a-z0-9]{6}$/i, "Room codes are six letters or digits")
   .transform((value) => value.toLowerCase());
 
-export const GameKindSchema = z.enum(["skribbl", "chain", "smashkarts", "holeio"]);
+export const GameKindSchema = z.enum([
+  "skribbl",
+  "chain",
+  "smashkarts",
+  "holeio",
+  "whos-the-spy",
+]);
+
+export const SpyDifficultySchema = z.enum(["easy", "normal", "hard"]);
+export const SpyRoleSchema = z.enum(["civilian", "spy"]);
+export const SpyTeamSchema = z.enum(["civilians", "spies"]);
+export const SpyClueFormatSchema = z.enum(["voice", "text", "both"]);
+export const SpyResultReasonSchema = z.enum([
+  "all-spies-eliminated",
+  "spies-reached-parity",
+  "final-guess-correct",
+  "final-guess-wrong",
+  "final-guess-timeout",
+]);
+export const SpyCategoryIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(48)
+  .regex(/^[a-z0-9-]+$/, "Category ids are lowercase slugs");
 
 export const WordLanguageSchema = z.enum(["en", "tl", "ja", "ko"]);
 
@@ -89,6 +152,23 @@ export const GameSettingsSchema = z
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
     botCount: z.number().int().min(0).max(HOLEIO_BOT_MAX).optional(),
+    spyCount: z.number().int().min(0).max(SPY_MAX_SPIES).optional(),
+    spyCategories: z.array(SpyCategoryIdSchema).min(1).max(20).optional(),
+    spyDifficulty: SpyDifficultySchema.optional(),
+    spyClueSeconds: z.number().int().min(30).max(90).optional(),
+    spyDiscussionSeconds: z.number().int().min(30).max(120).optional(),
+    spyVotingSeconds: z
+      .number()
+      .int()
+      .min(SPY_VOTING_SECONDS.min)
+      .max(SPY_VOTING_SECONDS.max)
+      .optional(),
+    spyFinalGuess: z.boolean().optional(),
+    spyRoleReveal: z.boolean().optional(),
+    spyTextChat: z.boolean().optional(),
+    spyVoiceChat: z.boolean().optional(),
+    spySpectatorChat: z.boolean().optional(),
+    spyClueFormat: SpyClueFormatSchema.optional(),
   })
   .strict();
 
@@ -316,6 +396,12 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("room.leave") }).strict(),
   z.object({ type: z.literal("room.start") }).strict(),
   z.object({ type: z.literal("room.settings.update"), settings: GameSettingsSchema }).strict(),
+  z
+    .object({
+      type: z.literal("room.player.remove"),
+      playerId: z.string().min(1).max(64),
+    })
+    .strict(),
   z.object({ type: z.literal("game.word.choose"), wordId: z.string().min(1).max(16) }).strict(),
   z
     .object({
@@ -353,7 +439,45 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("smash.snapshot"), snapshot: SmashMatchSnapshotSchema }).strict(),
   z.object({ type: z.literal("holeio.input"), input: HoleioInputSchema }).strict(),
   z.object({ type: z.literal("holeio.snapshot"), snapshot: HoleioMatchSnapshotSchema }).strict(),
+  z
+    .object({
+      type: z.literal("spy.clue"),
+      text: z.string().trim().min(1).max(MAX_SPY_CLUE_LENGTH),
+    })
+    .strict(),
+  z.object({ type: z.literal("spy.ready") }).strict(),
+  z
+    .object({
+      type: z.literal("spy.vote"),
+      targetId: z.string().min(1).max(64),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("spy.final.guess"),
+      word: z.string().trim().min(1).max(MAX_SPY_FINAL_GUESS_LENGTH),
+    })
+    .strict(),
+  z.object({ type: z.literal("voice.join") }).strict(),
+  z.object({ type: z.literal("voice.leave") }).strict(),
+  z.object({ type: z.literal("voice.mute"), muted: z.boolean() }).strict(),
+  z.object({ type: z.literal("voice.speaking"), speaking: z.boolean() }).strict(),
+  z
+    .object({
+      type: z.literal("voice.signal"),
+      targetId: z.string().min(1).max(64),
+      signal: VoiceSignalSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("voice.host"),
+      muteAll: z.boolean().optional(),
+      disabled: z.boolean().optional(),
+    })
+    .strict(),
   z.object({ type: z.literal("game.rematch") }).strict(),
+  z.object({ type: z.literal("game.lobby") }).strict(),
   z.object({ type: z.literal("room.sync") }).strict(),
 ]);
 
@@ -424,10 +548,73 @@ export const RankingSchema = z.object({
   score: z.number(),
 });
 
+export const SpyClueSchema = z.object({
+  playerId: z.string(),
+  text: z.string(),
+  round: z.number().int().min(0),
+  createdAt: z.number(),
+});
+
+export const SpyEliminationSchema = z.object({
+  playerId: z.string(),
+  round: z.number().int().min(0),
+  tied: z.boolean(),
+  viaRevote: z.boolean(),
+  role: SpyRoleSchema.nullable(),
+});
+
+export const SpyVoteRecordSchema = z.object({
+  voterId: z.string(),
+  targetId: z.string(),
+  round: z.number().int().min(0),
+  revote: z.boolean(),
+});
+
+export const SpyPublicStateSchema = z.object({
+  round: z.number().int().min(0),
+  spyCount: z.number().int().min(1).max(SPY_MAX_SPIES),
+  activePlayerIds: z.array(z.string()),
+  turnOrder: z.array(z.string()),
+  activeSpeakerId: z.string().nullable(),
+  clues: z.array(SpyClueSchema),
+  readyPlayerIds: z.array(z.string()),
+  votesCast: z.number().int().min(0),
+  eligibleVoters: z.number().int().min(0),
+  tiedPlayerIds: z.array(z.string()),
+  lastElimination: SpyEliminationSchema.nullable(),
+  finalGuessPlayerId: z.string().nullable(),
+  finalGuessResult: z
+    .object({ playerId: z.string(), correct: z.boolean() })
+    .nullable(),
+  winnerTeam: SpyTeamSchema.nullable(),
+  resultReason: SpyResultReasonSchema.nullable(),
+  categoryId: z.string().nullable(),
+  categoryLabel: z.string().nullable(),
+  civilianWord: z.string().nullable(),
+  spyWord: z.string().nullable(),
+  roles: z.record(z.string(), SpyRoleSchema).nullable(),
+  votes: z.array(SpyVoteRecordSchema).nullable(),
+});
+
 export const RoomSnapshotSchema = z.object({
   code: z.string(),
   game: GameKindSchema,
-  phase: z.enum(["lobby", "choosing", "drawing", "round-result", "playing", "game-over"]),
+  phase: z.enum([
+    "lobby",
+    "choosing",
+    "drawing",
+    "round-result",
+    "playing",
+    "game-over",
+    "role-reveal",
+    "clue",
+    "discussion",
+    "voting",
+    "revote",
+    "elimination",
+    "final-guess",
+    "results",
+  ]),
   hostId: z.string(),
   players: z.array(PlayerSchema),
   settings: z.object({
@@ -453,6 +640,23 @@ export const RoomSnapshotSchema = z.object({
     killTarget: z.number().int().min(5).max(100).optional(),
     durationSeconds: z.number().int().min(60).max(1800).optional(),
     botCount: z.number().int().min(0).max(HOLEIO_BOT_MAX).optional(),
+    spyCount: z.number().int().min(0).max(SPY_MAX_SPIES).optional(),
+    spyCategories: z.array(z.string()).optional(),
+    spyDifficulty: SpyDifficultySchema.optional(),
+    spyClueSeconds: z.number().int().min(30).max(90).optional(),
+    spyDiscussionSeconds: z.number().int().min(30).max(120).optional(),
+    spyVotingSeconds: z
+      .number()
+      .int()
+      .min(SPY_VOTING_SECONDS.min)
+      .max(SPY_VOTING_SECONDS.max)
+      .optional(),
+    spyFinalGuess: z.boolean().optional(),
+    spyRoleReveal: z.boolean().optional(),
+    spyTextChat: z.boolean().optional(),
+    spyVoiceChat: z.boolean().optional(),
+    spySpectatorChat: z.boolean().optional(),
+    spyClueFormat: SpyClueFormatSchema.optional(),
   }),
   roundNumber: z.number(),
   drawerId: z.string().nullable(),
@@ -460,6 +664,7 @@ export const RoomSnapshotSchema = z.object({
   endsAt: z.number().nullable(),
   strokes: z.array(StrokeSchema),
   chain: ChainStateSchema.nullable(),
+  spy: SpyPublicStateSchema.nullable(),
   rankings: z.array(RankingSchema).optional(),
   winnerId: z.string().nullable().optional(),
   version: z.number(),
@@ -503,6 +708,7 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     system: z.boolean().optional(),
     kind: z.enum(CHAT_EVENT_KINDS).optional(),
     private: z.boolean().optional(),
+    spectator: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("game.correct-guess"),
@@ -530,6 +736,87 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     input: HoleioInputSchema,
   }),
   z.object({ type: z.literal("holeio.snapshot"), snapshot: HoleioMatchSnapshotSchema }),
+  z.object({
+    type: z.literal("spy.role"),
+    role: SpyRoleSchema,
+    word: z.string(),
+    categoryId: z.string(),
+    categoryLabel: z.string(),
+    round: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("spy.clue"),
+    playerId: z.string(),
+    text: z.string(),
+    round: z.number().int().min(0),
+    createdAt: z.number(),
+  }),
+  z.object({
+    type: z.literal("spy.ready"),
+    playerId: z.string(),
+    readyCount: z.number().int().min(0),
+    total: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("spy.vote.progress"),
+    cast: z.number().int().min(0),
+    total: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("spy.elimination"),
+    elimination: SpyEliminationSchema,
+  }),
+  z.object({
+    type: z.literal("spy.phase"),
+    phase: z.enum([
+      "lobby",
+      "choosing",
+      "drawing",
+      "round-result",
+      "playing",
+      "game-over",
+      "role-reveal",
+      "clue",
+      "discussion",
+      "voting",
+      "revote",
+      "elimination",
+      "final-guess",
+      "results",
+    ]),
+    round: z.number().int().min(0),
+    endsAt: z.number().nullable(),
+    activeSpeakerId: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal("spy.final-guess.result"),
+    playerId: z.string(),
+    correct: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("spy.results"),
+    winnerTeam: SpyTeamSchema,
+    reason: SpyResultReasonSchema,
+    civilianWord: z.string(),
+    spyWord: z.string(),
+    roles: z.record(z.string(), SpyRoleSchema),
+    rankings: z.array(RankingSchema),
+  }),
+  z
+    .object({
+      type: z.literal("voice.state"),
+      participants: z.array(VoiceParticipantSchema).max(SPY_MAX_PLAYERS),
+      muteAll: z.boolean(),
+      disabled: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("voice.signal"),
+      fromId: z.string().min(1).max(64),
+      signal: VoiceSignalSchema,
+    })
+    .strict(),
   z.object({
     type: z.literal("game.finished"),
     rankings: z.array(RankingSchema),
