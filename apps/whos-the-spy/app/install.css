@@ -1,0 +1,278 @@
+/* ── Install page ───────────────────────────────────────────────────── */
+
+.install-page {
+  padding-top: clamp(24px, 4vw, 48px);
+}
+
+.install-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.52fr);
+  gap: clamp(36px, 6vw, 96px);
+  align-items: center;
+  padding-bottom: clamp(60px, 8vw, 110px);
+}
+
+.install-hero h1 {
+  max-width: 12ch;
+  font-family: var(--display);
+  font-size: clamp(3rem, 5.6vw, 5.6rem);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.install-hero > div > p {
+  max-width: 44ch;
+  margin-top: 22px;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.install-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.install-card {
+  padding: clamp(24px, 3vw, 36px);
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+.install-card-kicker {
+  color: #8f2b5f;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.install-card h2 {
+  max-width: 16ch;
+  margin-top: 8px;
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.025em;
+}
+
+.install-card-copy {
+  margin-top: 12px;
+  color: #5c5164;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.install-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 22px;
+  padding: 14px 0;
+  background: rgba(22, 18, 28, 0.05);
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.install-status-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5c5164;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.install-status-row i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b9ac9b;
+}
+
+.install-status-row i.is-on {
+  background: #2f7d5e;
+}
+
+.install-action {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.install-message {
+  margin-top: 12px;
+  color: #8f2b5f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.install-card-note {
+  margin-top: 14px;
+  color: #6d6075;
+  font-size: 0.7rem;
+}
+
+.install-benefits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(26px, 4vw, 64px);
+  padding: clamp(40px, 5vw, 64px) 0;
+  background: var(--bg-raised);
+  padding-left: clamp(22px, 4vw, 40px);
+  padding-right: clamp(22px, 4vw, 40px);
+}
+
+.install-benefits h2 {
+  max-width: 16ch;
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.install-benefits p {
+  max-width: 34ch;
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.install-guide {
+  padding: clamp(70px, 8vw, 110px) 0 0;
+}
+
+.install-guide-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.48fr);
+  gap: clamp(24px, 5vw, 70px);
+  align-items: end;
+  margin-bottom: clamp(32px, 4vw, 50px);
+}
+
+.install-guide-head h2 {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 4.2vw, 4rem);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.install-guide-head p {
+  max-width: 40ch;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.install-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.install-guide-card {
+  padding: clamp(22px, 2.6vw, 30px);
+  background: var(--bg-raised);
+}
+
+.install-guide-card.is-recommended {
+  background: var(--amber);
+  color: var(--amber-ink);
+}
+
+.install-guide-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.install-guide-card-head h3 {
+  font-family: var(--display);
+  font-size: 1.8rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.install-guide-card-head span {
+  flex: none;
+  padding: 3px 7px;
+  border: 1.5px solid currentColor;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.install-guide-short {
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.install-guide-card.is-recommended .install-guide-short {
+  color: rgba(26, 18, 4, 0.65);
+}
+
+.install-guide-card ol {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 20px;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.install-guide-card li::marker {
+  font-weight: 800;
+}
+
+.install-guide-note {
+  margin-top: 18px;
+  padding-top: 14px;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.install-guide-card.is-recommended .install-guide-note {
+  color: rgba(26, 18, 4, 0.7);
+}
+
+@media (max-width: 900px) {
+  .install-hero,
+  .install-guide-head {
+    grid-template-columns: 1fr;
+  }
+
+  .install-benefits,
+  .install-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .install-hero h1 {
+    font-size: clamp(2.7rem, 13vw, 3.8rem);
+  }
+
+  .install-hero-actions .button {
+    flex: 1 1 100%;
+  }
+
+  .install-benefits {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
