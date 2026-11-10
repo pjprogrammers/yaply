@@ -5525,13 +5525,28 @@ p {
    side by side, and the chat input spans the full width in the last row. */
 
 @media (max-width: 900px) {
+  html:has(.match-page),
+  body:has(.match-page) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body:has(.match-page) {
+    position: fixed;
+    inset: 0;
+  }
+
   .match-page {
+    position: fixed;
+    inset: 0;
     display: block;
-    height: 100dvh;
+    height: auto;
     min-height: 0;
     padding: 0;
     gap: 0;
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .match-page .match-logo,
@@ -5541,7 +5556,7 @@ p {
 
   .match-page .game {
     width: 100%;
-    height: 100dvh;
+    height: 100%;
     grid-template-columns: 49% 51%;
     grid-template-rows: 34px 248px 1fr 26px;
   }
@@ -5679,8 +5694,11 @@ p {
   }
 
   .match-page .chat input {
-    grid-column: 1 / 3;
-    grid-row: 4;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--keyboard-inset, 0px);
+    z-index: 30;
     margin: 0;
     border: 0;
     border-top: 2px solid var(--accent);
@@ -5724,5 +5742,64 @@ p {
     right: 6px;
     z-index: 20;
     width: auto;
+  }
+}
+
+/* Touch tablets keep the desktop table but dock the guess input to the bottom
+   of the screen, clear of the soft keyboard. */
+@media (pointer: coarse) and (min-width: 901px) {
+  html:has(.match-page),
+  body:has(.match-page) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body:has(.match-page) {
+    position: fixed;
+    inset: 0;
+  }
+
+  .match-page {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    padding: 14px 14px 40px;
+  }
+
+  .match-page .game {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    grid-template-rows: 50px minmax(0, 1fr);
+  }
+
+  .match-page .players,
+  .match-page .chat {
+    height: auto;
+    align-self: stretch;
+  }
+
+  /* A backdrop blur turns the chat panel into the containing block for the
+     fixed guess input, which would pin it to the sidebar instead of the
+     bottom of the screen. */
+  .match-page .chat {
+    backdrop-filter: none;
+  }
+
+  .match-page .chat input {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--keyboard-inset, 0px);
+    z-index: 30;
+    margin: 0;
+    border: 0;
+    border-top: 2px solid var(--accent);
+    border-radius: 0;
+    height: 40px;
   }
 }

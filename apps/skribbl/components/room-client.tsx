@@ -47,6 +47,13 @@ const FATAL_CODES = new Set([
   "PROTOCOL_MISMATCH",
 ]);
 
+type VirtualKeyboardLike = {
+  overlaysContent: boolean;
+  readonly boundingRect: DOMRectReadOnly;
+  addEventListener: (type: "geometrychange", listener: () => void) => void;
+  removeEventListener: (type: "geometrychange", listener: () => void) => void;
+};
+
 const DRAW_COLORS = ["#000000", "#e22b2b", "#2a9d3c", "#2666e2", "#f2c200", "#a44ce0", "#8a8a8a", "#ffffff"];
 const DRAW_WIDTH = 8;
 const CHOOSE_SECONDS = 20;
@@ -311,6 +318,81 @@ function ConnectedRoom({
   const drawer = snapshot?.players.find((player) => player.id === snapshot.drawerId) ?? null;
   const remaining = useCountdown(snapshot?.endsAt ?? null, now);
   const fatal = error && FATAL_CODES.has(error.code) ? error : null;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    const virtualKeyboard = (
+      navigator as Navigator & { virtualKeyboard?: VirtualKeyboardLike }
+    ).virtualKeyboard;
+    let frame = 0;
+    let typing = false;
+
+    // Chromium with interactive-widget=overlays-content deliberately leaves
+    // the visual viewport at full height, so ask the VirtualKeyboard API for
+    // the covered area. Safari (and anything without the API) falls back to
+    // the visualViewport shrink below.
+    try {
+      if (virtualKeyboard) virtualKeyboard.overlaysContent = true;
+    } catch {
+      // Non-secure contexts or embedded frames may refuse the opt-in.
+    }
+
+    const setInset = (inset: number) => {
+      root.style.setProperty("--keyboard-inset", `${Math.max(0, Math.round(inset))}px`);
+    };
+
+    // Keep the chat input above the soft keyboard while it is being used, but
+    // put it back on the bottom edge as soon as the keyboard goes away. The
+    // small cutoff ignores browser-chrome differences and stale iOS viewport
+    // values that would otherwise leave a permanent gap.
+    const sync = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!typing) {
+          setInset(0);
+          return;
+        }
+        const keyboardHeight = virtualKeyboard?.boundingRect.height ?? 0;
+        const covered = viewport
+          ? window.innerHeight - viewport.height - viewport.offsetTop
+          : 0;
+        const inset = Math.max(keyboardHeight, covered);
+        setInset(inset >= 100 ? inset : 0);
+      });
+    };
+
+    const isChatInput = (target: EventTarget | null) =>
+      target instanceof Element && Boolean(target.closest(".match-page .chat input"));
+
+    const onFocusIn = (event: FocusEvent) => {
+      if (!isChatInput(event.target)) return;
+      typing = true;
+      sync();
+    };
+
+    const onFocusOut = (event: FocusEvent) => {
+      if (!isChatInput(event.target)) return;
+      typing = false;
+      setInset(0);
+    };
+
+    sync();
+    viewport?.addEventListener("resize", sync);
+    viewport?.addEventListener("scroll", sync);
+    virtualKeyboard?.addEventListener("geometrychange", sync);
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport?.removeEventListener("resize", sync);
+      viewport?.removeEventListener("scroll", sync);
+      virtualKeyboard?.removeEventListener("geometrychange", sync);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      root.style.removeProperty("--keyboard-inset");
+    };
+  }, []);
 
   useEffect(() => {
     if (!error) return;
@@ -1006,7 +1088,7 @@ function ConnectedRoom({
                 : me?.guessedCorrectly
                   ? "You guessed it - secret chat..."
                   : "Type your guess here..."
-              : "Type a message..."
+              : "Type your guess here..."
           }
         />
       </div>
