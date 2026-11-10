@@ -13,8 +13,17 @@ const display = Space_Grotesk({
   display: "swap",
 });
 
+// Search Console verification for the yaplygames.vercel.app property. The env
+// var can override it for other deployments.
+const googleVerification =
+  process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
+  "lrihOhmRTJmkRzSy5Pv3_Fe36k_dGKd23rPrL7ftpv8";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  verification: {
+    google: googleVerification,
+  },
   title: "Chain Reaction — one orb, whole board",
   description:
     "A turn-based board game for 2–8 players. Claim cells, stack orbs past their critical mass and watch the chain flip the table. Play online, pass-and-play or against CPUs.",
