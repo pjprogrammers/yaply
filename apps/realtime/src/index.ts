@@ -199,7 +199,8 @@ export default {
             health: "/health",
             version: "/version",
             createRoom: "POST /rooms",
-            roomSocket: "GET /room/:code?game=skribbl|chain|smashkarts|holeio (WebSocket)",
+            roomSocket:
+              "GET /room/:code?game=skribbl|chain|smashkarts|holeio|whos-the-spy (WebSocket)",
           },
         },
         200,
@@ -336,7 +337,8 @@ export default {
         gameParam !== "chain" &&
         gameParam !== "skribbl" &&
         gameParam !== "smashkarts" &&
-        gameParam !== "holeio"
+        gameParam !== "holeio" &&
+        gameParam !== "whos-the-spy"
       ) {
         return json({ error: "A valid game is required." }, 400, corsHeaders(request, env));
       }

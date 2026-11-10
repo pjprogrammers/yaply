@@ -88,6 +88,22 @@ describe("client event validation", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts a host removing another seat", () => {
+    const result = ClientEventSchema.safeParse({
+      type: "room.player.remove",
+      playerId: "player-1",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an empty removal target", () => {
+    const result = ClientEventSchema.safeParse({
+      type: "room.player.remove",
+      playerId: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects room codes with the wrong shape", () => {
     const result = ClientEventSchema.safeParse({
       type: "room.join",
@@ -97,6 +113,69 @@ describe("client event validation", () => {
       nickname: "Alice",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts WebRTC offer and candidate signaling", () => {
+    const offer = ClientEventSchema.safeParse({
+      type: "voice.signal",
+      targetId: "player-2",
+      signal: { type: "offer", sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\n" },
+    });
+    expect(offer.success).toBe(true);
+
+    const candidate = ClientEventSchema.safeParse({
+      type: "voice.signal",
+      targetId: "player-2",
+      signal: {
+        type: "candidate",
+        candidate: "candidate:1 1 udp 2122260223 192.168.1.2 54321 typ host",
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+      },
+    });
+    expect(candidate.success).toBe(true);
+  });
+
+  it("rejects oversized or malformed WebRTC payloads", () => {
+    const oversized = ClientEventSchema.safeParse({
+      type: "voice.signal",
+      targetId: "player-2",
+      signal: { type: "offer", sdp: "x".repeat(20_001) },
+    });
+    expect(oversized.success).toBe(false);
+
+    const negativeIndex = ClientEventSchema.safeParse({
+      type: "voice.signal",
+      targetId: "player-2",
+      signal: {
+        type: "candidate",
+        candidate: "candidate:1",
+        sdpMLineIndex: -1,
+      },
+    });
+    expect(negativeIndex.success).toBe(false);
+
+    const extraField = ClientEventSchema.safeParse({
+      type: "voice.signal",
+      targetId: "player-2",
+      signal: { type: "offer", sdp: "v=0", audioTrack: "steal" },
+    });
+    expect(extraField.success).toBe(false);
+  });
+
+  it("accepts host voice controls and rejects malformed flags", () => {
+    const control = ClientEventSchema.safeParse({
+      type: "voice.host",
+      muteAll: true,
+      disabled: false,
+    });
+    expect(control.success).toBe(true);
+
+    const malformed = ClientEventSchema.safeParse({
+      type: "voice.host",
+      muteAll: "yes",
+    });
+    expect(malformed.success).toBe(false);
   });
 });
 
@@ -133,6 +212,7 @@ describe("server event validation", () => {
     endsAt: null,
     strokes: [],
     chain: null,
+    spy: null,
     version: 1,
   };
 

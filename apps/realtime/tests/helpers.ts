@@ -100,8 +100,10 @@ export type RoomHarness = {
   connect: () => FakeWebSocket;
 };
 
+export type TestGame = "skribbl" | "chain" | "smashkarts" | "holeio" | "whos-the-spy";
+
 export async function makeRoom(
-  game: "skribbl" | "chain" | "smashkarts" | "holeio",
+  game: TestGame,
   code = "abc123",
   options: { reserve?: boolean } = {},
 ): Promise<RoomHarness> {
@@ -137,7 +139,7 @@ export async function makeRoom(
 }
 
 export async function createAndJoin(
-  game: "skribbl" | "chain" | "smashkarts" | "holeio",
+  game: TestGame,
   names: string[] = ["Alice", "Bob"],
   code = "abc123",
 ): Promise<{

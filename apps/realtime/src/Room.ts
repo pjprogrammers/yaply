@@ -9,6 +9,9 @@ import type {
   Ranking,
   RoomSnapshot,
   SmashMatchSnapshot,
+  SpyPublicState,
+  SpyRole,
+  SpyTeam,
   Stroke,
 } from "@yaply/shared/types";
 import type { ChatEventKind, ClientEvent, ServerEvent } from "@yaply/shared/events";
@@ -37,6 +40,8 @@ import {
   MAX_STROKE_POINTS_PER_ROUND,
   MAX_STROKES_PER_ROUND,
   MESSAGE_RATE_LIMIT,
+  MAX_SPY_CLUE_LENGTH,
+  MAX_SPY_FINAL_GUESS_LENGTH,
   PLAYER_COLORS,
   PROTOCOL_VERSION,
   RECONNECT_GRACE_PERIOD_MS,
@@ -48,6 +53,21 @@ import {
   SMASH_KILL_TARGET_MIN,
   SMASH_MAX_PLAYERS,
   SMASH_PLAYER_COLORS,
+  SPY_CLUE_SECONDS,
+  SPY_DEFAULT_PLAYERS,
+  SPY_DISCUSSION_SECONDS,
+  SPY_ELIMINATION_MS,
+  SPY_FINAL_GUESS_SECONDS,
+  SPY_MAX_PLAYERS,
+  SPY_MAX_SPIES,
+  SPY_MIN_PLAYERS,
+  SPY_PLAYER_COLORS,
+  SPY_REVOTE_SECONDS,
+  SPY_ROLE_REVEAL_MS,
+  SPY_VOTING_SECONDS,
+  isSpyCategoryId,
+  isSpyClueFormat,
+  isSpyDifficulty,
   UNJOINED_SOCKET_TTL_MS,
 } from "@yaply/shared/constants";
 import { ClientEventSchema } from "@yaply/shared/schemas";
@@ -61,6 +81,27 @@ import {
   rankChainPlayers,
   removeChainPlayer,
 } from "./chain";
+import {
+  activeSpySpeaker,
+  addSpyClue,
+  createSpyState,
+  currentSpyClues,
+  hasSpyClue,
+  lastEliminatedSpyId,
+  normalizeWord,
+  resetSpyClueRound,
+  resolveSpyCount,
+  scoreSpyGame,
+  selectSpyPair,
+  spyAliveIds,
+  spyCountIsValid,
+  spyRoleOf,
+  spyWinner,
+  tallySpyVotes,
+  textRevealsAnyWord,
+  type SpyState,
+  type SpyVote,
+} from "./spy";
 
 type StoredPlayer = Player & {
   resumeToken: string;
@@ -89,6 +130,12 @@ type StoredState = {
    * seated as a brand-new player on zero.
    */
   departedPlayers: DepartedPlayer[];
+  /**
+   * Resume tokens belonging to seats the host removed. They stay blocked for
+   * the life of the room so an automatic reconnect cannot silently reclaim a
+   * fresh seat after a kick.
+   */
+  removedResumeTokens: string[];
   settings: GameSettings;
   roundNumber: number;
   drawerId: string | null;
@@ -110,6 +157,10 @@ type StoredState = {
   revealedIndices: number[];
   strokes: Stroke[];
   chain: ChainState | null;
+  /** Who's the Spy state, including its server-only role assignments. */
+  spy: SpyState | null;
+  /** Pair history survives rematches so a room keeps seeing fresh words. */
+  spyRecentPairIds: string[];
   /**
    * Last authoritative snapshot relayed by the Smash Karts host. It is kept
    * separate from `RoomSnapshot` so a 40-kart match state is not serialized on
@@ -118,6 +169,10 @@ type StoredState = {
   lastSmashState: SmashMatchSnapshot | null;
   /** Last authoritative Hole.io frame relayed by the host. */
   lastHoleioState: HoleioMatchSnapshot | null;
+  /** Host voice kill switch; kept across rounds until the host re-enables it. */
+  voiceDisabled: boolean;
+  /** Host mute-all override; persisted so a refresh does not reopen every mic. */
+  voiceMutedAll: boolean;
   version: number;
   createdAt: number;
   lastActivity: number;
@@ -146,6 +201,8 @@ const DRAWER_GRACE_MS = 15_000;
 const CHOOSE_TIME_MS = 20_000;
 const ROUND_RESULT_MS = 5_000;
 const SNAPSHOT_SYNC_COOLDOWN_MS = 1_000;
+/** Bound the kick list so repeated moderation cannot grow room state forever. */
+const MAX_REMOVED_RESUME_TOKENS = 64;
 /** A stalled Smash Karts host is replaced quickly so the match can continue. */
 const SMASH_HOST_TRANSFER_MS = 6_000;
 const SECRET_MESSAGE_PLACEHOLDER = "Secret message hidden.";
@@ -178,13 +235,17 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
         ? HOLEIO_MAX_PLAYERS
         : game === "chain"
           ? 8
-          : 12;
+          : game === "whos-the-spy"
+            ? SPY_MAX_PLAYERS
+            : 12;
   const defaultMax =
     game === "smashkarts"
       ? SMASH_MAX_PLAYERS
       : game === "holeio"
         ? HOLEIO_MAX_PLAYERS
-        : DEFAULT_GAME_SETTINGS.maxPlayers;
+        : game === "whos-the-spy"
+          ? SPY_DEFAULT_PLAYERS
+          : DEFAULT_GAME_SETTINGS.maxPlayers;
   const maxPlayers = clamp(
     input?.maxPlayers ?? input?.playerCount ?? defaultMax,
     2,
@@ -249,6 +310,41 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
       game === "holeio"
         ? clamp(input?.botCount ?? HOLEIO_BOT_MAX, 0, HOLEIO_BOT_MAX)
         : 0,
+    spyCount:
+      game === "whos-the-spy"
+        ? clamp(input?.spyCount ?? DEFAULT_GAME_SETTINGS.spyCount ?? 0, 0, SPY_MAX_SPIES)
+        : 0,
+    spyCategories:
+      game === "whos-the-spy"
+        ? (() => {
+            const selected = Array.isArray(input?.spyCategories)
+              ? [...new Set(input.spyCategories.filter((value) => isSpyCategoryId(value)))]
+              : [];
+            return selected.length > 0 ? selected : ["mixed"];
+          })()
+        : ["mixed"],
+    spyDifficulty: isSpyDifficulty(input?.spyDifficulty) ? input.spyDifficulty : "normal",
+    spyClueSeconds: clamp(
+      input?.spyClueSeconds ?? SPY_CLUE_SECONDS.default,
+      SPY_CLUE_SECONDS.min,
+      SPY_CLUE_SECONDS.max,
+    ),
+    spyDiscussionSeconds: clamp(
+      input?.spyDiscussionSeconds ?? SPY_DISCUSSION_SECONDS.default,
+      SPY_DISCUSSION_SECONDS.min,
+      SPY_DISCUSSION_SECONDS.max,
+    ),
+    spyVotingSeconds: clamp(
+      input?.spyVotingSeconds ?? SPY_VOTING_SECONDS.default,
+      SPY_VOTING_SECONDS.min,
+      SPY_VOTING_SECONDS.max,
+    ),
+    spyFinalGuess: input?.spyFinalGuess ?? true,
+    spyRoleReveal: input?.spyRoleReveal ?? true,
+    spyTextChat: input?.spyTextChat ?? true,
+    spyVoiceChat: input?.spyVoiceChat ?? true,
+    spySpectatorChat: input?.spySpectatorChat ?? false,
+    spyClueFormat: isSpyClueFormat(input?.spyClueFormat) ? input.spyClueFormat : "both",
   };
 }
 
@@ -261,6 +357,7 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     hostId: "",
     players: [],
     departedPlayers: [],
+    removedResumeTokens: [],
     settings: { ...DEFAULT_GAME_SETTINGS },
     roundNumber: 0,
     drawerId: null,
@@ -278,8 +375,12 @@ function createEmptyState(code: string, game: GameKind): StoredState {
     revealedIndices: [],
     strokes: [],
     chain: null,
+    spy: null,
+    spyRecentPairIds: [],
     lastSmashState: null,
     lastHoleioState: null,
+    voiceDisabled: false,
+    voiceMutedAll: false,
     version: 0,
     createdAt: now,
     lastActivity: now,
@@ -297,6 +398,11 @@ export class GameRoom {
   private sockets = new Map<WebSocket, string | null>();
   private playerSockets = new Map<string, WebSocket>();
   private socketState = new Map<WebSocket, SocketState>();
+  /** Ephemeral WebRTC room membership; audio itself never touches the Worker. */
+  private voiceParticipants = new Map<
+    string,
+    { micMuted: boolean; speaking: boolean; joinedAt: number }
+  >();
   // Reactions are ephemeral chat messages, so they stay in memory and reset
   // with every drawing turn instead of growing the persisted room state.
   private reactedPlayerIds = new Set<string>();
@@ -322,7 +428,9 @@ export class GameRoom {
           ? "smashkarts"
           : stored.game === "holeio"
             ? "holeio"
-            : "skribbl";
+            : stored.game === "whos-the-spy"
+              ? "whos-the-spy"
+              : "skribbl";
     // Merge over a fresh state so rooms written by an older build gain any
     // fields added since, instead of starting with `undefined` values.
     this.room = { ...createEmptyState(stored.code, game), ...stored, game };
@@ -411,7 +519,9 @@ export class GameRoom {
               ? "smashkarts"
               : payload.game === "holeio"
                 ? "holeio"
-                : null;
+                : payload.game === "whos-the-spy"
+                  ? "whos-the-spy"
+                  : null;
       const code = typeof payload.code === "string" ? payload.code.toLowerCase() : "";
       if (!game || !/^[a-z0-9]{6}$/.test(code)) {
         return new Response(JSON.stringify({ reserved: false, reason: "invalid" }), {
@@ -466,7 +576,8 @@ export class GameRoom {
       gameParam !== "chain" &&
       gameParam !== "skribbl" &&
       gameParam !== "smashkarts" &&
-      gameParam !== "holeio"
+      gameParam !== "holeio" &&
+      gameParam !== "whos-the-spy"
     ) {
       return new Response("Invalid game", { status: 400 });
     }
@@ -649,6 +760,7 @@ export class GameRoom {
   }
 
   private createSnapshot(): RoomSnapshot {
+    const isSpy = this.room.game === "whos-the-spy";
     return {
       code: this.room.code,
       game: this.room.game,
@@ -668,8 +780,9 @@ export class GameRoom {
       roundNumber: this.room.roundNumber,
       drawerId: this.room.drawerId,
       maskedWord: this.maskedWord(),
-      endsAt:
-        this.room.phase === "choosing"
+      endsAt: isSpy
+        ? this.room.endsAt
+        : this.room.phase === "choosing"
           ? this.room.chooseEndsAt
           : this.room.phase === "drawing"
             ? this.room.endsAt
@@ -680,8 +793,11 @@ export class GameRoom {
                 : null,
       strokes: this.room.strokes.slice(-MAX_STROKES_PER_ROUND),
       chain: this.room.chain,
+      spy: isSpy ? this.spyPublicState() : null,
       rankings:
-        this.room.phase === "round-result" || this.room.phase === "game-over"
+        this.room.phase === "round-result" ||
+        this.room.phase === "game-over" ||
+        (isSpy && this.room.phase === "results")
           ? this.rankings()
           : undefined,
       winnerId:
@@ -689,8 +805,56 @@ export class GameRoom {
           ? this.room.game === "chain"
             ? this.room.chain?.winnerId ?? null
             : this.rankings()[0]?.playerId ?? null
-          : undefined,
+          : isSpy && this.room.phase === "results"
+            ? this.rankings()[0]?.playerId ?? null
+            : undefined,
       version: ++this.room.version,
+    };
+  }
+
+  private spyPublicState(): SpyPublicState | null {
+    const spy = this.room.spy;
+    if (!spy) return null;
+    const atResults = this.room.phase === "results";
+    const revealRole = atResults || this.room.settings.spyRoleReveal !== false;
+    const lastElimination = spy.lastElimination
+      ? {
+          ...spy.lastElimination,
+          role: revealRole ? spy.lastElimination.role : null,
+        }
+      : null;
+
+    return {
+      round: spy.round,
+      spyCount: spy.spyIds.length,
+      activePlayerIds: spyAliveIds(spy, this.room.players.map((player) => player.id)),
+      turnOrder: spy.turnOrder,
+      activeSpeakerId: this.room.phase === "clue" ? activeSpySpeaker(spy) : null,
+      clues: currentSpyClues(spy),
+      readyPlayerIds: spy.readyIds,
+      votesCast: spy.votes.length,
+      eligibleVoters: spyAliveIds(spy, this.room.players.map((player) => player.id)).length,
+      tiedPlayerIds: spy.tiedIds,
+      lastElimination,
+      finalGuessPlayerId: spy.finalGuessPlayerId,
+      finalGuessResult: atResults ? spy.finalGuessResult : null,
+      winnerTeam: atResults ? spy.winnerTeam : null,
+      resultReason: atResults ? spy.resultReason : null,
+      categoryId: spy.categoryId,
+      categoryLabel: spy.categoryLabel,
+      civilianWord: atResults ? spy.civilianWord : null,
+      spyWord: atResults ? spy.spyWord : null,
+      roles: atResults
+        ? Object.fromEntries(
+            Object.entries(spy.assignments).map(([playerId, assignment]) => [
+              playerId,
+              assignment.role,
+            ]),
+          )
+        : null,
+      votes: atResults
+        ? spy.voteHistory.map((vote) => ({ ...vote }))
+        : null,
     };
   }
 
@@ -732,9 +896,17 @@ export class GameRoom {
       resumeToken: player.resumeToken,
       protocolVersion: PROTOCOL_VERSION,
     });
+    if (this.room.game === "whos-the-spy") {
+      this.send(ws, this.voiceStateEvent());
+    }
   }
 
   private sendPrivateState(ws: WebSocket, playerId: string) {
+    if (this.room.game === "whos-the-spy") {
+      this.sendSpyRole(ws, playerId);
+      return;
+    }
+
     if (this.room.game !== "skribbl" || playerId !== this.room.drawerId) return;
 
     if (this.room.phase === "choosing" && this.room.wordChoices.length > 0) {
@@ -747,6 +919,24 @@ export class GameRoom {
     if (this.room.phase === "drawing" && this.room.selectedWord) {
       this.send(ws, { type: "game.word.selected", word: this.room.selectedWord });
     }
+  }
+
+  /**
+   * The only place a secret word leaves the Durable Object. It goes to one
+   * socket at a time, addressed by the player id attached to that socket.
+   */
+  private sendSpyRole(ws: WebSocket, playerId: string) {
+    const spy = this.room.spy;
+    const assignment = spy?.assignments[playerId];
+    if (!spy || !assignment) return;
+    this.send(ws, {
+      type: "spy.role",
+      role: assignment.role,
+      word: assignment.word,
+      categoryId: spy.categoryId,
+      categoryLabel: spy.categoryLabel,
+      round: spy.round,
+    });
   }
 
   private sendSmashState(ws: WebSocket) {
@@ -800,6 +990,7 @@ export class GameRoom {
     player.connected = false;
     player.lastSeen = Date.now();
     this.room.lastActivity = Date.now();
+    this.removeVoiceParticipant(playerId);
 
     // The host keeps the role through the reconnect grace period so a refresh
     // does not hand the room to someone else.
@@ -826,6 +1017,7 @@ export class GameRoom {
     // Smash Karts and Hole.io have their own seat grids; Chain uses palettes.
     if (this.room.game === "smashkarts") return SMASH_PLAYER_COLORS;
     if (this.room.game === "holeio") return HOLEIO_PLAYER_COLORS;
+    if (this.room.game === "whos-the-spy") return SPY_PLAYER_COLORS;
     if (this.room.game !== "chain") return PLAYER_COLORS;
     return resolveChainPalette(this.room.settings.palette, this.room.settings.customColors);
   }
@@ -917,6 +1109,9 @@ export class GameRoom {
       case "room.settings.update":
         await this.handleSettings(ws, event.settings);
         break;
+      case "room.player.remove":
+        await this.handleRemovePlayer(ws, event.playerId);
+        break;
       case "game.word.choose":
         await this.handleChooseWord(ws, event.wordId);
         break;
@@ -953,8 +1148,41 @@ export class GameRoom {
       case "holeio.snapshot":
         await this.handleHoleioSnapshot(ws, event.snapshot);
         break;
+      case "spy.clue":
+        await this.handleSpyClue(ws, event.text);
+        break;
+      case "spy.ready":
+        await this.handleSpyReady(ws);
+        break;
+      case "spy.vote":
+        await this.handleSpyVote(ws, event.targetId);
+        break;
+      case "spy.final.guess":
+        await this.handleSpyFinalGuess(ws, event.word);
+        break;
+      case "voice.join":
+        await this.handleVoiceJoin(ws);
+        break;
+      case "voice.leave":
+        await this.handleVoiceLeave(ws);
+        break;
+      case "voice.mute":
+        await this.handleVoiceMute(ws, event.muted);
+        break;
+      case "voice.speaking":
+        await this.handleVoiceSpeaking(ws, event.speaking);
+        break;
+      case "voice.signal":
+        this.handleVoiceSignal(ws, event.targetId, event.signal);
+        break;
+      case "voice.host":
+        await this.handleVoiceHost(ws, event);
+        break;
       case "game.rematch":
         await this.handleRematch(ws);
+        break;
+      case "game.lobby":
+        await this.handleReturnToLobby(ws);
         break;
       case "room.sync": {
         const state = this.socketState.get(ws);
@@ -1069,6 +1297,16 @@ export class GameRoom {
       return;
     }
 
+    if (event.resumeToken && this.room.removedResumeTokens.includes(event.resumeToken)) {
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "REMOVED_BY_HOST",
+        "The host removed this seat from the room.",
+      );
+      return;
+    }
+
     const resumed = event.resumeToken
       ? this.room.players.find((player) => player.resumeToken === event.resumeToken)
       : undefined;
@@ -1152,6 +1390,19 @@ export class GameRoom {
       });
     }
 
+    // Who's the Spy hands out roles and words once, at match start. A new seat
+    // that appears after that point would have no assignment and could never
+    // vote, speak or win; wait for the host to reopen the lobby instead.
+    if (this.room.game === "whos-the-spy" && this.room.phase !== "lobby") {
+      this.rejectEntry(
+        ws,
+        "room.join",
+        "ROOM_IN_PROGRESS",
+        "That case is already in progress. Wait for the host to return to the lobby.",
+      );
+      return;
+    }
+
     // Departed seats keep their slot for the current match so a returning
     // player can reclaim their score. New players can use any remaining slot.
     const seatedPlayers = this.room.players.length + this.room.departedPlayers.length;
@@ -1190,12 +1441,16 @@ export class GameRoom {
     this.sockets.delete(ws);
     this.socketState.delete(ws);
     this.playerSockets.delete(player.id);
+    this.removeVoiceParticipant(player.id);
 
     const midMatch =
-      this.room.game === "skribbl" &&
-      (this.room.phase === "choosing" ||
-        this.room.phase === "drawing" ||
-        this.room.phase === "round-result");
+      (this.room.game === "skribbl" &&
+        (this.room.phase === "choosing" ||
+          this.room.phase === "drawing" ||
+          this.room.phase === "round-result")) ||
+      (this.room.game === "whos-the-spy" &&
+        this.room.phase !== "lobby" &&
+        this.room.phase !== "results");
 
     if (midMatch) {
       // An explicit leave during a match keeps the seat for the reconnect grace
@@ -1228,7 +1483,46 @@ export class GameRoom {
     if (this.room.phase !== "lobby") return;
     const connectedCount = this.room.players.filter((entry) => entry.connected).length;
     const holeioSeats = connectedCount + (this.room.settings.botCount ?? 0);
-    if (
+    if (this.room.game === "whos-the-spy") {
+      if (connectedCount < SPY_MIN_PLAYERS) {
+        this.send(ws, {
+          type: "room.error",
+          code: "NOT_ENOUGH_PLAYERS",
+          message: `Who's the Spy needs at least ${SPY_MIN_PLAYERS} connected players.`,
+        });
+        return;
+      }
+      if (connectedCount !== this.room.players.length) {
+        this.send(ws, {
+          type: "room.error",
+          code: "PLAYER_DISCONNECTED",
+          message: "Wait for every seated player to reconnect before starting.",
+        });
+        return;
+      }
+      const requested = this.room.settings.spyCount ?? 0;
+      if (!spyCountIsValid(connectedCount, requested)) {
+        this.send(ws, {
+          type: "room.error",
+          code: "INVALID_SETTINGS",
+          message: `With ${connectedCount} players, the spies must be fewer than the civilians.`,
+        });
+        return;
+      }
+      const availablePair = selectSpyPair(
+        this.room.settings.spyCategories ?? ["mixed"],
+        this.room.settings.spyDifficulty ?? "normal",
+        this.room.spy?.recentPairIds ?? [],
+      );
+      if (!availablePair) {
+        this.send(ws, {
+          type: "room.error",
+          code: "NO_WORD_PAIR",
+          message: "No word pair matches those categories and difficulty. Try another setting.",
+        });
+        return;
+      }
+    } else if (
       this.room.game === "holeio"
         ? holeioSeats < 2
         : connectedCount < 2
@@ -1251,6 +1545,68 @@ export class GameRoom {
       code: safeCode(this.room.code),
       players: this.room.players.length,
     });
+    await this.commit();
+  }
+
+  private async handleRemovePlayer(ws: WebSocket, playerId: string) {
+    const actor = this.socketPlayer(ws);
+    if (!actor || actor.id !== this.room.hostId) {
+      this.send(ws, {
+        type: "room.error",
+        code: "NOT_HOST",
+        message: "Only the host can remove a player.",
+      });
+      return;
+    }
+
+    const target = this.player(playerId);
+    if (!target) {
+      this.send(ws, {
+        type: "room.error",
+        code: "PLAYER_NOT_FOUND",
+        message: "That seat is no longer in the room.",
+      });
+      return;
+    }
+
+    if (target.id === actor.id) {
+      this.send(ws, {
+        type: "room.error",
+        code: "CANNOT_REMOVE_SELF",
+        message: "The host cannot remove their own seat.",
+      });
+      return;
+    }
+
+    const targetSockets = [...this.sockets.entries()]
+      .filter(([, socketPlayerId]) => socketPlayerId === target.id)
+      .map(([socket]) => socket);
+    for (const socket of targetSockets) this.sockets.delete(socket);
+
+    // Remember the token so the removed tab cannot silently reclaim a fresh
+    // seat through its automatic reconnect (or a reload).
+    this.room.removedResumeTokens = [
+      ...this.room.removedResumeTokens.filter((token) => token !== target.resumeToken),
+      target.resumeToken,
+    ].slice(-MAX_REMOVED_RESUME_TOKENS);
+
+    this.removePlayer(target.id, "removed");
+    this.broadcast({ type: "room.player.left", playerId: target.id });
+
+    for (const socket of targetSockets) {
+      this.send(socket, {
+        type: "room.error",
+        code: "REMOVED_BY_HOST",
+        message: "The host removed you from this room.",
+      });
+      try {
+        socket.close(4001, "Removed by host");
+      } catch {
+        // Already closed.
+      }
+    }
+
+    this.broadcastSnapshot();
     await this.commit();
   }
 
@@ -1298,6 +1654,7 @@ export class GameRoom {
     this.room.roundEndsAt = null;
     this.room.chooseEndsAt = null;
     this.room.chain = null;
+    this.room.spy = null;
     this.room.roundNumber = 0;
     this.room.turnNumber = 0;
     this.room.roundOrder = this.room.players.map((player) => player.id);
@@ -1345,6 +1702,11 @@ export class GameRoom {
       return;
     }
 
+    if (this.room.game === "whos-the-spy") {
+      this.startSpyGame();
+      return;
+    }
+
     this.nextTurn();
   }
 
@@ -1353,6 +1715,900 @@ export class GameRoom {
       const j = Math.floor(Math.random() * (i + 1));
       [items[i], items[j]] = [items[j], items[i]];
     }
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /* Who's the Spy                                                           */
+  /* ----------------------------------------------------------------------- */
+
+  private spyAlivePlayerIds(): string[] {
+    if (!this.room.spy) return [];
+    return spyAliveIds(
+      this.room.spy,
+      this.room.players.map((player) => player.id),
+    );
+  }
+
+  private broadcastSpyPhase() {
+    const spy = this.room.spy;
+    if (!spy) return;
+    this.broadcast({
+      type: "spy.phase",
+      phase: this.room.phase,
+      round: spy.round,
+      endsAt: this.room.endsAt,
+      activeSpeakerId: this.room.phase === "clue" ? activeSpySpeaker(spy) : null,
+    });
+    this.refreshVoiceLocks();
+  }
+
+  private startSpyGame() {
+    const state = createSpyState({
+      playerIds: this.room.players.map((player) => player.id),
+      categoryIds: this.room.settings.spyCategories ?? ["mixed"],
+      difficulty: this.room.settings.spyDifficulty ?? "normal",
+      requestedSpies: this.room.settings.spyCount ?? 0,
+      recentPairIds: this.room.spyRecentPairIds,
+    });
+    if (!state) {
+      this.room.phase = "lobby";
+      this.room.endsAt = null;
+      return;
+    }
+
+    this.room.spy = state;
+    this.room.spyRecentPairIds = state.recentPairIds;
+    this.room.phase = "role-reveal";
+    this.room.roundNumber = state.round;
+    this.room.turnNumber = state.round;
+    this.room.drawerId = null;
+    this.room.endsAt = Date.now() + SPY_ROLE_REVEAL_MS;
+    this.room.roundOrder = [...state.turnOrder];
+
+    for (const player of this.room.players) {
+      const socket = this.playerSockets.get(player.id);
+      if (socket) this.sendSpyRole(socket, player.id);
+    }
+
+    this.broadcastSystemChat(
+      `${state.spyIds.length} ${state.spyIds.length === 1 ? "spy is" : "spies are"} hidden among you.`,
+      "round_started",
+    );
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  /** Starts the first clue round after the role-reveal screen. */
+  private beginSpyClueRound(nextRound: boolean) {
+    const spy = this.room.spy;
+    if (!spy) return;
+    if (nextRound) {
+      resetSpyClueRound(spy, this.spyAlivePlayerIds());
+    }
+    spy.readyIds = [];
+    this.room.phase = "clue";
+    this.room.roundNumber = spy.round;
+    this.room.turnNumber = spy.round;
+    this.room.endsAt = Date.now() + (this.room.settings.spyClueSeconds ?? 45) * 1000;
+
+    const skipped = this.skipDisconnectedSpeakers();
+    if (spy.speakerIndex >= spy.turnOrder.length) {
+      this.beginSpyDiscussion();
+      return;
+    }
+    if (!skipped) {
+      this.broadcastSystemChat(
+        `Clue round ${spy.round} starts. ${this.speakerName()} gives the first clue.`,
+        "phase",
+      );
+    }
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private speakerName(): string {
+    const speakerId = this.room.spy ? activeSpySpeaker(this.room.spy) : null;
+    return this.player(speakerId)?.nickname ?? "The next player";
+  }
+
+  /**
+   * Moves past seats that dropped during their turn. A disconnected player
+   * keeps their role and can return next round; the room does not stall for the
+   * whole reconnect grace period.
+   */
+  private skipDisconnectedSpeakers(): boolean {
+    const spy = this.room.spy;
+    if (!spy) return false;
+    let skipped = false;
+    while (spy.speakerIndex < spy.turnOrder.length) {
+      const player = this.player(spy.turnOrder[spy.speakerIndex] ?? "");
+      if (player?.connected) break;
+      skipped = true;
+      spy.speakerIndex += 1;
+    }
+    return skipped;
+  }
+
+  private beginSpyDiscussion() {
+    const spy = this.room.spy;
+    if (!spy) return;
+    this.room.phase = "discussion";
+    this.room.endsAt = Date.now() + (this.room.settings.spyDiscussionSeconds ?? 45) * 1000;
+    this.broadcastSystemChat("Every clue is in. Discussion is open.", "phase");
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private advanceSpySpeaker() {
+    const spy = this.room.spy;
+    if (!spy || this.room.phase !== "clue") return;
+    spy.speakerIndex += 1;
+    if (spy.speakerIndex >= spy.turnOrder.length) {
+      this.beginSpyDiscussion();
+      return;
+    }
+    this.skipDisconnectedSpeakers();
+    if (spy.speakerIndex >= spy.turnOrder.length) {
+      this.beginSpyDiscussion();
+      return;
+    }
+    // Always give the next connected speaker a full turn. Skipping an absent
+    // seat must not carry the previous speaker's nearly-expired clock over.
+    this.room.endsAt = Date.now() + (this.room.settings.spyClueSeconds ?? 45) * 1000;
+    this.broadcastSystemChat(`${this.speakerName()}'s turn to give a clue.`, "phase");
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private beginSpyVoting(revote: boolean) {
+    const spy = this.room.spy;
+    if (!spy) return;
+    spy.votes = [];
+    if (!revote) {
+      spy.tiedIds = [];
+      spy.revoteUsed = false;
+    }
+    this.room.phase = revote ? "revote" : "voting";
+    this.room.endsAt =
+      Date.now() +
+      (revote ? SPY_REVOTE_SECONDS : this.room.settings.spyVotingSeconds ?? 30) * 1000;
+    this.broadcastSystemChat(
+      revote
+        ? `The vote is tied. Revote between ${this.spyNames(spy.tiedIds)}.`
+        : "Voting is open. Choose who you believe is the spy.",
+      "vote",
+    );
+    this.broadcast({ type: "spy.vote.progress", cast: 0, total: this.spyAlivePlayerIds().length });
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private spyNames(playerIds: readonly string[]): string {
+    const names = playerIds
+      .map((playerId) => this.player(playerId)?.nickname ?? "Unknown")
+      .filter(Boolean);
+    if (names.length === 0) return "nobody";
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  }
+
+  private async handleSpyReady(ws: WebSocket) {
+    const player = this.socketPlayer(ws);
+    const spy = this.room.spy;
+    if (!player || !spy || this.room.game !== "whos-the-spy") return;
+    if (this.room.phase !== "role-reveal") return;
+
+    // "Ready" only means the player has memorised their private role card; it
+    // never changes or redistributes the secret assignment.
+    if (!spy.readyIds.includes(player.id)) {
+      spy.readyIds.push(player.id);
+      this.broadcast({
+        type: "spy.ready",
+        playerId: player.id,
+        readyCount: spy.readyIds.length,
+        total: this.spyAlivePlayerIds().length,
+      });
+    }
+
+    const connectedAlive = this.spyAlivePlayerIds().filter(
+      (playerId) => this.player(playerId)?.connected,
+    );
+    const everyoneReady =
+      connectedAlive.length > 0 &&
+      connectedAlive.every((playerId) => spy.readyIds.includes(playerId));
+    this.broadcastSnapshot();
+    if (everyoneReady) this.beginSpyClueRound(false);
+    await this.commit();
+  }
+
+  private async handleSpyClue(ws: WebSocket, text: string) {
+    const player = this.socketPlayer(ws);
+    const spy = this.room.spy;
+    if (!player || !spy || this.room.game !== "whos-the-spy") return;
+    if (this.room.phase !== "clue") return;
+    if (spy.eliminatedIds.includes(player.id)) {
+      this.send(ws, {
+        type: "room.error",
+        code: "ELIMINATED",
+        message: "Eliminated players cannot submit clues.",
+      });
+      return;
+    }
+    if (activeSpySpeaker(spy) !== player.id) {
+      this.send(ws, {
+        type: "room.error",
+        code: "NOT_YOUR_TURN",
+        message: "Wait for your turn to give a clue.",
+      });
+      return;
+    }
+    if (hasSpyClue(spy, player.id)) {
+      this.send(ws, {
+        type: "room.error",
+        code: "CLUE_ALREADY_SENT",
+        message: "You already gave your clue this round.",
+      });
+      return;
+    }
+    if (this.room.endsAt && Date.now() >= this.room.endsAt) {
+      await this.handleSpyAlarm(Date.now());
+      await this.commit();
+      return;
+    }
+
+    const trimmed = text.trim().slice(0, MAX_SPY_CLUE_LENGTH);
+    if (!trimmed) return;
+    if (textRevealsAnyWord(trimmed, [spy.civilianWord, spy.spyWord])) {
+      this.send(ws, {
+        type: "room.error",
+        code: "CLUE_REVEALS_WORD",
+        message: "A clue cannot contain either secret word.",
+      });
+      return;
+    }
+
+    const clue = addSpyClue(spy, player.id, trimmed, Date.now());
+    this.broadcast({
+      type: "spy.clue",
+      playerId: clue.playerId,
+      text: clue.text,
+      round: clue.round,
+      createdAt: clue.createdAt,
+    });
+    this.advanceSpySpeaker();
+    await this.commit();
+  }
+
+  private async handleSpyVote(ws: WebSocket, targetId: string) {
+    const player = this.socketPlayer(ws);
+    const spy = this.room.spy;
+    if (!player || !spy || this.room.game !== "whos-the-spy") return;
+    if (this.room.phase !== "voting" && this.room.phase !== "revote") return;
+    if (spy.eliminatedIds.includes(player.id)) {
+      this.send(ws, {
+        type: "room.error",
+        code: "ELIMINATED",
+        message: "Eliminated players cannot vote.",
+      });
+      return;
+    }
+    if (this.room.endsAt && Date.now() >= this.room.endsAt) {
+      await this.handleSpyAlarm(Date.now());
+      await this.commit();
+      return;
+    }
+
+    const alive = new Set(this.spyAlivePlayerIds());
+    if (!alive.has(targetId) || !spy.assignments[targetId]) {
+      this.send(ws, {
+        type: "room.error",
+        code: "INVALID_VOTE",
+        message: "That player cannot be voted for.",
+      });
+      return;
+    }
+    if (targetId === player.id) {
+      this.send(ws, {
+        type: "room.error",
+        code: "SELF_VOTE",
+        message: "You cannot vote for yourself.",
+      });
+      return;
+    }
+    if (this.room.phase === "revote" && !spy.tiedIds.includes(targetId)) {
+      this.send(ws, {
+        type: "room.error",
+        code: "INVALID_VOTE",
+        message: "The revote is limited to the tied players.",
+      });
+      return;
+    }
+    if (spy.votes.some((vote) => vote.voterId === player.id)) {
+      this.send(ws, {
+        type: "room.error",
+        code: "VOTE_LOCKED",
+        message: "Your vote is already locked in.",
+      });
+      return;
+    }
+
+    const vote: SpyVote = { voterId: player.id, targetId };
+    spy.votes.push(vote);
+    spy.voteHistory.push({
+      voterId: player.id,
+      targetId,
+      round: spy.round,
+      revote: this.room.phase === "revote",
+    });
+
+    const total = this.spyAlivePlayerIds().length;
+    this.broadcast({ type: "spy.vote.progress", cast: spy.votes.length, total });
+
+    const eligible = this.spyAlivePlayerIds().filter(
+      (playerId) => this.player(playerId)?.connected,
+    );
+    const voted = new Set(spy.votes.map((entry) => entry.voterId));
+    if (eligible.length > 0 && eligible.every((playerId) => voted.has(playerId))) {
+      await this.finishSpyVoting();
+      await this.commit();
+      return;
+    }
+
+    this.broadcastSnapshot();
+    await this.commit();
+  }
+
+  private async finishSpyVoting() {
+    const spy = this.room.spy;
+    if (!spy || (this.room.phase !== "voting" && this.room.phase !== "revote")) return;
+
+    const alive = this.spyAlivePlayerIds();
+    const candidates = this.room.phase === "revote" ? spy.tiedIds : alive;
+    const tally = tallySpyVotes(spy.votes, alive, candidates);
+
+    if (tally.tiedIds.length > 0) {
+      if (this.room.phase !== "revote") {
+        spy.revoteUsed = true;
+        spy.tiedIds = tally.tiedIds;
+        this.beginSpyVoting(true);
+        return;
+      }
+      // A tied revote eliminates nobody. The next clue round starts after a
+      // short result beat so players can see what happened.
+      spy.tiedIds = [];
+      spy.revoteUsed = false;
+      spy.lastElimination = null;
+      this.room.phase = "elimination";
+      this.room.endsAt = Date.now() + SPY_ELIMINATION_MS;
+      this.broadcastSystemChat("The revote is tied. Nobody is eliminated.", "elimination");
+      this.broadcastSpyPhase();
+      this.broadcastSnapshot();
+      return;
+    }
+
+    if (!tally.eliminatedId) {
+      spy.tiedIds = [];
+      spy.revoteUsed = false;
+      spy.lastElimination = null;
+      this.room.phase = "elimination";
+      this.room.endsAt = Date.now() + SPY_ELIMINATION_MS;
+      this.broadcastSystemChat("No valid votes were cast. Nobody is eliminated.", "elimination");
+      this.broadcastSpyPhase();
+      this.broadcastSnapshot();
+      return;
+    }
+
+    this.eliminateSpyPlayer(tally.eliminatedId, this.room.phase === "revote");
+  }
+
+  private eliminateSpyPlayer(playerId: string, viaRevote: boolean) {
+    const spy = this.room.spy;
+    const player = this.player(playerId);
+    if (!spy || !player || spy.eliminatedIds.includes(playerId)) return;
+
+    spy.eliminatedIds.push(playerId);
+    spy.readyIds = spy.readyIds.filter((id) => id !== playerId);
+    spy.tiedIds = [];
+    spy.revoteUsed = false;
+    spy.lastElimination = {
+      playerId,
+      round: spy.round,
+      tied: false,
+      viaRevote,
+      role: spy.assignments[playerId]?.role ?? null,
+    };
+    this.room.phase = "elimination";
+    this.room.endsAt = Date.now() + SPY_ELIMINATION_MS;
+
+    const publicElimination = {
+      ...spy.lastElimination,
+      role: this.room.settings.spyRoleReveal === false ? null : spy.lastElimination.role,
+    };
+    this.broadcast({ type: "spy.elimination", elimination: publicElimination });
+    this.broadcastSystemChat(
+      this.room.settings.spyRoleReveal === false
+        ? `${player.nickname} was eliminated.`
+        : `${player.nickname} was eliminated. They were ${spy.assignments[playerId]?.role === "spy" ? "the spy" : "a civilian"}.`,
+      "elimination",
+    );
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private resolveSpyElimination() {
+    const spy = this.room.spy;
+    if (!spy) return;
+    const alive = this.spyAlivePlayerIds();
+    const winner = spyWinner(spy, alive);
+
+    if (winner === "civilians") {
+      if (
+        this.room.settings.spyFinalGuess !== false &&
+        spy.lastElimination &&
+        spyRoleOf(spy, spy.lastElimination.playerId) === "spy"
+      ) {
+        this.beginSpyFinalGuess();
+        return;
+      }
+      this.finishSpyGame("civilians", "all-spies-eliminated");
+      return;
+    }
+
+    if (winner === "spies") {
+      this.finishSpyGame("spies", "spies-reached-parity");
+      return;
+    }
+
+    this.beginSpyClueRound(true);
+  }
+
+  private beginSpyFinalGuess() {
+    const spy = this.room.spy;
+    if (!spy) return;
+    const spyId = lastEliminatedSpyId(spy);
+    if (!spyId) {
+      this.finishSpyGame("civilians", "all-spies-eliminated");
+      return;
+    }
+    spy.finalGuessPlayerId = spyId;
+    spy.finalGuessResult = null;
+    this.room.phase = "final-guess";
+    this.room.endsAt = Date.now() + SPY_FINAL_GUESS_SECONDS * 1000;
+    this.broadcastSystemChat(
+      `The last spy has one chance to guess the civilian word.`,
+      "phase",
+    );
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  private async handleSpyFinalGuess(ws: WebSocket, word: string) {
+    const player = this.socketPlayer(ws);
+    const spy = this.room.spy;
+    if (!player || !spy || this.room.game !== "whos-the-spy") return;
+    if (this.room.phase !== "final-guess" || spy.finalGuessPlayerId !== player.id) return;
+    if (spy.finalGuessResult) return;
+
+    const guess = word.trim().slice(0, MAX_SPY_FINAL_GUESS_LENGTH);
+    if (!guess) return;
+    const correct = normalizeWord(guess) === normalizeWord(spy.civilianWord);
+    spy.finalGuessResult = { playerId: player.id, correct };
+    this.broadcast({ type: "spy.final-guess.result", playerId: player.id, correct });
+    this.broadcastSystemChat(
+      correct
+        ? `${player.nickname} guessed the civilian word. The spies steal the win!`
+        : `${player.nickname} guessed wrong. The civilians win!`,
+      "announcement",
+    );
+    this.finishSpyGame(
+      correct ? "spies" : "civilians",
+      correct ? "final-guess-correct" : "final-guess-wrong",
+    );
+    await this.commit();
+  }
+
+  private finishSpyGame(team: SpyTeam, reason: SpyState["resultReason"]) {
+    const spy = this.room.spy;
+    if (!spy || this.room.phase === "results") return;
+
+    spy.winnerTeam = team;
+    spy.resultReason = reason;
+    spy.finalGuessPlayerId = null;
+    spy.readyIds = [];
+    this.room.phase = "results";
+    this.room.endsAt = null;
+    this.room.drawerId = null;
+
+    if (!spy.scored) {
+      const rankings = scoreSpyGame({
+        state: spy,
+        players: this.room.players.map((player) => ({
+          id: player.id,
+          nickname: player.nickname,
+          joinedAt: player.joinedAt,
+        })),
+        winnerTeam: team,
+      });
+      for (const ranking of rankings) {
+        const player = this.player(ranking.playerId);
+        if (player) player.score = ranking.score;
+      }
+      spy.scored = true;
+    }
+
+    const roles = Object.fromEntries(
+      Object.entries(spy.assignments).map(([playerId, assignment]) => [
+        playerId,
+        assignment.role,
+      ]),
+    ) as Record<string, SpyRole>;
+    const rankings = this.rankings();
+    this.broadcast({
+      type: "spy.results",
+      winnerTeam: team,
+      reason: reason ?? "all-spies-eliminated",
+      civilianWord: spy.civilianWord,
+      spyWord: spy.spyWord,
+      roles,
+      rankings,
+    });
+    this.broadcast({
+      type: "game.finished",
+      rankings,
+      winnerId: rankings[0]?.playerId,
+    });
+    this.broadcastSystemChat(
+      team === "civilians" ? "The civilians win!" : "The spies win!",
+      "announcement",
+    );
+    this.broadcastSpyPhase();
+    this.broadcastSnapshot();
+  }
+
+  /**
+   * Called after a seat is permanently removed (grace expired or explicit
+   * leave). Eliminated spectators leave without touching the match; an active
+   * player is treated as eliminated and the win conditions are recalculated.
+   */
+  private handleSpyRemoval(playerId: string) {
+    const spy = this.room.spy;
+    if (!spy || this.room.phase === "results" || this.room.phase === "lobby") return;
+    const wasAlive = !spy.eliminatedIds.includes(playerId);
+    if (!wasAlive) return;
+
+    const currentSpeaker = activeSpySpeaker(spy);
+    spy.eliminatedIds.push(playerId);
+    spy.readyIds = spy.readyIds.filter((id) => id !== playerId);
+    spy.turnOrder = spy.turnOrder.filter((id) => id !== playerId);
+    spy.votes = spy.votes.filter(
+      (vote) => vote.voterId !== playerId && vote.targetId !== playerId,
+    );
+    spy.tiedIds = spy.tiedIds.filter((id) => id !== playerId);
+
+    if (currentSpeaker && currentSpeaker !== playerId) {
+      spy.speakerIndex = Math.max(0, spy.turnOrder.indexOf(currentSpeaker));
+    } else {
+      spy.speakerIndex = Math.min(spy.speakerIndex, spy.turnOrder.length);
+    }
+
+    if (this.room.phase === "clue") {
+      if (currentSpeaker === playerId) {
+        this.skipDisconnectedSpeakers();
+      }
+      if (spy.speakerIndex >= spy.turnOrder.length) {
+        this.beginSpyDiscussion();
+      }
+    }
+
+    if (this.room.phase === "final-guess" && spy.finalGuessPlayerId === playerId) {
+      spy.finalGuessResult = { playerId, correct: false };
+      this.finishSpyGame("civilians", "final-guess-timeout");
+      return;
+    }
+
+    const alive = this.spyAlivePlayerIds();
+    const winner = spyWinner(spy, alive);
+    if (winner === "spies") {
+      this.finishSpyGame("spies", "spies-reached-parity");
+      return;
+    }
+    if (winner === "civilians" && alive.length > 0) {
+      // A departed spy cannot use the final guess. The civilians win.
+      this.finishSpyGame("civilians", "all-spies-eliminated");
+      return;
+    }
+
+    if (this.room.phase === "voting" || this.room.phase === "revote") {
+      const eligible = this.spyAlivePlayerIds().filter(
+        (id) => this.player(id)?.connected,
+      );
+      const voted = new Set(spy.votes.map((vote) => vote.voterId));
+      if (eligible.length > 0 && eligible.every((id) => voted.has(id))) {
+        void this.finishSpyVoting();
+      }
+    }
+  }
+
+  private async handleSpyChat(player: StoredPlayer, text: string) {
+    const spy = this.room.spy;
+    const trimmed = text.trim().slice(0, MAX_CHAT_LENGTH);
+    if (!trimmed) return;
+
+    // The lobby has no spy state yet, but the table can still talk while it
+    // fills. There are no secret words to protect until the first deal.
+    if (!spy) {
+      this.broadcastChat(player, trimmed);
+      return;
+    }
+
+    if (this.room.phase === "results") {
+      this.broadcastChat(player, trimmed);
+      return;
+    }
+
+    const isSpectator = spy.eliminatedIds.includes(player.id);
+    if (isSpectator) {
+      if (this.room.settings.spySpectatorChat !== true) {
+        this.sendSystemChat(
+          player.id,
+          "Spectator chat is disabled in this room.",
+          "error",
+        );
+        return;
+      }
+      this.broadcastSpectatorChat(player, trimmed, spy.eliminatedIds);
+      return;
+    }
+
+    if (this.room.settings.spyTextChat === false) return;
+    if (textRevealsAnyWord(trimmed, [spy.civilianWord, spy.spyWord])) {
+      this.sendSystemChat(
+        player.id,
+        "Your message was blocked because it contains a secret word.",
+        "error",
+      );
+      return;
+    }
+    this.broadcastChat(player, trimmed);
+  }
+
+  /** Spectator messages can only reach other eliminated players. */
+  private broadcastSpectatorChat(
+    player: StoredPlayer,
+    text: string,
+    eliminatedIds: readonly string[],
+  ) {
+    const spectators = new Set(eliminatedIds);
+    const createdAt = Date.now();
+    for (const [ws, playerId] of this.sockets.entries()) {
+      if (!playerId || !spectators.has(playerId)) continue;
+      this.send(ws, {
+        type: "chat.message",
+        playerId: player.id,
+        nickname: player.nickname,
+        text,
+        createdAt,
+        spectator: true,
+      });
+    }
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /* Voice: signaling and host controls                                      */
+  /* ----------------------------------------------------------------------- */
+
+  private voiceEnabled(): boolean {
+    return this.room.game === "whos-the-spy" && this.room.settings.spyVoiceChat !== false;
+  }
+
+  /**
+   * Server-side opinion of whether a participant may transmit. The client also
+   * disables the local track, but this keeps speaking flags honest and stops a
+   * stale "speaking" indicator surviving a vote lock or elimination.
+   */
+  private voiceCanSpeak(playerId: string): boolean {
+    const participant = this.voiceParticipants.get(playerId);
+    if (!participant || participant.micMuted) return false;
+    if (!this.voiceEnabled() || this.room.voiceDisabled || this.room.voiceMutedAll) {
+      return false;
+    }
+    if (this.room.phase === "voting" || this.room.phase === "revote") return false;
+    const spy = this.room.spy;
+    if (spy && this.room.phase !== "results" && spy.eliminatedIds.includes(playerId)) {
+      // Eliminated players keep listening, but only the results screen lets
+      // them address the whole table again.
+      return false;
+    }
+    return true;
+  }
+
+  private voiceStateEvent(): ServerEvent {
+    const participants = [...this.voiceParticipants.entries()]
+      .filter(([playerId]) => this.player(playerId) !== undefined)
+      .sort((left, right) => left[1].joinedAt - right[1].joinedAt)
+      .map(([playerId, state]) => ({
+        playerId,
+        micMuted: state.micMuted,
+        speaking: state.speaking,
+      }));
+    return {
+      type: "voice.state",
+      participants,
+      muteAll: this.room.voiceMutedAll,
+      disabled: this.room.voiceDisabled,
+    };
+  }
+
+  private broadcastVoiceState() {
+    this.broadcast(this.voiceStateEvent());
+  }
+
+  /** Re-evaluate speaking flags after a phase or elimination change. */
+  private refreshVoiceLocks() {
+    if (this.voiceParticipants.size === 0) return;
+    for (const [playerId, state] of this.voiceParticipants) {
+      if (state.speaking && !this.voiceCanSpeak(playerId)) state.speaking = false;
+    }
+    this.broadcastVoiceState();
+  }
+
+  private removeVoiceParticipant(playerId: string) {
+    if (this.voiceParticipants.delete(playerId)) this.broadcastVoiceState();
+  }
+
+  private async handleVoiceJoin(ws: WebSocket) {
+    const player = this.socketPlayer(ws);
+    if (!player) return;
+    if (!this.voiceEnabled() || this.room.voiceDisabled) {
+      this.send(ws, {
+        type: "room.error",
+        code: "VOICE_DISABLED",
+        message: this.room.voiceDisabled
+          ? "The host disabled voice chat."
+          : "Voice chat is off in this room.",
+      });
+      return;
+    }
+    if (!this.voiceParticipants.has(player.id)) {
+      this.voiceParticipants.set(player.id, {
+        micMuted: false,
+        speaking: false,
+        joinedAt: Date.now(),
+      });
+    }
+    // The broadcast reaches the new participant too, so every client can build
+    // the same peer list from one authoritative message.
+    this.broadcastVoiceState();
+  }
+
+  private async handleVoiceLeave(ws: WebSocket) {
+    const player = this.socketPlayer(ws);
+    if (!player) return;
+    this.removeVoiceParticipant(player.id);
+  }
+
+  private async handleVoiceMute(ws: WebSocket, muted: boolean) {
+    const player = this.socketPlayer(ws);
+    if (!player) return;
+    const participant = this.voiceParticipants.get(player.id);
+    if (!participant || participant.micMuted === muted) return;
+    participant.micMuted = muted;
+    if (muted) participant.speaking = false;
+    this.broadcastVoiceState();
+  }
+
+  private async handleVoiceSpeaking(ws: WebSocket, speaking: boolean) {
+    const player = this.socketPlayer(ws);
+    if (!player) return;
+    const participant = this.voiceParticipants.get(player.id);
+    if (!participant) return;
+    const next = speaking && this.voiceCanSpeak(player.id);
+    if (participant.speaking === next) return;
+    participant.speaking = next;
+    this.broadcastVoiceState();
+  }
+
+  private handleVoiceSignal(
+    ws: WebSocket,
+    targetId: string,
+    signal: Extract<ClientEvent, { type: "voice.signal" }>["signal"],
+  ) {
+    const player = this.socketPlayer(ws);
+    if (!player || player.id === targetId) return;
+    if (!this.voiceEnabled() || this.room.voiceDisabled) return;
+    if (!this.voiceParticipants.has(player.id)) return;
+    if (!this.voiceParticipants.has(targetId)) return;
+    const target = this.playerSockets.get(targetId);
+    if (!target) return;
+    // Signaling is addressed to one peer; it must never be broadcast to the
+    // whole room the way game state is.
+    this.send(target, { type: "voice.signal", fromId: player.id, signal });
+  }
+
+  private async handleVoiceHost(
+    ws: WebSocket,
+    patch: Extract<ClientEvent, { type: "voice.host" }>,
+  ) {
+    const player = this.socketPlayer(ws);
+    if (!player || player.id !== this.room.hostId) {
+      this.send(ws, {
+        type: "room.error",
+        code: "NOT_HOST",
+        message: "Only the host can control voice for the room.",
+      });
+      return;
+    }
+
+    const muteAll =
+      typeof patch.muteAll === "boolean" ? patch.muteAll : this.room.voiceMutedAll;
+    const disabled =
+      typeof patch.disabled === "boolean" ? patch.disabled : this.room.voiceDisabled;
+    if (muteAll === this.room.voiceMutedAll && disabled === this.room.voiceDisabled) return;
+
+    this.room.voiceMutedAll = muteAll;
+    this.room.voiceDisabled = disabled;
+    if (muteAll || disabled) {
+      for (const participant of this.voiceParticipants.values()) {
+        participant.speaking = false;
+      }
+    }
+    this.broadcastVoiceState();
+    await this.commit();
+  }
+
+  /** Runs expired Spy deadlines. Returns true when the room changed. */
+  private async handleSpyAlarm(now: number): Promise<boolean> {
+    const spy = this.room.spy;
+    if (!spy || !this.room.endsAt || now < this.room.endsAt) return false;
+
+    if (this.room.phase === "role-reveal") {
+      this.beginSpyClueRound(false);
+      return true;
+    }
+
+    if (this.room.phase === "clue") {
+      const speakerId = activeSpySpeaker(spy);
+      const speaker = this.player(speakerId);
+      if (speaker) {
+        this.broadcastSystemChat(
+          `${speaker.nickname} ran out of time to give a clue.`,
+          "announcement",
+        );
+      }
+      this.advanceSpySpeaker();
+      return true;
+    }
+
+    if (this.room.phase === "discussion") {
+      this.beginSpyVoting(false);
+      return true;
+    }
+
+    if (this.room.phase === "voting" || this.room.phase === "revote") {
+      await this.finishSpyVoting();
+      return true;
+    }
+
+    if (this.room.phase === "elimination") {
+      this.resolveSpyElimination();
+      return true;
+    }
+
+    if (this.room.phase === "final-guess") {
+      if (spy.finalGuessPlayerId && !spy.finalGuessResult) {
+        spy.finalGuessResult = { playerId: spy.finalGuessPlayerId, correct: false };
+        this.broadcast({
+          type: "spy.final-guess.result",
+          playerId: spy.finalGuessPlayerId,
+          correct: false,
+        });
+        this.broadcastSystemChat("The final guess timed out. The civilians win!", "announcement");
+      }
+      this.finishSpyGame("civilians", "final-guess-timeout");
+      return true;
+    }
+
+    return false;
   }
 
   private nextTurn() {
@@ -1566,6 +2822,11 @@ export class GameRoom {
 
     const trimmed = text.trim().slice(0, MAX_CHAT_LENGTH);
     if (!trimmed) return;
+
+    if (this.room.game === "whos-the-spy") {
+      await this.handleSpyChat(player, trimmed);
+      return;
+    }
 
     const isDrawing = this.room.game === "skribbl" && this.room.phase === "drawing";
     const selectedWord = this.room.selectedWord ?? "";
@@ -2227,9 +3488,20 @@ export class GameRoom {
       this.send(ws, { type: "room.error", code: "NOT_HOST", message: "Only the host can start a rematch." });
       return;
     }
-    if (this.room.phase !== "game-over") return;
+    const finished =
+      this.room.phase === "game-over" ||
+      (this.room.game === "whos-the-spy" && this.room.phase === "results");
+    if (!finished) return;
     const connectedCount = this.room.players.filter((entry) => entry.connected).length;
     const holeioSeats = connectedCount + (this.room.settings.botCount ?? 0);
+    if (this.room.game === "whos-the-spy" && connectedCount < SPY_MIN_PLAYERS) {
+      this.send(ws, {
+        type: "room.error",
+        code: "NOT_ENOUGH_PLAYERS",
+        message: `Who's the Spy needs at least ${SPY_MIN_PLAYERS} connected players for a rematch.`,
+      });
+      return;
+    }
     if (this.room.game === "holeio" ? holeioSeats < 2 : connectedCount < 2) {
       this.send(ws, {
         type: "room.error",
@@ -2247,9 +3519,40 @@ export class GameRoom {
     await this.commit();
   }
 
-  private removePlayer(playerId: string, reason: "left" | "disconnected") {
+  private async handleReturnToLobby(ws: WebSocket) {
+    const player = this.socketPlayer(ws);
+    if (!player || player.id !== this.room.hostId) {
+      this.send(ws, {
+        type: "room.error",
+        code: "NOT_HOST",
+        message: "Only the host can return the room to the lobby.",
+      });
+      return;
+    }
+    if (this.room.game !== "whos-the-spy" || this.room.phase !== "results") return;
+
+    this.room.phase = "lobby";
+    this.room.spy = null;
+    this.room.endsAt = null;
+    this.room.roundNumber = 0;
+    this.room.turnNumber = 0;
+    this.room.drawerId = null;
+    this.room.roundOrder = this.room.players.map((entry) => entry.id);
+    for (const entry of this.room.players) {
+      entry.score = 0;
+      entry.guessedCorrectly = false;
+    }
+    this.broadcastSystemChat("The room is back in the lobby.", "phase");
+    this.refreshVoiceLocks();
+    this.broadcastSnapshot();
+    await this.commit();
+  }
+
+  private removePlayer(playerId: string, reason: "left" | "disconnected" | "removed") {
     const player = this.player(playerId);
     if (!player) return;
+
+    this.removeVoiceParticipant(playerId);
 
     const wasDrawer = this.room.drawerId === playerId;
     const wasTurn = this.room.chain?.turnPlayerId === playerId;
@@ -2281,6 +3584,16 @@ export class GameRoom {
       this.transferHost();
     }
 
+    if (this.room.game === "whos-the-spy") {
+      // The seat is already gone, so the spy engine can exclude it from the
+      // alive list while advancing the speaker order or ending the match.
+      this.handleSpyRemoval(playerId);
+      if (this.room.phase === "results") {
+        // finishSpyGame already broadcast the result snapshot.
+        return;
+      }
+    }
+
     if (this.room.game === "skribbl" && wasDrawer && this.room.phase === "drawing") {
       this.endRound("drawer-disconnected");
     } else if (this.room.game === "skribbl" && wasDrawer && this.room.phase === "choosing") {
@@ -2307,6 +3620,7 @@ export class GameRoom {
       // Keep the used marker (version) and creation time so the code is not
       // reallocated before the empty-room TTL alarm fires. The room itself is
       // lobby-empty, so a fresh player can still create it after expiry.
+      this.voiceParticipants.clear();
       const previous = this.room;
       this.room = {
         ...createEmptyState(previous.code, previous.game),
@@ -2321,6 +3635,7 @@ export class GameRoom {
       this.room.players.length < 2 &&
       this.room.game !== "smashkarts" &&
       this.room.game !== "holeio" &&
+      this.room.game !== "whos-the-spy" &&
       this.room.phase !== "lobby" &&
       this.room.phase !== "game-over"
     ) {
@@ -2332,6 +3647,7 @@ export class GameRoom {
     // score and can reclaim it by joining again with the same resume token.
     if (
       this.room.game === "skribbl" &&
+      reason !== "removed" &&
       this.room.players.length > 0 &&
       (this.room.phase === "choosing" ||
         this.room.phase === "drawing" ||
@@ -2349,8 +3665,14 @@ export class GameRoom {
     }
 
     this.broadcastSystemChat(
-      `${player.nickname} ${reason === "left" ? "left the room" : "disconnected"}.`,
-      reason === "left" ? "player_left" : "disconnected",
+      `${player.nickname} ${
+        reason === "removed"
+          ? "was removed from the room"
+          : reason === "left"
+            ? "left the room"
+            : "disconnected"
+      }.`,
+      reason === "disconnected" ? "disconnected" : "player_left",
     );
     if (wasTurn && this.room.chain && !this.room.chain.turnEndsAt) {
       this.room.chain.turnEndsAt = Date.now() + (this.room.settings.turnTimeSeconds ?? 45) * 1000;
@@ -2403,6 +3725,16 @@ export class GameRoom {
       if (this.room.phase === "round-result" && this.room.roundEndsAt) {
         deadlines.push(this.room.roundEndsAt);
       }
+    }
+
+    if (
+      this.room.game === "whos-the-spy" &&
+      this.room.phase !== "lobby" &&
+      this.room.phase !== "results" &&
+      this.room.endsAt &&
+      this.room.players.some((player) => player.connected)
+    ) {
+      deadlines.push(this.room.endsAt);
     }
 
     if (this.room.game === "chain" && this.room.phase === "playing" && this.room.chain?.turnEndsAt) {
@@ -2559,6 +3891,8 @@ export class GameRoom {
         this.nextTurn();
         changed = true;
       }
+    } else if (this.room.game === "whos-the-spy") {
+      if (await this.handleSpyAlarm(now)) changed = true;
     } else if (this.room.game === "chain" && this.room.phase === "playing") {
       if (this.room.chain?.turnEndsAt && now >= this.room.chain.turnEndsAt) {
         await this.handleChainTimeout();
