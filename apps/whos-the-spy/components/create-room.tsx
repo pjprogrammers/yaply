@@ -80,7 +80,7 @@ export function CreateRoom() {
       <main className="page-shell">
         <div className="page-head">
           <div>
-            <h1>Open a case.</h1>
+            <h1>Create a Who&apos;s the Spy room.</h1>
             <p>
               Pick the categories, set the clocks and choose how many spies are
               hiding. You can still change all of it in the lobby before the

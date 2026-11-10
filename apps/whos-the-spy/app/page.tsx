@@ -11,6 +11,8 @@ import {
 } from "@/components/icons";
 import { SiteFooter } from "@/components/site-footer";
 import { Topbar } from "@/components/topbar";
+import { ABOUT_SECTIONS, FAQS } from "@/lib/content";
+import { homeSchema } from "@/lib/structured-data";
 
 const ROUND_BEATS = [
   {
@@ -49,22 +51,22 @@ const SETTINGS_ROWS = [
 export default function HomePage() {
   return (
     <div className="site">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeSchema()) }}
+      />
       <Topbar />
 
       <main>
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-grid">
             <div className="hero-copy">
-              <h1 id="hero-title">
-                One of you has
-                <br />
-                the wrong word.
-              </h1>
+              <h1 id="hero-title">Who&apos;s the Spy</h1>
               <p className="hero-lede">
-                Who&apos;s the Spy is a social deduction game for 3–12 players.
-                Everyone gets a secret word. The spies get a different one. Give
-                clues, read the room and vote out the player who doesn&apos;t
-                quite belong.
+                One of you has the wrong word. Who&apos;s the Spy is a free
+                online spy game for 3–12 players. Everyone gets a secret word;
+                the spies get a different one. Give clues, read the room and
+                vote out the player who doesn&apos;t quite belong.
               </p>
               <div className="hero-actions">
                 <Link href="/create" className="button button--large">
@@ -386,6 +388,48 @@ export default function HomePage() {
                 the same seat, word and timer when you return.
               </p>
             </div>
+          </div>
+        </section>
+
+        <section className="seo-section" aria-labelledby="about-game-title">
+          <div className="section-head">
+            <h2 id="about-game-title">
+              What is Yaply Who&apos;s the Spy?
+            </h2>
+            <p>
+              A free browser spy game for 3–12 players. One room link, private
+              word cards and a table full of bluffing.
+            </p>
+          </div>
+
+          <div className="seo-copy">
+            {ABOUT_SECTIONS.map((section) => (
+              <article key={section.id}>
+                <h3>{section.title}</h3>
+                {section.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="seo-faq" aria-labelledby="faq-title">
+          <div className="section-head">
+            <h2 id="faq-title">Who&apos;s the Spy FAQ</h2>
+            <p>
+              The short answers for anyone searching for the whos the spy game,
+              whos the spy, spy game or Yaply Who&apos;s the Spy.
+            </p>
+          </div>
+
+          <div className="seo-faq-list">
+            {FAQS.map((faq) => (
+              <details key={faq.question}>
+                <summary>{faq.question}</summary>
+                <p>{faq.answer}</p>
+              </details>
+            ))}
           </div>
         </section>
 

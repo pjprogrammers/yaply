@@ -1235,6 +1235,81 @@ button {
   line-height: 1.5;
 }
 
+/* ── SEO content ────────────────────────────────────────────────────── */
+
+.seo-section {
+  padding: clamp(80px, 10vw, 140px) 0 0;
+}
+
+.seo-copy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 3vw, 36px);
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.seo-copy article {
+  padding: clamp(24px, 4vw, 44px);
+  background: var(--bg-raised);
+}
+
+.seo-copy h3 {
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 2.8vw, 2.6rem);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.025em;
+}
+
+.seo-copy p {
+  max-width: 60ch;
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.seo-faq {
+  padding: clamp(80px, 10vw, 140px) 0;
+}
+
+.seo-faq-list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.seo-faq-list details {
+  padding: 18px clamp(18px, 3vw, 30px);
+  background: var(--bg-raised);
+}
+
+.seo-faq-list summary {
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.seo-faq-list p {
+  max-width: 70ch;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .seo-copy {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Final CTA ──────────────────────────────────────────────────────── */
 
 .final-cta {

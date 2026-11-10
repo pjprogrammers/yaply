@@ -3,11 +3,39 @@ import Link from "next/link";
 import { PlayIcon } from "@/components/icons";
 import { SiteFooter } from "@/components/site-footer";
 import { Topbar } from "@/components/topbar";
+import { GAME_KEYWORDS, GAME_SHORT_DESCRIPTION } from "@/lib/content";
+import { SITE_URL } from "@/lib/config";
+import { howToPlaySchema } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  title: "How to play | Who's the Spy",
+  title: { absolute: "How to play Who's the Spy | Yaply" },
   description:
-    "The complete rules: secret words, clue turns, private voting, revotes, eliminations and the final spy guess.",
+    "Learn how to play Who's the Spy, the free online spy game: secret words, clue turns, private voting, revotes, eliminations and the final spy guess.",
+  keywords: GAME_KEYWORDS,
+  alternates: { canonical: `${SITE_URL}/how-to-play` },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: `${SITE_URL}/how-to-play`,
+    siteName: "Yaply Who's the Spy",
+    title: "How to play Who's the Spy | Rules and voting",
+    description: GAME_SHORT_DESCRIPTION,
+    images: [
+      {
+        url: "/og.png",
+        width: 900,
+        height: 1200,
+        alt: "Who's the Spy — a social deduction party game by Yaply",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How to play Who's the Spy | Rules and voting",
+    description: GAME_SHORT_DESCRIPTION,
+    images: ["/og.png"],
+  },
 };
 
 const CONTENTS = [
@@ -24,11 +52,15 @@ const CONTENTS = [
 export default function HowToPlayPage() {
   return (
     <div className="app-shell">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToPlaySchema()) }}
+      />
       <Topbar />
       <main className="page-shell">
         <div className="page-head">
           <div>
-            <h1>The rules, without the table talk.</h1>
+            <h1>How to play Who&apos;s the Spy.</h1>
             <p>
               Everything the room enforces, in the order it happens. If you have
               played a word-deduction game before, the short version is: everyone

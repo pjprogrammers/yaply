@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
+import { GAME_SHORT_DESCRIPTION } from "@/lib/content";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/?app=whos-the-spy",
     name: "Yaply Who's the Spy",
     short_name: "Who's the Spy",
-    description:
-      "A social deduction party game for 3–12 players. Everyone gets a secret word, but the spies get a different one.",
+    description: GAME_SHORT_DESCRIPTION,
     start_url: "/",
     scope: "/",
     display: "standalone",

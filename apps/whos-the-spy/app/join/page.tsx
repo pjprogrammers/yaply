@@ -53,7 +53,7 @@ function JoinContent() {
       <main className="page-shell">
         <div className="page-head">
           <div>
-            <h1>Join the table.</h1>
+            <h1>Join a Who&apos;s the Spy room.</h1>
             <p>
               Six characters and a name. The host has the code; the room has the
               words.
