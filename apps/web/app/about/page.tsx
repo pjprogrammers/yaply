@@ -1,19 +1,40 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { aboutSchema } from "@/lib/structured-data";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "About",
+  title: { absolute: "About Yaply Games" },
   description:
-    "Yaply is a browser games platform for game night. One link, no installs and a small shelf of multiplayer games built to start fast.",
+    "Yaply (YaplyGames) is a browser games platform for game night. One link, no installs and a small shelf of multiplayer games built to start fast: Chain Reaction, Skribbl, Smash Karts, Hole.io and Who's the Spy.",
+  keywords: [
+    "about yaply",
+    "yaply games",
+    "yaplygames",
+    "yaply game",
+    "yaply browser games",
+    "free browser games",
+    "multiplayer browser games",
+  ],
   alternates: { canonical: "/about" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: `${SITE_URL}/about`,
-    siteName: "Yaply",
-    title: "About Yaply",
+    siteName: "Yaply Games",
+    title: "About Yaply Games",
     description:
       "A browser games platform for game night. One link, no installs and a small shelf of multiplayer games built to start fast.",
     images: [
@@ -25,11 +46,22 @@ export const metadata: Metadata = {
       },
     ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "About Yaply Games",
+    description:
+      "The browser games platform for game night. One link, no installs, five games live.",
+    images: ["/og.png"],
+  },
 };
 
 export default function AboutPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema()) }}
+      />
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -50,9 +82,10 @@ export default function AboutPage() {
               <h2>One link does the introductions.</h2>
               <div className="about-copy">
                 <p>
-                  Yaply exists because game night should start faster. Every
-                  game runs in the browser, so there is no download, no launcher
-                  and no five-minute setup before the first round.
+                  Yaply (also written YaplyGames or Yaply Games) exists because
+                  game night should start faster. Every game runs in the
+                  browser, so there is no download, no launcher and no
+                  five-minute setup before the first round.
                 </p>
                 <p>
                   Chain Reaction, Skribbl, Smash Karts, Hole.io and Who&apos;s the Spy

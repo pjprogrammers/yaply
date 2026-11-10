@@ -27,6 +27,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
       images: [mainImage, ...games.map((game) => absolute(game.poster))],
     },
+    ...games.map((game) => ({
+      url: `${baseUrl}/games/${game.slug}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: game.status === "available" ? 0.9 : 0.5,
+      images: [
+        absolute(game.ogImage?.src ?? game.poster),
+        absolute(game.poster),
+      ],
+    })),
     {
       url: `${baseUrl}/install`,
       lastModified,
@@ -45,15 +55,26 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${baseUrl}/about`,
       lastModified,
       changeFrequency: "monthly",
-      priority: 0.6,
+      priority: 0.7,
       images: [mainImage],
     },
-    ...games.map((game) => ({
-      url: `${baseUrl}/games/${game.slug}`,
+    {
+      url: `${baseUrl}/llms.txt`,
       lastModified,
-      changeFrequency: "monthly" as const,
-      priority: game.status === "available" ? 0.8 : 0.5,
-      images: [absolute(game.ogImage?.src ?? game.poster)],
-    })),
+      changeFrequency: "weekly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/llms-full.txt`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/ai.txt`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
   ];
 }

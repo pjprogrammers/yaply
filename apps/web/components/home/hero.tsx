@@ -56,11 +56,11 @@ export default function Hero() {
         <div className="hero__panel">
           <div className="hero__copy">
             <h1 id="hero-title">
-              <span>Yaply</span> <span>browser games</span>
+              <span>Yaply</span> <span>Games</span>
             </h1>
             <p className="hero__lead">
-              Fast multiplayer browser games for game night, ready to play with
-              one link.
+              Free multiplayer browser games for game night. Pick a game, open
+              a room and send one link — no installs, no account.
             </p>
             <div className="hero__actions">
               <a href="#games" className="button">

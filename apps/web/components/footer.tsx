@@ -60,9 +60,9 @@ export function Footer() {
 
         <div className="site-footer__bottom">
           <p className="site-footer__about">
-            Yaply is a browser games platform for game night. Play Chain
-            Reaction, Skribbl, Smash Karts, Hole.io and Who&apos;s the Spy with
-            friends using one link or room code. Ludo is on the way.
+            Yaply (YaplyGames) is a browser games platform for game night. Play
+            Chain Reaction, Skribbl, Smash Karts, Hole.io and Who&apos;s the Spy
+            with friends using one link or room code. Ludo is on the way.
           </p>
           <p>
             © {new Date().getFullYear()} Yaply ·{" "}

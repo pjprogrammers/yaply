@@ -31,6 +31,11 @@ export function GET() {
       },
       vercelEnv: process.env.VERCEL_ENV ?? null,
     },
-    { headers: { "cache-control": "no-store" } },
+    {
+      headers: {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+      },
+    },
   );
 }

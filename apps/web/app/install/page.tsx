@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { InstallCard, InstallGuide } from "@/components/install/pwa";
+import { installSchema } from "@/lib/structured-data";
 import { SITE_URL } from "@/lib/site";
 import "./install.css";
 
@@ -10,15 +11,52 @@ export const metadata: Metadata = {
   title: "Install Yaply",
   description:
     "Install Yaply on your phone, tablet or desktop. Put every Yaply game one tap away with no app store and no account.",
+  keywords: [
+    "install yaply",
+    "yaply app",
+    "yaply games app",
+    "yaplygames",
+    "browser game app",
+    "install web app",
+    "pwa game",
+    "add to home screen",
+    "play browser games offline",
+  ],
   alternates: { canonical: `${SITE_URL}/install` },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: `${SITE_URL}/install`,
-    siteName: "Yaply",
-    title: "Install Yaply | Yaply",
+    siteName: "Yaply Games",
+    title: "Install Yaply",
     description:
       "Put the whole Yaply games shelf on your home screen. Free, no app store, no account.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Yaply browser games — a fanned deck of game posters on a blue and yellow field",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Install Yaply",
+    description:
+      "Put the whole Yaply games shelf on your home screen. Free, no app store, no account.",
+    images: ["/og.png"],
   },
 };
 
@@ -52,6 +90,10 @@ const BENEFITS = [
 export default function InstallPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(installSchema()) }}
+      />
       <a className="skip-link" href="#main">
         Skip to content
       </a>

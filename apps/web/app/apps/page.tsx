@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { availableGames } from "@/data/games";
+import { appsSchema } from "@/lib/structured-data";
 import { SITE_URL } from "@/lib/site";
 import "./apps.css";
 
@@ -11,15 +12,55 @@ export const metadata: Metadata = {
   title: "Install the Yaply apps",
   description:
     "Install each Yaply browser game as its own app. Yaply, Chain Reaction, Skribbl, Smash Karts, Hole.io and Who's the Spy each get a separate home-screen icon and window.",
+  keywords: [
+    "yaply apps",
+    "install yaply",
+    "yaply games",
+    "yaplygames",
+    "browser game apps",
+    "install web games",
+    "pwa games",
+    "chain reaction app",
+    "skribbl app",
+    "smash karts app",
+    "holeio app",
+    "who is the spy app",
+  ],
   alternates: { canonical: `${SITE_URL}/apps` },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: `${SITE_URL}/apps`,
-    siteName: "Yaply",
-    title: "Install the Yaply apps | Yaply",
+    siteName: "Yaply Games",
+    title: "Install the Yaply apps",
     description:
       "One install per game. Pick the Yaply apps your group actually plays and add them to your home screen.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Yaply browser games — a fanned deck of game posters on a blue and yellow field",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Install the Yaply apps",
+    description:
+      "One install per game. Add Yaply, Chain Reaction, Skribbl, Smash Karts, Hole.io and Who's the Spy to your home screen.",
+    images: ["/og.png"],
   },
 };
 
@@ -88,6 +129,10 @@ const COUNT_WORDS = [
 export default function AppsPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appsSchema()) }}
+      />
       <a className="skip-link" href="#main">
         Skip to content
       </a>

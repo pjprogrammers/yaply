@@ -15,15 +15,22 @@ export function gameMetadata(game: GameEntry): Metadata {
         ? "Play free in your browser on Yaply."
         : "Coming soon to Yaply."
     }`;
-  const keywords = game.keywords ?? [
-    game.name,
-    `play ${game.name}`,
-    `${game.name} online`,
-    `${game.name} game`,
-    "browser game",
-    "free browser game",
-    "play games with friends",
-    "Yaply",
+  const keywords = [
+    ...new Set([
+      ...(game.keywords ?? []),
+      ...(game.aliases ?? []),
+      game.name,
+      `play ${game.name}`,
+      `${game.name} online`,
+      `${game.name} game`,
+      "browser game",
+      "free browser game",
+      "play games with friends",
+      "games to play with friends online",
+      "online party games",
+      "Yaply",
+      "Yaply Games",
+    ]),
   ];
   const image = game.ogImage ?? {
     src: game.poster,
@@ -53,7 +60,7 @@ export function gameMetadata(game: GameEntry): Metadata {
       type: "website",
       locale: "en_US",
       url: `${SITE_URL}/games/${game.slug}`,
-      siteName: "Yaply",
+      siteName: "Yaply Games",
       title: socialTitle,
       description,
       images: [
