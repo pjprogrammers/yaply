@@ -19,8 +19,17 @@ const display = Instrument_Serif({
   display: "swap",
 });
 
+// Search Console verification for the yaplygames.vercel.app property. The env
+// var can override it for other deployments.
+const googleVerification =
+  process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
+  "lrihOhmRTJmkRzSy5Pv3_Fe36k_dGKd23rPrL7ftpv8";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  verification: {
+    google: googleVerification,
+  },
   title: "Who's the Spy — one of you has the wrong word",
   description:
     "A social deduction party game for 3–12 players. Everyone gets a secret word, but the spies get a different one. Give clues, read the room and vote them out.",
