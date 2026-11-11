@@ -9,6 +9,8 @@ type RoomSettingsFieldsProps = {
   isHost: boolean;
   onChange: (patch: Partial<GameSettings>) => void;
   maxPlayersFloor?: number;
+  /** Room type can only change in the lobby; matches are locked to their current visibility. */
+  visibilityLocked?: boolean;
 };
 
 /**
@@ -20,9 +22,37 @@ export function RoomSettingsFields({
   isHost,
   onChange,
   maxPlayersFloor = 0,
+  visibilityLocked = false,
 }: RoomSettingsFieldsProps) {
+  const visibility = settings.visibility ?? "private";
+
   return (
     <div className="settings-list">
+      <div className="setting-row">
+        <span className="setting-label">Room type</span>
+        {isHost && !visibilityLocked ? (
+          <Segmented
+            label="Public or private room"
+            value={visibility}
+            options={[
+              { label: "Private", value: "private" },
+              { label: "Public", value: "public" },
+            ]}
+            onChange={(value) => onChange({ visibility: value })}
+          />
+        ) : (
+          <span
+            className="setting-value"
+            title={
+              visibilityLocked
+                ? "Room type can only be changed in the lobby."
+                : undefined
+            }
+          >
+            {visibility === "public" ? "Public" : "Private"}
+          </span>
+        )}
+      </div>
       <div className="setting-row">
         <span className="setting-label">Language</span>
         {isHost ? (

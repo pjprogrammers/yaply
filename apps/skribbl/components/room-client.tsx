@@ -696,6 +696,7 @@ function ConnectedRoom({
           isHost={isHost}
           onChange={updateSettings}
           maxPlayersFloor={snapshot.players.length}
+          visibilityLocked={!isLobby}
         />
         <p className="modal-note">
           {isHost ? "Changes apply from the next round." : "Only the host can change these settings."}

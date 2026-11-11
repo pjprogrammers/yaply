@@ -65,6 +65,31 @@ describe("GameRoom lifecycle", () => {
     expect(host.last("room.snapshot").snapshot.settings.visibility).toBe("public");
   });
 
+  it("lets the host switch a lobby room between private and public", async () => {
+    const { sockets } = await createAndJoin("skribbl", ["Alice", "Bob"]);
+    expect(sockets[0].last("room.snapshot").snapshot.settings.visibility).toBe("private");
+
+    await sockets[0].message({
+      type: "room.settings.update",
+      settings: { visibility: "public" },
+    });
+    expect(sockets[0].last("room.snapshot").snapshot.settings.visibility).toBe("public");
+    expect(sockets[1].last("room.snapshot").snapshot.settings.visibility).toBe("public");
+
+    await sockets[1].message({
+      type: "room.settings.update",
+      settings: { visibility: "private" },
+    });
+    expect(sockets[1].last("room.error").code).toBe("NOT_HOST");
+    expect(sockets[1].last("room.snapshot").snapshot.settings.visibility).toBe("public");
+
+    await sockets[0].message({
+      type: "room.settings.update",
+      settings: { visibility: "private" },
+    });
+    expect(sockets[0].last("room.snapshot").snapshot.settings.visibility).toBe("private");
+  });
+
   it("joins a second player and broadcasts the updated snapshot", async () => {
     const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     const hostSnapshot = sockets[0].last("room.snapshot").snapshot;
