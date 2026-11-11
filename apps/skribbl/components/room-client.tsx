@@ -9,9 +9,12 @@ import {
   DEFAULT_GAME_SETTINGS,
   isWordLanguage,
   MAX_NICKNAME_LENGTH,
+  SKRIBBL_DEFAULT_MAX_PLAYERS,
+  SKRIBBL_MAX_PLAYERS,
 } from "@yaply/shared/constants";
 import { useCountdown, useGameRoom, useNow } from "@yaply/shared/react";
 import {
+  findOpenRoom,
   inviteUrl,
   numberParam,
   readStoredNickname,
@@ -46,6 +49,20 @@ const FATAL_CODES = new Set([
   "RESUME_FAILED",
   "PROTOCOL_MISMATCH",
 ]);
+
+/** Play should silently move to the next room instead of showing these. */
+const PLAY_RETRY_CODES = new Set(["ROOM_FULL", "ROOM_NOT_FOUND", "ROOM_NOT_RESERVED"]);
+
+function playRoomHref(code: string, name: string, host: boolean): string {
+  const params = new URLSearchParams({
+    name,
+    play: "1",
+    vis: "public",
+    max: String(SKRIBBL_DEFAULT_MAX_PLAYERS),
+  });
+  if (host) params.set("host", "1");
+  return `/room/${code}?${params.toString()}`;
+}
 
 type VirtualKeyboardLike = {
   overlaysContent: boolean;
@@ -119,6 +136,7 @@ export function RoomClient({ code }: { code: string }) {
   }, []);
 
   const isHost = searchParams.get("host") === "1";
+  const playMode = searchParams.get("play") === "1";
   const settings = useMemo<GameSettings>(() => {
     const language = searchParams.get("lang");
     const mode = searchParams.get("mode");
@@ -133,10 +151,16 @@ export function RoomClient({ code }: { code: string }) {
         180,
       ),
       wordCount: numberParam(searchParams.get("words"), DEFAULT_GAME_SETTINGS.wordCount ?? 3, 2, 5),
-      maxPlayers: numberParam(searchParams.get("max"), DEFAULT_GAME_SETTINGS.maxPlayers, 2, 12),
+      maxPlayers: numberParam(
+        searchParams.get("max"),
+        SKRIBBL_DEFAULT_MAX_PLAYERS,
+        2,
+        SKRIBBL_MAX_PLAYERS,
+      ),
       language: isWordLanguage(language) ? language : DEFAULT_GAME_SETTINGS.language,
       skribblMode: mode === "dark" ? "dark" : "light",
       skribblTheme: theme === "classic" ? "classic" : "paper",
+      visibility: searchParams.get("vis") === "public" ? "public" : "private",
     };
   }, [searchParams]);
 
@@ -182,18 +206,28 @@ export function RoomClient({ code }: { code: string }) {
     );
   }
 
-  return <ConnectedRoom code={code} nickname={gateName} isHost={isHost} initialSettings={settings} />;
+  return (
+    <ConnectedRoom
+      code={code}
+      nickname={gateName}
+      isHost={isHost}
+      playMode={playMode}
+      initialSettings={settings}
+    />
+  );
 }
 
 function ConnectedRoom({
   code,
   nickname,
   isHost: createdByHost,
+  playMode,
   initialSettings,
 }: {
   code: string;
   nickname: string;
   isHost: boolean;
+  playMode: boolean;
   initialSettings: GameSettings;
 }) {
   const router = useRouter();
@@ -206,6 +240,8 @@ function ConnectedRoom({
   const [toast, setToast] = useState<Toast | null>(null);
   const [copied, setCopied] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playRetryFailed, setPlayRetryFailed] = useState(false);
+  const playRetryRef = useRef(false);
   const [color, setColor] = useState(DRAW_COLORS[0]);
   // A reaction belongs to one drawing turn. Tracking the turn key instead of a
   // plain boolean lets the buttons come back automatically on the next turn.
@@ -407,6 +443,26 @@ function ConnectedRoom({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const retryablePlayError =
+    playMode && fatal !== null && PLAY_RETRY_CODES.has(fatal.code);
+
+  useEffect(() => {
+    if (!retryablePlayError || playRetryRef.current) return;
+    playRetryRef.current = true;
+    let cancelled = false;
+    findOpenRoom()
+      .then((room) => {
+        if (cancelled) return;
+        router.replace(playRoomHref(room.code, nickname, room.host));
+      })
+      .catch(() => {
+        if (!cancelled) setPlayRetryFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nickname, retryablePlayError, router]);
+
   useEffect(() => {
     if (!settingsOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -526,6 +582,29 @@ function ConnectedRoom({
   const winner = rankings.find((entry) => entry.playerId === winnerId);
   const letterCount = (snapshot?.maskedWord ?? "").replace(/\s/g, "").length;
 
+  if (!snapshot && retryablePlayError && !playRetryFailed) {
+    return (
+      <div className="app-shell">
+        <Topbar compact />
+        <main className="join-gate">
+          <div className="loading-card">
+            <span className="dot-pulse" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            {(fatal?.code === "ROOM_FULL"
+              ? "That room just filled up. "
+              : "That room just closed. ") + "Finding the next open room…"}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const playRetryExhausted =
+    playMode && retryablePlayError && playRetryFailed;
+
   if (!snapshot && (fatal || status === "failed")) {
     return (
       <div className="app-shell">
@@ -533,11 +612,11 @@ function ConnectedRoom({
         <main className="join-gate">
           <div className="error-card">
             <p className="eyebrow">Room {code.toUpperCase()}</p>
-            <h1>Could not open this room</h1>
+            <h1>{playRetryExhausted ? "No open room found" : "Could not open this room"}</h1>
             <p>{fatal?.message ?? "The realtime server could not be reached. Check the connection and try again."}</p>
             <div className="error-actions">
-              <Link href="/" className="btn btn--primary">
-                Back to home
+              <Link href={playRetryExhausted ? "/play" : "/"} className="btn btn--primary">
+                {playRetryExhausted ? "Try Play again" : "Back to home"}
               </Link>
               <button className="btn btn--ghost" type="button" onClick={() => window.location.reload()}>
                 Try again
@@ -569,7 +648,7 @@ function ConnectedRoom({
 
   const isLobby = phase === "lobby";
   const emptySlots = isLobby
-    ? Math.max(0, Math.min(12, roomSettings.maxPlayers) - snapshot.players.length)
+    ? Math.max(0, Math.min(SKRIBBL_MAX_PLAYERS, roomSettings.maxPlayers) - snapshot.players.length)
     : 0;
 
   const connectionBanner =

@@ -20,6 +20,51 @@ describe("GameRoom lifecycle", () => {
     expect(harness.state.storage.map.has("room")).toBe(true);
   });
 
+  it("reports live capacity to public matchmaking", async () => {
+    const created = await createAndJoin("skribbl", ["Alice"]);
+    const open = await created.harness.room.fetch(
+      new Request("https://room.internal/internal/open-status"),
+    );
+    const body = (await open.json()) as any;
+    expect(body).toMatchObject({
+      joinable: true,
+      players: 1,
+      maxPlayers: 8,
+      // Creating the room consumes its reservation; it is now a live room.
+      reserved: false,
+    });
+
+    const full = await createAndJoin(
+      "skribbl",
+      Array.from({ length: 8 }, (_, index) => `Player ${index + 1}`),
+      "full01",
+    );
+    const fullResponse = await full.harness.room.fetch(
+      new Request("https://room.internal/internal/open-status"),
+    );
+    const fullBody = (await fullResponse.json()) as any;
+    expect(fullBody.joinable).toBe(false);
+    expect(fullBody.players).toBe(8);
+  });
+
+  it("defaults rooms to private and keeps an explicit public flag", async () => {
+    const privateRoom = await createAndJoin("skribbl", ["Alice"]);
+    expect(privateRoom.sockets[0].last("room.snapshot").snapshot.settings.visibility).toBe(
+      "private",
+    );
+
+    const harness = await makeRoom("skribbl", "pub001");
+    const host = harness.connect();
+    await host.message({
+      type: "room.create",
+      protocolVersion: 1,
+      game: "skribbl",
+      nickname: "Alice",
+      settings: { visibility: "public", maxPlayers: 8 },
+    });
+    expect(host.last("room.snapshot").snapshot.settings.visibility).toBe("public");
+  });
+
   it("joins a second player and broadcasts the updated snapshot", async () => {
     const { sockets, playerIds } = await createAndJoin("skribbl", ["Alice", "Bob"]);
     const hostSnapshot = sockets[0].last("room.snapshot").snapshot;

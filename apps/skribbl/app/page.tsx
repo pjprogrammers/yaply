@@ -68,16 +68,17 @@ export default function Home() {
                   Guess fast.
                 </h1>
                 <p className="landing-lede">
-                  A private room, a blank sheet and a word nobody can draw. One player sketches,
-                  everyone else guesses in chat — the earlier the guess, the more it scores.
+                  Draw with friends in a private room, or hit Play and jump into the open public
+                  match. One player sketches, everyone else guesses — the earlier the guess, the
+                  more it scores.
                 </p>
                 <div className="landing-actions">
-                  <Link href="/create" className="landing-button landing-button--lg">
+                  <Link href="/play" className="landing-button landing-button--lg">
                     <PlayIcon size={15} />
-                    Create a room
+                    Play now
                   </Link>
-                  <Link href="/join" className="landing-button landing-button--ghost landing-button--lg">
-                    Join with a code
+                  <Link href="/create" className="landing-button landing-button--ghost landing-button--lg">
+                    Create a room
                     <ArrowRightIcon size={15} />
                   </Link>
                 </div>
@@ -247,8 +248,8 @@ export default function Home() {
                   Your rules.
                 </h2>
                 <p className="landing-lede">
-                  Every room is private. Share a six-letter code or send the link; friends join in a
-                  click. The host sets the pace before the first word and again before a rematch.
+                  Open a private room and share the code, or create a public one that Play can fill.
+                  The host sets the pace before the first word and again before a rematch.
                 </p>
               </Reveal>
 
@@ -378,12 +379,12 @@ export default function Home() {
                   one click away.
                 </p>
                 <div className="landing-actions">
-                  <Link href="/create" className="landing-button landing-button--lg">
+                  <Link href="/play" className="landing-button landing-button--lg">
                     <PlayIcon size={15} />
-                    Create a room
+                    Play now
                   </Link>
-                  <Link href="/join" className="landing-button landing-button--ghost landing-button--lg">
-                    Join with a code
+                  <Link href="/create" className="landing-button landing-button--ghost landing-button--lg">
+                    Create a room
                     <ArrowRightIcon size={15} />
                   </Link>
                 </div>

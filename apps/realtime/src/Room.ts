@@ -65,6 +65,7 @@ import {
   SPY_REVOTE_SECONDS,
   SPY_ROLE_REVEAL_MS,
   SPY_VOTING_SECONDS,
+  SKRIBBL_MAX_PLAYERS,
   isSpyCategoryId,
   isSpyClueFormat,
   isSpyDifficulty,
@@ -237,7 +238,7 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
           ? 8
           : game === "whos-the-spy"
             ? SPY_MAX_PLAYERS
-            : 12;
+            : SKRIBBL_MAX_PLAYERS;
   const defaultMax =
     game === "smashkarts"
       ? SMASH_MAX_PLAYERS
@@ -278,6 +279,8 @@ function sanitizeSettings(input: Partial<GameSettings> | undefined, game: GameKi
     ),
     skribblMode: input?.skribblMode === "dark" ? "dark" : "light",
     skribblTheme: input?.skribblTheme === "classic" ? "classic" : "paper",
+    visibility:
+      game === "skribbl" && input?.visibility === "public" ? "public" : "private",
     playerCount,
     boardSize: isChainBoardSize(input?.boardSize)
       ? input.boardSize
@@ -478,6 +481,41 @@ export class GameRoom {
     return true;
   }
 
+  /**
+   * Best-effort notification to the singleton Play directory. It must never
+   * block or fail a room operation: the directory re-checks live room status
+   * before handing a room out, so a missed release only delays cleanup.
+   */
+  private notifyDirectory(path: "/internal/claim" | "/internal/release"): void {
+    const directory = this.env?.ROOM_DIRECTORY;
+    if (!directory || this.room.game !== "skribbl" || !this.room.code) return;
+    const game = this.room.game;
+    const code = this.room.code;
+    const task = (async () => {
+      const stub = directory.get(directory.idFromName(game));
+      await stub.fetch(`https://directory.internal${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ game, code }),
+      });
+    })().catch(() => {
+      // Matchmaking degrades to a fresh room if the directory is unavailable.
+    });
+    try {
+      this.ctx.waitUntil(task);
+    } catch {
+      void task;
+    }
+  }
+
+  private claimOpenRoom(): void {
+    this.notifyDirectory("/internal/claim");
+  }
+
+  private releaseOpenRoom(): void {
+    this.notifyDirectory("/internal/release");
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -563,6 +601,31 @@ export class GameRoom {
         status: 201,
         headers: { "content-type": "application/json", "cache-control": "no-store" },
       });
+    }
+
+    if (url.pathname === "/internal/open-status") {
+      const now = Date.now();
+      const reserved = this.activeReservation(now) !== null;
+      const players = this.room.players.length;
+      const seats = players + this.room.departedPlayers.length;
+      // A reserved but not-yet-created room is still the open room: whoever
+      // arrives first creates it. A created room accepts Play while it has a
+      // free seat, even after the match has started (late join is supported).
+      const joinable =
+        players === 0 ? reserved : seats < this.room.settings.maxPlayers;
+      return new Response(
+        JSON.stringify({
+          joinable,
+          players,
+          seats,
+          maxPlayers: this.room.settings.maxPlayers,
+          reserved,
+          phase: this.room.phase,
+        }),
+        {
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        },
+      );
     }
 
     const parts = url.pathname.split("/").filter(Boolean);
@@ -1254,6 +1317,9 @@ export class GameRoom {
     this.room.players.push(player);
     this.room.hostId = player.id;
     this.room.roundOrder = [player.id];
+    if (this.room.game === "skribbl" && this.room.settings.visibility === "public") {
+      this.claimOpenRoom();
+    }
 
     this.attachSocket(ws, player);
     this.sendWelcome(ws, player);
@@ -1619,6 +1685,7 @@ export class GameRoom {
     if (this.room.phase !== "lobby") return;
 
     const previousLanguage = this.room.settings.language;
+    const previousVisibility = this.room.settings.visibility;
     this.room.settings = sanitizeSettings({ ...this.room.settings, ...settings }, this.room.game);
     if (this.room.settings.language !== previousLanguage) {
       // The bag belongs to the previous language; starting a fresh cycle keeps
@@ -1627,6 +1694,13 @@ export class GameRoom {
     }
     this.room.settings.maxPlayers = Math.max(this.room.settings.maxPlayers, this.room.players.length);
     this.room.settings.playerCount = this.room.settings.maxPlayers;
+    if (
+      this.room.game === "skribbl" &&
+      this.room.settings.visibility !== previousVisibility
+    ) {
+      if (this.room.settings.visibility === "public") this.claimOpenRoom();
+      else this.releaseOpenRoom();
+    }
     if (this.room.game === "chain") this.applyPaletteToPlayers();
     this.broadcastSnapshot();
     await this.commit();
@@ -3621,6 +3695,8 @@ export class GameRoom {
       // reallocated before the empty-room TTL alarm fires. The room itself is
       // lobby-empty, so a fresh player can still create it after expiry.
       this.voiceParticipants.clear();
+      // The open Play room is gone as soon as its last player leaves.
+      this.releaseOpenRoom();
       const previous = this.room;
       this.room = {
         ...createEmptyState(previous.code, previous.game),
@@ -3948,6 +4024,7 @@ export class GameRoom {
       !this.activeReservation(now) &&
       now - this.room.lastActivity >= EMPTY_ROOM_TTL_MS
     ) {
+      this.releaseOpenRoom();
       this.room = createEmptyState(this.room.code, this.room.game);
       await this.ctx.storage.delete("room");
       await this.ctx.storage.deleteAlarm();
@@ -3960,6 +4037,7 @@ export class GameRoom {
       this.room.players.length > 0 &&
       now - this.room.lastActivity > ROOM_INACTIVITY_EXPIRY_MS
     ) {
+      this.releaseOpenRoom();
       this.room = createEmptyState(this.room.code, this.room.game);
       await this.ctx.storage.delete("room");
       await this.ctx.storage.deleteAlarm();

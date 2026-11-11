@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isWordLanguage, MAX_NICKNAME_LENGTH, WORD_LANGUAGES } from "@yaply/shared/constants";
-import type { SkribblMode, SkribblTheme, WordLanguage } from "@yaply/shared/types";
+import type { RoomVisibility, SkribblMode, SkribblTheme, WordLanguage } from "@yaply/shared/types";
 import { ArrowLeftIcon, PlayIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
 import { Topbar } from "@/components/topbar";
@@ -23,6 +23,7 @@ function CreateContent() {
   const [drawTime, setDrawTime] = useState(80);
   const [words, setWords] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(8);
+  const [visibility, setVisibility] = useState<RoomVisibility>("private");
   const [mode, setMode] = useState<SkribblMode>("light");
   const [roomTheme, setRoomTheme] = useState<SkribblTheme>("paper");
   const [creating, setCreating] = useState(false);
@@ -50,6 +51,7 @@ function CreateContent() {
         words: String(words),
         max: String(maxPlayers),
         lang: language,
+        vis: visibility,
         mode,
         theme: roomTheme,
       });
@@ -73,8 +75,8 @@ function CreateContent() {
             <p className="eyebrow">Skribbl</p>
             <h1 className="home-title">Create a room</h1>
             <p className="subline">
-              Pick the pace, then share the six-character code. Everyone else joins from the home
-              screen.
+              Pick the pace, then share the six-character code. Private rooms stay code-only;
+              public rooms can also be found from Play.
             </p>
           </div>
           <Link href="/" className="btn btn--ghost btn--sm">
@@ -99,6 +101,18 @@ function CreateContent() {
               </label>
 
               <div className="settings-list">
+                <div className="setting-row">
+                  <span className="setting-label">Room type</span>
+                  <Segmented
+                    label="Public or private room"
+                    value={visibility}
+                    options={[
+                      { label: "Private", value: "private" },
+                      { label: "Public", value: "public" },
+                    ]}
+                    onChange={setVisibility}
+                  />
+                </div>
                 <div className="setting-row">
                   <span className="setting-label">Language</span>
                   <Segmented

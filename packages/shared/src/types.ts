@@ -12,6 +12,12 @@ export type WordLanguage = "en" | "tl" | "ja" | "ko";
 export type SkribblMode = "light" | "dark";
 export type SkribblTheme = "paper" | "classic";
 
+/**
+ * Whether a room can be found by public matchmaking. Rooms default to private;
+ * only public Skribbl rooms are ever handed out by the Play button.
+ */
+export type RoomVisibility = "public" | "private";
+
 export type ChainBoardSize = "small" | "medium" | "large" | "xxl";
 export type ChainPaletteId = "classic" | "vivid" | "pastel" | "neon" | "mono" | "custom";
 export type ChainTheme = "dark" | "light" | "neon";
@@ -150,6 +156,8 @@ export type GameSettings = {
   skribblMode?: SkribblMode;
   /** Paper is the Yaply look; Classic mirrors the layout.html skribbl theme. */
   skribblTheme?: SkribblTheme;
+  /** Public rooms are discoverable through Play; private rooms are code-only. */
+  visibility?: RoomVisibility;
   /** Desired seats for a local game. Online rooms use it as the capacity. */
   playerCount?: number;
   boardSize?: ChainBoardSize;

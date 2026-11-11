@@ -35,8 +35,13 @@ export function isWordLanguage(value: unknown): value is WordLanguage {
   return typeof value === "string" && WORD_LANGUAGE_IDS.includes(value as WordLanguage);
 }
 
+/** Skribbl's seat ceiling, including public rooms the owner has expanded. */
+export const SKRIBBL_MAX_PLAYERS = 12;
+/** Public Play rooms start at eight seats and the owner may raise them to 12. */
+export const SKRIBBL_DEFAULT_MAX_PLAYERS = 8;
+
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
-  maxPlayers: 8,
+  maxPlayers: SKRIBBL_DEFAULT_MAX_PLAYERS,
   rounds: 3,
   drawingTimeSeconds: 80,
   language: "en",
@@ -45,6 +50,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   turnTimeSeconds: 45,
   skribblMode: "light",
   skribblTheme: "paper",
+  visibility: "private",
   playerCount: 4,
   boardSize: "medium",
   palette: "classic",

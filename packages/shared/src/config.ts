@@ -179,6 +179,91 @@ export async function requestRoomCode(
   throw error;
 }
 
+export type OpenRoomResponse = {
+  code: string;
+  game: GameKind;
+  /** The caller should open the room as its creator. */
+  host: boolean;
+  /** A brand-new room was reserved for this request. */
+  created: boolean;
+};
+
+/**
+ * Asks the Worker for the single public Play room. The Worker hands out the
+ * current open room while it has free seats and atomically reserves a new one
+ * when it is full or empty, so concurrent Play clicks cannot open two rooms.
+ */
+export async function requestOpenRoom(
+  baseUrl: string,
+  game: GameKind,
+  options: RequestRoomCodeOptions | typeof fetch = {},
+): Promise<OpenRoomResponse> {
+  const opts: RequestRoomCodeOptions =
+    typeof options === "function" ? { fetchImpl: options } : options;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl = opts.sleepImpl ?? defaultSleep;
+  const attempts = Math.max(1, opts.attempts ?? 3);
+  const retryDelayMs = Math.max(0, opts.retryDelayMs ?? 250);
+
+  const origin = realtimeHttpOrigin(baseUrl);
+  if (!origin) throw new Error("The realtime server URL is not configured.");
+
+  let lastMessage = "Could not find a room right now.";
+  let lastRetryable = false;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchImpl(`${origin}/matchmake`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ game }),
+        cache: "no-store",
+        credentials: "omit",
+      });
+    } catch {
+      lastMessage = "The realtime server could not be reached.";
+      lastRetryable = true;
+      if (attempt + 1 < attempts) await sleepImpl(retryDelayMs * (attempt + 1));
+      continue;
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          code?: unknown;
+          game?: unknown;
+          host?: unknown;
+          created?: unknown;
+          error?: unknown;
+        }
+      | null;
+
+    if (
+      response.ok &&
+      typeof payload?.code === "string" &&
+      payload.game === game &&
+      typeof payload.host === "boolean"
+    ) {
+      return {
+        code: payload.code,
+        game,
+        host: payload.host,
+        created: payload.created === true,
+      };
+    }
+
+    lastMessage =
+      typeof payload?.error === "string" ? payload.error : "Could not find a room right now.";
+    lastRetryable = RETRYABLE_ROOM_STATUS.has(response.status);
+    if (!lastRetryable) break;
+    if (attempt + 1 < attempts) await sleepImpl(retryDelayMs * (attempt + 1));
+  }
+
+  const error = new Error(lastMessage);
+  (error as Error & { retryable?: boolean }).retryable = lastRetryable;
+  throw error;
+}
+
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
 /** Browser-side fallback used only if the Worker's room endpoint is unavailable. */

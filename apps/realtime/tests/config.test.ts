@@ -5,6 +5,7 @@ import {
   normalizeHttpUrl,
   normalizeRealtimeBaseUrl,
   realtimeHttpOrigin,
+  requestOpenRoom,
   requestRoomCode,
   resolveRealtimeBaseUrl,
 } from "@yaply/shared/config";
@@ -225,6 +226,97 @@ describe("requestRoomCode", () => {
   });
 });
 
+describe("requestOpenRoom", () => {
+  it("returns the current public room from matchmaking", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ code: "open01", game: "skribbl", host: false, created: false }, 200),
+    );
+
+    await expect(
+      requestOpenRoom("wss://rt.example.com/room", "skribbl", { fetchImpl: fetchMock }),
+    ).resolves.toEqual({
+      code: "open01",
+      game: "skribbl",
+      host: false,
+      created: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://rt.example.com/matchmake");
+    expect(init).toMatchObject({
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+    });
+    expect(JSON.parse(String(init.body))).toEqual({ game: "skribbl" });
+  });
+
+  it("marks the first arrival as the room creator", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ code: "open02", game: "skribbl", host: true, created: true }, 201),
+    );
+
+    await expect(
+      requestOpenRoom("https://rt.example.com", "skribbl", { fetchImpl: fetchMock }),
+    ).resolves.toMatchObject({ host: true, created: true });
+  });
+
+  it("retries transient failures before giving up", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: "busy" }, 503))
+      .mockResolvedValueOnce(
+        jsonResponse({ code: "open03", game: "skribbl", host: false, created: false }, 200),
+      );
+    const sleepImpl = vi.fn(async () => {});
+
+    await expect(
+      requestOpenRoom("https://rt.example.com", "skribbl", {
+        fetchImpl: fetchMock,
+        sleepImpl,
+        retryDelayMs: 1,
+      }),
+    ).resolves.toMatchObject({ code: "open03" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleepImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a non-retryable matchmaking error", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ error: "Origin is not allowed." }, 403));
+
+    await expect(
+      requestOpenRoom("https://rt.example.com", "skribbl", {
+        fetchImpl: fetchMock,
+        sleepImpl: async () => {},
+      }),
+    ).rejects.toThrow("Origin is not allowed.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a room issued for a different game", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ code: "open04", game: "chain", host: false, created: false }, 200),
+    );
+
+    await expect(
+      requestOpenRoom("https://rt.example.com", "skribbl", {
+        fetchImpl: fetchMock,
+        sleepImpl: async () => {},
+        attempts: 1,
+      }),
+    ).rejects.toThrow("Could not find a room right now.");
+  });
+
+  it("fails fast when the realtime URL is missing", async () => {
+    const fetchMock = vi.fn();
+    await expect(
+      requestOpenRoom("", "skribbl", { fetchImpl: fetchMock }),
+    ).rejects.toThrow("not configured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("Worker production configuration", () => {
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   const productionBlock = toml.slice(toml.indexOf("[env.production.vars]"));
@@ -258,5 +350,10 @@ describe("Worker production configuration", () => {
   it("binds the GameRoom Durable Object for production", () => {
     expect(productionBlock).toContain('name = "GAME_ROOMS"');
     expect(productionBlock).toContain('new_sqlite_classes = ["GameRoom"]');
+  });
+
+  it("binds the Play room directory for production", () => {
+    expect(productionBlock).toContain('name = "ROOM_DIRECTORY"');
+    expect(productionBlock).toContain('new_sqlite_classes = ["RoomDirectory"]');
   });
 });

@@ -56,6 +56,35 @@ describe("skribbl room config", () => {
     await expect(config.createRoomCode()).rejects.toThrow("Room creation is disabled.");
   });
 
+  it("asks the Worker for the open public Play room", async () => {
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://rt.example.com/room");
+    vi.resetModules();
+
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ code: "open01", game: "skribbl", host: true, created: true }),
+        {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config = await import("./config");
+    await expect(config.findOpenRoom()).resolves.toEqual({
+      code: "open01",
+      game: "skribbl",
+      host: true,
+      created: true,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://rt.example.com/matchmake");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ game: "skribbl" });
+  });
+
   it("normalises user-entered room codes", () => {
     expect(cleanRoomCode(" AB-C 12! ")).toBe("abc12");
     expect(cleanRoomCode("ABCDEFGHIJ")).toBe("abcdef");

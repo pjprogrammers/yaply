@@ -40,8 +40,11 @@ export function LandingNav() {
           <Link href="/join" className="landing-nav-join">
             Join a room
           </Link>
-          <Link href="/create" className="landing-button landing-nav-create">
+          <Link href="/create" className="landing-button landing-button--ghost landing-nav-create">
             Create a room
+          </Link>
+          <Link href="/play" className="landing-button">
+            Play now
           </Link>
           <button
             type="button"
@@ -74,8 +77,11 @@ export function LandingNav() {
           <Link href="/join" className="landing-button landing-button--ghost">
             Join a room
           </Link>
-          <Link href="/create" className="landing-button">
+          <Link href="/create" className="landing-button landing-button--ghost">
             Create a room
+          </Link>
+          <Link href="/play" className="landing-button">
+            Play now
           </Link>
         </div>
       </div>

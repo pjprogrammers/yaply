@@ -1,4 +1,5 @@
 import { GameRoom } from "./Room";
+import { RoomDirectory } from "./RoomDirectory";
 import {
   PROTOCOL_VERSION,
   ROOM_CODE_ALPHABET,
@@ -8,10 +9,11 @@ import {
 import { GameKindSchema } from "@yaply/shared/schemas";
 import type { GameKind } from "@yaply/shared/types";
 
-export { GameRoom };
+export { GameRoom, RoomDirectory };
 
 type Env = {
   GAME_ROOMS: DurableObjectNamespace;
+  ROOM_DIRECTORY: DurableObjectNamespace;
   ENVIRONMENT?: string;
   ALLOWED_ORIGINS?: string;
   APP_ORIGIN?: string;
@@ -199,6 +201,7 @@ export default {
             health: "/health",
             version: "/version",
             createRoom: "POST /rooms",
+            matchmake: "POST /matchmake",
             roomSocket:
               "GET /room/:code?game=skribbl|chain|smashkarts|holeio|whos-the-spy (WebSocket)",
           },
@@ -229,6 +232,7 @@ export default {
             reservedRoomCodes: true,
             reconnectTokens: true,
             durableObjectAlarms: true,
+            publicMatchmaking: true,
           },
         },
         200,
@@ -316,6 +320,83 @@ export default {
         503,
         { ...corsHeaders(request, env), "retry-after": "1" },
       );
+    }
+
+    if (url.pathname === "/matchmake") {
+      if (request.method !== "POST") {
+        return json({ error: "Method not allowed." }, 405, corsHeaders(request, env));
+      }
+      if (!originAllowed(request, env)) {
+        log("warn", "room.matchmake.origin_rejected", {
+          origin: request.headers.get("Origin") ?? null,
+        });
+        return json({ error: "Origin is not allowed." }, 403, corsHeaders(request, env));
+      }
+      if (!allowRoomCreation(request)) {
+        return json(
+          { error: "Too many rooms opened. Try again in a minute." },
+          429,
+          { ...corsHeaders(request, env), "retry-after": "60" },
+        );
+      }
+
+      const declaredLength = Number(request.headers.get("content-length"));
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_ROOM_CREATE_BODY_BYTES) {
+        return json({ error: "That request is too large." }, 413, corsHeaders(request, env));
+      }
+
+      let raw: string;
+      try {
+        raw = await request.text();
+      } catch {
+        return json({ error: "Expected a JSON body." }, 400, corsHeaders(request, env));
+      }
+      if (new TextEncoder().encode(raw).byteLength > MAX_ROOM_CREATE_BODY_BYTES) {
+        return json({ error: "That request is too large." }, 413, corsHeaders(request, env));
+      }
+
+      let body: unknown;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        return json({ error: "Expected a JSON body." }, 400, corsHeaders(request, env));
+      }
+
+      const gameResult = GameKindSchema.safeParse(
+        typeof body === "object" && body !== null ? (body as { game?: unknown }).game : undefined,
+      );
+      if (!gameResult.success) {
+        return json({ error: "Choose a valid game." }, 400, corsHeaders(request, env));
+      }
+
+      try {
+        const id = env.ROOM_DIRECTORY.idFromName(gameResult.data);
+        const stub = env.ROOM_DIRECTORY.get(id);
+        const result = await stub.fetch("https://directory.internal/internal/matchmake", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ game: gameResult.data }),
+        });
+        const text = await result.text();
+        const headers: Record<string, string> = {
+          ...corsHeaders(request, env),
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        };
+        const retryAfter = result.headers.get("retry-after");
+        if (retryAfter) headers["retry-after"] = retryAfter;
+        return new Response(text, { status: result.status, headers });
+      } catch (error) {
+        log("error", "room.matchmake.do_failed", {
+          game: gameResult.data,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+        return json(
+          { error: "Could not find a room right now. Try again." },
+          503,
+          { ...corsHeaders(request, env), "retry-after": "1" },
+        );
+      }
     }
 
     if (url.pathname.startsWith("/room/")) {

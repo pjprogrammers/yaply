@@ -26,6 +26,24 @@ function makeEnv(overrides: Record<string, unknown> = {}) {
         },
       }),
     },
+    ROOM_DIRECTORY: {
+      idFromName: (name: string) => name,
+      get: (name: string) => ({
+        fetch: async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body ?? "{}"));
+          return new Response(
+            JSON.stringify({
+              code: "open01",
+              game: body.game,
+              host: true,
+              created: true,
+              directory: name,
+            }),
+            { status: 201, headers: { "content-type": "application/json" } },
+          );
+        },
+      }),
+    },
     ...overrides,
   };
   return { env: env as any, names };
@@ -170,6 +188,95 @@ describe("Worker routing", () => {
       env,
     );
     expect(response.status).toBe(400);
+  });
+
+  it("hands Play matchmaking to the game directory", async () => {
+    const { env } = makeEnv();
+    const calls: { name: string; path: string; body: any }[] = [];
+    env.ROOM_DIRECTORY.get = (name: string) => ({
+      fetch: async (url: string, init?: RequestInit) => {
+        calls.push({
+          name,
+          path: new URL(url).pathname,
+          body: JSON.parse(String(init?.body ?? "{}")),
+        });
+        return new Response(
+          JSON.stringify({
+            code: "join01",
+            game: "skribbl",
+            host: false,
+            created: false,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+
+    const response = await worker.fetch(
+      request("/matchmake", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "http://localhost:3000",
+          "cf-connecting-ip": "10.0.0.50",
+        },
+        body: JSON.stringify({ game: "skribbl" }),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body).toEqual({
+      code: "join01",
+      game: "skribbl",
+      host: false,
+      created: false,
+    });
+    expect(calls).toEqual([
+      { name: "skribbl", path: "/internal/matchmake", body: { game: "skribbl" } },
+    ]);
+  });
+
+  it("rejects an invalid game when matching a Play room", async () => {
+    const { env } = makeEnv();
+    const response = await worker.fetch(
+      request("/matchmake", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "http://localhost:3000",
+          "cf-connecting-ip": "10.0.0.51",
+        },
+        body: JSON.stringify({ game: "ludo" }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns a retryable 503 when the directory is unavailable", async () => {
+    const { env } = makeEnv();
+    env.ROOM_DIRECTORY.get = () => ({
+      fetch: async () => {
+        throw new Error("directory unavailable");
+      },
+    });
+
+    const response = await worker.fetch(
+      request("/matchmake", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "http://localhost:3000",
+          "cf-connecting-ip": "10.0.0.52",
+        },
+        body: JSON.stringify({ game: "skribbl" }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("1");
   });
 
   it("rate limits room-code creation per client", async () => {

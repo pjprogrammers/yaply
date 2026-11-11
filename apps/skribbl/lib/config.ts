@@ -1,5 +1,6 @@
 import {
   normalizeHttpUrl,
+  requestOpenRoom,
   requestRoomCode,
   resolveRealtimeBaseUrl,
 } from "@yaply/shared/config";
@@ -38,6 +39,14 @@ export const NICKNAME_KEY = "yaply:nickname";
 export async function createRoomCode(): Promise<string> {
   const { code } = await requestRoomCode(REALTIME_URL, "skribbl");
   return code;
+}
+
+/**
+ * Matchmaking for the Play button. The Worker returns the current open public
+ * room, or reserves the next one when it is full or empty.
+ */
+export async function findOpenRoom() {
+  return requestOpenRoom(REALTIME_URL, "skribbl");
 }
 
 export function cleanRoomCode(value: string): string {
